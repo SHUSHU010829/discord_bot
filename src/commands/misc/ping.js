@@ -7,7 +7,7 @@ module.exports = {
     .setDMPermission(false)
     .toJSON(),
 
-    userPermissions: [PermissionFlagsBits.ManageMessages],
+    userPermissions: [PermissionFlagsBits.Administrator],
     botPermissions: [PermissionFlagsBits.Connect],
 
     run: async (client, interaction) => {

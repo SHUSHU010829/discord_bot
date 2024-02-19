@@ -17,12 +17,7 @@ module.exports = {
         .setName("問題")
         .setDescription("輸入你想問的問題")
         .setRequired(true)
-    )
-    .setDMPermission(false)
-    .toJSON(),
-
-  userPermissions: [PermissionFlagsBits.ManageMessages],
-  botPermissions: [PermissionFlagsBits.Connect],
+    ),
 
   run: async (client, interaction) => {
     const { options } = interaction;
