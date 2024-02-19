@@ -10,5 +10,7 @@
   "commandPremiumOnly": "This command can only be executed by premium users!",
 
   "userNoPermissions": "You do not have enough permissions to executed this command.",
-  "botNoPermissions": "I do not have enough permissions to execute this command."
+  "botNoPermissions": "I do not have enough permissions to execute this command.",
+
+  "footerText": "from 2023."
 }
