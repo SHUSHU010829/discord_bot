@@ -1,3 +1,5 @@
+require("colors");
+
 const { join } = require("path");
 const getAllFiles = require("../utils/getAllFiles");
 
@@ -18,10 +20,11 @@ module.exports = (client) => {
         if (typeof eventFunction === "function") {
           await eventFunction(client, arg);
         } else {
-          console.error(`File ${eventFile} does not export a function`);
+          console.log(
+            `[ERROR] File ${eventFile} does not export a function`.red
+          );
         }
       }
-
     });
   }
 };
