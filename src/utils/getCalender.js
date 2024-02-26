@@ -2,7 +2,7 @@ require("colors");
 
 // const { DateTime } = require("luxon");
 // const axios = require("axios");
-const calendarData = require("../data/calendarData.json");
+const calendarData = require("../data/calendar.json");
 
 module.exports = async () => {
   // const nowYear = DateTime.now().setZone("Asia/Taipei").year;
