@@ -1,7 +1,7 @@
 require("colors");
 
 const { DateTime } = require("luxon");
-const calendarData = require("../data/calendar.json");
+const calenderData = require("../data/calender.json");
 const { normalChannelId } = require("../config.json");
 
 module.exports = async (client) => {
@@ -15,8 +15,8 @@ module.exports = async (client) => {
     const randomFortune =
       fortuneList[Math.floor(Math.random() * fortuneList.length)];
 
-    if (calendarData) {
-      const matchingData = calendarData.find(
+    if (calenderData) {
+      const matchingData = calenderData.find(
         (data) => data.date === formattedDate
       );
 
