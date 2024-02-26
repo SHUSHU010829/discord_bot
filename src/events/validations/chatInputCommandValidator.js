@@ -65,6 +65,5 @@ module.exports = async (client, interaction) => {
     await commandObject.run(client, interaction);
   } catch (err) {
     console.log(`An error occurred! ${err}`.red);
-    console.log(err);
   }
 };

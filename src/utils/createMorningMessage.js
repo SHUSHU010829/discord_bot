@@ -17,7 +17,7 @@ module.exports = async (client) => {
     const randomFortune =
       fortuneList[Math.floor(Math.random() * fortuneList.length)];
 
-    if (calenderData !== "noData") {
+    if (calenderData) {
       const matchingData = calenderData.find(
         (data) => data.date === formattedDate
       );

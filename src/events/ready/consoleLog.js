@@ -4,7 +4,7 @@ const { ActivityType } = require("discord.js");
 
 module.exports = (client) => {
   client.user.setActivity({
-    name: "直播 🍿",
+    name: "舒舒的台 🍿",
     type: ActivityType.Streaming,
     url: "https://www.twitch.tv/shushu010829",
   });
