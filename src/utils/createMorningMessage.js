@@ -1,8 +1,7 @@
 require("colors");
 
 const { DateTime } = require("luxon");
-
-const getCalender = require("./getCalender");
+const calendarData = require("../data/calendar.json");
 const { normalChannelId } = require("../config.json");
 
 module.exports = async (client) => {
@@ -12,13 +11,12 @@ module.exports = async (client) => {
     const formattedDate = DateTime.now()
       .setZone("Asia/Taipei")
       .toFormat("yyyy-MM-dd");
-    const calenderData = await getCalender();
     const fortuneList = ["大吉", "中吉", "小吉", "平凡無奇", "凶", "大凶"];
     const randomFortune =
       fortuneList[Math.floor(Math.random() * fortuneList.length)];
 
-    if (calenderData) {
-      const matchingData = calenderData.find(
+    if (calendarData) {
+      const matchingData = calendarData.find(
         (data) => data.date === formattedDate
       );
 
@@ -35,7 +33,7 @@ module.exports = async (client) => {
         channel.send(message);
       }
     } else {
-      const message = `早安，現在是 ${formattedDate} 早上十點鐘。\n逼逼機器人開工了！\n各位起床起床起床床！！<a:nesuDance:1182636277602992169>\n今日抽卡運勢：**${randomFortune}**。(今天 API 罷工，沒有假期資料)`;
+      const message = `早安，現在是 ${formattedDate} 早上十點鐘。\n逼逼機器人開工了！\n各位起床起床起床床！！<a:nesuDance:1182636277602992169>\n今日抽卡運勢：**${randomFortune}**。(今天太神秘了，找不到假期資料？)`;
       channel.send(message);
     }
   } else {
