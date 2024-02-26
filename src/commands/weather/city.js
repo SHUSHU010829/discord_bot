@@ -50,61 +50,63 @@ module.exports = {
     const modifiedLocationName = locationName.replace(/^台/, "臺");
 
     await interaction.reply({
-    content: "抓取氣象局資料中.. 🌤️",
-    fetchReply: true,
+      content: "抓取氣象局資料中.. 🌤️",
+      fetchReply: true,
     });
-    
+
     // 檢查縣市名稱是否有效
     if (!validLocations.includes(modifiedLocationName)) {
-        interaction.editReply(
-            `我找不到 [${modifiedLocationName}] 這個縣市 <a:think:1196806259152789514>`
-        );
+      interaction.editReply(
+        `我找不到 [${modifiedLocationName}] 這個縣市 <a:think:1196806259152789514>`
+      );
     } else {
-    try {
+      try {
         // Fetch weather data from both APIs
         const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001?Authorization=${process.env.WEATHER_API_KEY}&locationName=${modifiedLocationName}`;
         // Fetch data from both APIs concurrently
         const response = await axios.get(apiUrl);
         const weatherData = response.data;
         if (weatherData.success === "true") {
-        const locationData = weatherData.records.location[0];
-        const weatherElement = locationData.weatherElement;
+          const locationData = weatherData.records.location[0];
+          const weatherElement = locationData.weatherElement;
 
-        const weatherInfo = {
+          const weatherInfo = {
             weather: weatherElement[0].time[0].parameter.parameterName, // 天氣狀況 (Wx)
             precipitation: `${weatherElement[1].time[0].parameter.parameterName}%`, // 降雨機率 (PoP)
             temperature: `${weatherElement[2].time[0].parameter.parameterName}°C - ${weatherElement[4].time[0].parameter.parameterName}°C`, // 溫度範圍 (MinT 和 MaxT)
-        };
-        const embed = new EmbedBuilder()
+          };
+          const embed = new EmbedBuilder()
             .setColor("Random")
             .setTitle(`今日${locationData.locationName}天氣預報 🌤️`)
             .setAuthor({
-            name: "中央氣象署",
-            iconURL: "https://openweathermap.org/img/wn/10d@2x.png",
-            url: "https://www.cwa.gov.tw/V8/C/",
+              name: "中央氣象署",
+              iconURL: "https://openweathermap.org/img/wn/10d@2x.png",
+              url: "https://www.cwa.gov.tw/V8/C/",
             })
             .addFields(
-            { name: "🔅 溫度", value: weatherInfo.temperature },
-            {
+              { name: "🔅 溫度", value: weatherInfo.temperature },
+              {
                 name: "🔅 降雨機率",
                 value: weatherInfo.precipitation,
-            },
-            { name: "🔅 天氣狀況", value: weatherInfo.weather }
+              },
+              { name: "🔅 天氣狀況", value: weatherInfo.weather }
             );
-        interaction.editReply("讀取成功 <:great:1189032879607529553> ");
-        interaction.editReply({ embeds: [embed] });
+          interaction.editReply("讀取成功 <:great:1189032879607529553> ");
+          interaction.editReply({ embeds: [embed] });
         } else {
-        interaction.editReply("哎呀！氣象局可能罷工了。");
-        console.log(
-            `[ERROR] An error occurred inside the weather city data:\n${error}`.red
-        );
+          interaction.editReply("哎呀！氣象局可能罷工了。");
+          console.log(
+            `[ERROR] An error occurred inside the weather city data:\n${error}`
+              .red
+          );
         }
-    } catch (error) {
+      } catch (error) {
         interaction.editReply("哎呀！氣象局可能罷工了。");
         console.log(
-        `[ERROR] An error occurred inside the weather city data:\n${error}`.red
+          `[ERROR] An error occurred inside the weather city data:\n${error}`
+            .red
         );
-    }
+      }
     }
   },
 };
