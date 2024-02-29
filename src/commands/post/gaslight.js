@@ -17,7 +17,7 @@ module.exports = {
         const collection = client.gaslightCollection;
 
         const msg = await interaction.reply({
-            content: "生成中... 🎰",
+            content: "生成中... 📝",
             fetchReply: true,
         });
 
