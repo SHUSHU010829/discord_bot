@@ -27,15 +27,10 @@ module.exports = {
       return sortedNumbers;
     };
 
-    const getSpecialNumber = () => {
-      return Math.floor(Math.random() * 49) + 1;
-    };
-
     const lottoNumbers = getLottoNumbers();
-    const specialNumber = getSpecialNumber();
 
     try {
-      interaction.editReply(`本期樂透 ➡️ \n\n${lottoNumbers.join(", ")}` + ` 特別號 ${specialNumber}` +`\n\n祝您中大獎！🔥\n中了記得分舒舒，不客氣 ✨`);
+      interaction.editReply(`本期樂透 ➡️ \n\n${lottoNumbers.join(", ")}` +`\n\n祝您中大獎！🔥\n中了記得分舒舒，不客氣 ✨`);
     } catch (error) {
       interaction.editReply("哎呀！今天不適合簽大樂透 💤");
       console.log(
