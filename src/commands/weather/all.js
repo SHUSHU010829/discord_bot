@@ -1,18 +1,15 @@
 require("colors");
 
 const axios = require("axios");
-const fs = require("fs");
 
-const {
-  SlashCommandBuilder,
-} = require("discord.js");
+const { SlashCommandBuilder } = require("discord.js");
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("全台天氣")
     .setDescription("查看全台今日天氣狀況"),
 
-  run: async (client, interaction) => {
+  run: async (interaction) => {
     try {
       await interaction.reply({
         content: "抓取氣象局資料中.. 🌤️",
@@ -96,12 +93,13 @@ module.exports = {
         interaction.editReply(weatherMessage);
       } else {
         interaction.editReply("哎呀！氣象局可能罷工了。");
-        console.log( `[ERROR] Can't not get the weather data from the API.`.red );
+        console.log(`[ERROR] Can't not get the weather data from the API.`.red);
       }
     } catch (error) {
       interaction.editReply("哎呀！氣象局可能罷工了。");
       console.log(
-        `[ERROR] An error occurred inside the all weather city data:\n${error}`.red
+        `[ERROR] An error occurred inside the all weather city data:\n${error}`
+          .red
       );
     }
   },

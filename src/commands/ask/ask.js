@@ -1,10 +1,6 @@
 require("colors");
 
-const {
-  SlashCommandBuilder,
-  PermissionFlagsBits,
-  EmbedBuilder,
-} = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const getAnswer = require("../../utils/getAnswer.js");
 const changeTraditional = require("../../utils/changeTraditional.js");
 
