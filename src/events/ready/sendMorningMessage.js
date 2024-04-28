@@ -40,8 +40,13 @@ module.exports = (client) => {
               channel.send(message);
             }
           } else {
-            const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！\n各位起床起床起床床！！<a:nesuDance:1182636277602992169>\n今日抽卡運勢：**${randomFortune}** <:PrideFloat:1220032890658619452>  `;
-            channel.send(message);
+            if (matchingData.description !== null) {
+              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！\n各位起床起床起床床！！\n順帶一提今天是${matchingData.description}！嗨起來各位！<a:nesuDance:1182636277602992169>\n今日抽卡運勢：**${randomFortune}** <:PrideFloat:1220032890658619452>  `;
+              channel.send(message);
+            } else {
+              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！\n各位起床起床起床床！！<a:nesuDance:1182636277602992169>\n今日抽卡運勢：**${randomFortune}** <:PrideFloat:1220032890658619452>  `;
+              channel.send(message);
+            }
           }
         } else {
           const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！\n各位起床起床起床床！！<a:nesuDance:1182636277602992169>\n今日抽卡運勢：**${randomFortune}** <:PrideFloat:1220032890658619452> (今天太神秘了，找不到假期資料？)`;

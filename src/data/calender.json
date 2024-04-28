@@ -669,7 +669,7 @@
         "date": "2024-04-21",
         "week": 0,
         "is_holiday": true,
-        "description": "汐饅頭女士生日噗噗！"
+        "description": "汐饅頭女士生日！"
     },
     {
         "date": "2024-04-22",
@@ -1233,7 +1233,7 @@
         "date": "2024-07-24",
         "week": 3,
         "is_holiday": true,
-        "description": "KSP 貓貓生日噗噗！"
+        "description": "KSP 貓貓生日！"
     },
     {
         "date": "2024-07-25",
@@ -1611,7 +1611,7 @@
         "date": "2024-09-25",
         "week": 3,
         "is_holiday": false,
-        "description": null
+        "description": "汐饅頭出道二週年！"
     },
     {
         "date": "2024-09-26",

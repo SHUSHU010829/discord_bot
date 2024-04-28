@@ -1,16 +1,13 @@
 require("colors");
 
-const {
-  SlashCommandBuilder,
-  EmbedBuilder,
-} = require("discord.js");
+const { SlashCommandBuilder } = require("discord.js");
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("鹹魚翻身")
     .setDescription("不保證中獎樂透號碼... 🎰"),
 
-  run: async (client, interaction) => {
+  run: async (interaction) => {
     await interaction.reply({
       content: "預測中... 🎰",
       fetchReply: true,
@@ -30,7 +27,10 @@ module.exports = {
     const lottoNumbers = getLottoNumbers();
 
     try {
-      interaction.editReply(`本期樂透 ➡️ \n\n${lottoNumbers.join(", ")}` +`\n\n祝您中大獎！🔥\n中了記得分舒舒，不客氣 ✨`);
+      interaction.editReply(
+        `本期樂透 ➡️ \n\n${lottoNumbers.join(", ")}` +
+          `\n\n祝您中大獎！🔥\n中了記得分舒舒，不客氣 ✨`
+      );
     } catch (error) {
       interaction.editReply("哎呀！今天不適合簽大樂透 💤");
       console.log(
