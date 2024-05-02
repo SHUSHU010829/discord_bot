@@ -1,6 +1,7 @@
 require("colors");
 
 const axios = require("axios");
+const fs = require("fs");
 
 const { SlashCommandBuilder } = require("discord.js");
 
@@ -9,7 +10,7 @@ module.exports = {
     .setName("全台天氣")
     .setDescription("查看全台今日天氣狀況"),
 
-  run: async (interaction) => {
+  run: async (client, interaction) => {
     try {
       await interaction.reply({
         content: "抓取氣象局資料中.. 🌤️",

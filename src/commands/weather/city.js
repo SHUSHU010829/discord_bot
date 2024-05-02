@@ -1,8 +1,13 @@
 require("colors");
 
 const axios = require("axios");
+const fs = require("fs");
 
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  PermissionFlagsBits,
+  EmbedBuilder,
+} = require("discord.js");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -15,7 +20,7 @@ module.exports = {
         .setRequired(true)
     ),
 
-  run: async (interaction) => {
+  run: async (client, interaction) => {
     const validLocations = [
       "臺北市",
       "新北市",
