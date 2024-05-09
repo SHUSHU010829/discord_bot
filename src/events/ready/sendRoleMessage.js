@@ -25,10 +25,10 @@ module.exports = async (client) => {
       );
     });
 
-    await channel.send({
-      content: "想要收到舒舒的開台通知！領取身份組吧！",
-      components: [row],
-    });
+    // await channel.send({
+    //   content: "想要收到舒舒的開台通知！領取身份組吧！",
+    //   components: [row],
+    // });
   } catch (error) {
     console.log(`[ERROR] 身份訊息無法找到該頻道：\n${error}`.red);
   }
