@@ -55,16 +55,8 @@ module.exports = (client) => {
           channel.send(message);
         }
         const foreignExchangeRate = await getForeignExchangeRate(client);
-        const today = DateTime.now()
-          .setZone("Asia/Taipei")
-          .toFormat("yyyyMMdd");
-
-        const todayRate = foreignExchangeRate.find(
-          (rate) => rate.Date === today
-        );
-
-        if (todayRate) {
-          const message = `今日匯率資訊：\nUSD/NTD: ${todayRate["USD/NTD"]}\nRMB/NTD: ${todayRate["RMB/NTD"]}\nUSD/JPY: ${todayRate["USD/JPY"]}`;
+        if (foreignExchangeRate) {
+          const message = `\n**匯率資訊（來源 RTER.info）**\nUSD/NTD: ${foreignExchangeRate["USDTWD"].Exrate}`;
           channel.send(message);
         }
       } else {

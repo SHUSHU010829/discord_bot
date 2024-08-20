@@ -2,7 +2,7 @@ require("colors");
 const axios = require("axios");
 
 module.exports = async () => {
-  const apiUrl = "https://openapi.taifex.com.tw/v1/DailyForeignExchangeRates";
+  const apiUrl = "https://tw.rter.info/capi.php";
 
   try {
     const response = await axios.get(apiUrl);
