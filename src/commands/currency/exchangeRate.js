@@ -16,10 +16,7 @@ module.exports = {
     const { options } = interaction;
     const targetCurrency = options.getString("欲兌貨幣") || "TWD"; // 目標貨幣
 
-    await interaction.reply({
-      content: "查詢中... 📝",
-      fetchReply: true,
-    });
+    await interaction.deferReply();
 
     try {
       // 查詢 USDTWD 和 USD{目標貨幣} 的匯率
@@ -38,8 +35,10 @@ module.exports = {
             )
             .setFooter({ text: "資料來源：RTER.info" });
 
-          await interaction.editReply("即時匯率 ⬇️");
-          await interaction.editReply({ embeds: [embed] });
+          await interaction.editReply({
+            content: "即時匯率 ⬇️",
+            embeds: [embed],
+          });
         } else {
           await interaction.editReply("找尋不到對應幣值！");
         }
