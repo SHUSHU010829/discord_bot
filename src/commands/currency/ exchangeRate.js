@@ -9,7 +9,7 @@ module.exports = {
     .setName("即時匯率")
     .setDescription("均採用美金報價，預設為 TWD。資料來源：RTER.info")
     .addStringOption((option) =>
-      option.setName("欲兌貨幣").setDescription("EX:日幣➡️JPY")
+      option.setName("欲兌貨幣").setDescription("EX:日幣 ➡️ JPY")
     ),
 
   run: async (client, interaction) => {
@@ -30,7 +30,7 @@ module.exports = {
         const twdRate = foreignExchangeRate["USDTWD"];
         if (twdRate) {
           const embed = new EmbedBuilder()
-            .setTitle(`匯率資訊：USD/TWD`)
+            .setTitle(`匯率資訊：USD ➡️ TWD`)
             .setColor("Random")
             .addFields(
               { name: "匯率", value: `${twdRate.Exrate}` },
@@ -53,7 +53,7 @@ module.exports = {
           const exchangeRate = targetRate.Exrate / twdRate.Exrate;
 
           const embed = new EmbedBuilder()
-            .setTitle(`匯率資訊：TWD/${targetCurrency.toUpperCase()}`)
+            .setTitle(`匯率資訊：TWD ➡️ ${targetCurrency.toUpperCase()}`)
             .setColor("Random")
             .addFields(
               { name: "匯率", value: `${exchangeRate.toFixed(4)}` },
