@@ -6,6 +6,8 @@ const { DateTime } = require("luxon");
 const calenderData = require("../../data/calender.json");
 const { normalChannelId } = require("../../config.json");
 
+const getForeignExchangeRate = require("../../utils/getForeignExchangeRate");
+
 module.exports = (client) => {
   // Schedule createMorningMessage to run every day at 10:00 AM
   // 第一個字段（30）代表分鐘，設定為 30。
@@ -15,7 +17,7 @@ module.exports = (client) => {
   // 第五個字段（*）代表一週中的日子，設定為每天。
   cron.schedule(
     "0 10 * * *",
-    () => {
+    async () => {
       const channel = client.channels.cache.get(normalChannelId);
 
       if (channel) {
@@ -50,6 +52,19 @@ module.exports = (client) => {
           }
         } else {
           const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！\n各位起床起床起床床！！<a:nesuDance:1182636277602992169>\n今日抽卡運勢：**${randomFortune}** <:PrideFloat:1220032890658619452> (今天太神秘了，找不到假期資料？)`;
+          channel.send(message);
+        }
+        const foreignExchangeRate = await getForeignExchangeRate(client);
+        const today = DateTime.now()
+          .setZone("Asia/Taipei")
+          .toFormat("yyyyMMdd");
+
+        const todayRate = foreignExchangeRate.find(
+          (rate) => rate.Date === today
+        );
+
+        if (todayRate) {
+          const message = `今日匯率資訊：\nUSD/NTD: ${todayRate["USD/NTD"]}\nRMB/NTD: ${todayRate["RMB/NTD"]}\nUSD/JPY: ${todayRate["USD/JPY"]}`;
           channel.send(message);
         }
       } else {
