@@ -49,10 +49,10 @@ module.exports = {
           foreignExchangeRate[`USD${targetCurrency.toUpperCase()}`];
 
         if (twdRate && targetRate) {
-          const exchangeRate = targetRate.Exrate / twdRate.Exrate;
+          const exchangeRate = twdRate.Exrate / targetRate.Exrate;
 
           const embed = new EmbedBuilder()
-            .setTitle(`匯率資訊：TWD ➡️ ${targetCurrency.toUpperCase()}`)
+            .setTitle(`匯率資訊：${targetCurrency.toUpperCase()} ➡️ TWD`)
             .setColor("Random")
             .addFields(
               { name: "匯率", value: `${exchangeRate.toFixed(4)}` },
