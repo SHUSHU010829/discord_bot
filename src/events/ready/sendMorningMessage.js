@@ -35,28 +35,32 @@ module.exports = (client) => {
 
           if (matchingData && matchingData.is_holiday === true) {
             if (matchingData.description === null) {
-              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！\n但今天是週末，大家可以繼續睡！！<a:nesuDance:1182636277602992169>\n今日抽卡運勢：**${randomFortune}** <:PrideFloat:1220032890658619452>  `;
+              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！但今天是週末，大家可以繼續睡！<a:nesuDance:1182636277602992169>`;
               channel.send(message);
             } else {
-              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！\n但今天是${matchingData.description}，大家可以繼續睡！！<a:nesuDance:1182636277602992169>\n今日抽卡運勢：**${randomFortune}** <:PrideFloat:1220032890658619452>  `;
+              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！但今天是${matchingData.description}，大家可以繼續睡！<a:nesuDance:1182636277602992169>`;
               channel.send(message);
             }
           } else {
             if (matchingData.description !== null) {
-              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！\n各位起床起床起床床！！\n順帶一提今天是${matchingData.description}！嗨起來各位！<a:nesuDance:1182636277602992169>\n今日抽卡運勢：**${randomFortune}** <:PrideFloat:1220032890658619452>  `;
+              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！各位起床起床起床床！\n順帶一提今天是${matchingData.description}！嗨起來各位！<a:nesuDance:1182636277602992169>\n`;
               channel.send(message);
             } else {
-              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！\n各位起床起床起床床！！<a:nesuDance:1182636277602992169>\n今日抽卡運勢：**${randomFortune}** <:PrideFloat:1220032890658619452>  `;
+              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！各位起床起床起床床！<a:nesuDance:1182636277602992169>`;
               channel.send(message);
             }
           }
         } else {
-          const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！\n各位起床起床起床床！！<a:nesuDance:1182636277602992169>\n今日抽卡運勢：**${randomFortune}** <:PrideFloat:1220032890658619452> (今天太神秘了，找不到假期資料？)`;
+          const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！各位起床起床起床床！！<a:nesuDance:1182636277602992169>\n(今天太神秘了，找不到假期資料？)`;
+          channel.send(message);
+        }
+        if (randomFortune) {
+          const message = `今日抽卡運勢：**${randomFortune}** <:PrideFloat:1220032890658619452>`;
           channel.send(message);
         }
         const foreignExchangeRate = await getForeignExchangeRate(client);
         if (foreignExchangeRate) {
-          const message = `\n**匯率資訊（來源 RTER.info）**\nUSD/NTD: ${foreignExchangeRate["USDTWD"].Exrate}`;
+          const message = `\n匯率資訊：USD/NTD - ${foreignExchangeRate["USDTWD"].Exrate}（來源 RTER.info）`;
           channel.send(message);
         }
       } else {
