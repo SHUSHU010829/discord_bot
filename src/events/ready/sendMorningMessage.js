@@ -16,7 +16,7 @@ module.exports = (client) => {
   // 第四個字段（*）代表月份，設定為每個月。
   // 第五個字段（*）代表一週中的日子，設定為每天。
   cron.schedule(
-    "0 10 * * *",
+    "0 8 * * *",
     async () => {
       const channel = client.channels.cache.get(normalChannelId);
 
@@ -35,23 +35,23 @@ module.exports = (client) => {
 
           if (matchingData && matchingData.is_holiday === true) {
             if (matchingData.description === null) {
-              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！但今天是週末，大家可以繼續睡！<a:nesuDance:1182636277602992169>`;
+              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 早上八點鐘\n逼逼機器人開工了！但今天是週末，大家可以繼續睡！<a:nesuDance:1182636277602992169>`;
               channel.send(message);
             } else {
-              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！但今天是${matchingData.description}，大家可以繼續睡！<a:nesuDance:1182636277602992169>`;
+              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 早上八點鐘\n逼逼機器人開工了！但今天是${matchingData.description}，大家可以繼續睡！<a:nesuDance:1182636277602992169>`;
               channel.send(message);
             }
           } else {
             if (matchingData.description !== null) {
-              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！各位起床起床起床床！\n順帶一提今天是${matchingData.description}！嗨起來各位！<a:nesuDance:1182636277602992169>\n`;
+              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 早上八點鐘\n逼逼機器人開工了！順帶一提今天是${matchingData.description}！嗨起來各位！<a:nesuDance:1182636277602992169>\n`;
               channel.send(message);
             } else {
-              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！各位起床起床起床床！<a:nesuDance:1182636277602992169>`;
+              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 早上八點鐘\n各位早八人請加油好好上課喔 <:FlushedHug:1220244873064742972>\n 逼逼機器人繼續睡覺了，晚安 <a:Peepo_GoToBed:1003843539878301736> `;
               channel.send(message);
             }
           }
         } else {
-          const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 10:00 A.M.\n逼逼機器人開工了！各位起床起床起床床！！<a:nesuDance:1182636277602992169>\n(今天太神秘了，找不到假期資料？)`;
+          const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 早上八點鐘\n逼逼機器人開工了！各位起床起床起床床！！<a:nesuDance:1182636277602992169>\n(今天太神秘了，找不到假期資料？)`;
           channel.send(message);
         }
         if (randomFortune) {
