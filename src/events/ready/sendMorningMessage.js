@@ -43,10 +43,10 @@ module.exports = (client) => {
             }
           } else {
             if (matchingData.description !== null) {
-              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 早上八點鐘\n逼逼機器人開工了！順帶一提今天是${matchingData.description}！嗨起來各位！<a:nesuDance:1182636277602992169>\n`;
+              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 早上八點鐘\n逼逼機器人開工了！順帶一提今天是${matchingData.description}！嗨起來各位！<a:nesuDance:1182636277602992169>`;
               channel.send(message);
             } else {
-              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 早上八點鐘\n各位早八人請加油好好上課喔 <:FlushedHug:1220244873064742972>\n 逼逼機器人繼續睡覺了，晚安 <a:Peepo_GoToBed:1003843539878301736> `;
+              const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 早上八點鐘\n各位早八人請加油好好上課喔 <:FlushedHug:1220244873064742972>\n逼逼機器人繼續睡覺了，晚安 <a:nesuDance:1182636277602992169>`;
               channel.send(message);
             }
           }
