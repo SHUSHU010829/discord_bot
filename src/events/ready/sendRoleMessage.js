@@ -4,11 +4,11 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 
 module.exports = async (client) => {
   try {
-    const channelId = "1174352640210124873";
+    const channelId = "1286145970693869568";
     const roles = [
       {
-        id: "1181223481128525846",
-        label: "🃏 舒禮的人",
+        id: "1286170878463447133",
+        label: "🎮 LEAGUE OF LEGENDS",
       },
     ];
     const channel = client.channels.cache.get(channelId);
