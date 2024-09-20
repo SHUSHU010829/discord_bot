@@ -13,10 +13,10 @@ module.exports = {
     .setDescription("逼逼機器人工作介紹！"),
 
   run: async (client, interaction) => {
+    await interaction.deferReply();
+
     try {
-      return interaction.reply({
-        command: "還在製作中...",
-      });
+      await interaction.editReply("還在製作中... 🚧");
     } catch (error) {
       console.log(
         `[ERROR] An error occurred inside the command ask:\n${error}`.red
