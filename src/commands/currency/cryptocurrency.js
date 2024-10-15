@@ -32,16 +32,18 @@ module.exports = {
           .setTimestamp()
           .setFooter({ text: "對應幣值：USD" });
 
-        await interaction.editReply({
+        await interaction.reply({
           content: "即時價格 ⬇️",
           embeds: [embed],
         });
       } else {
-        await interaction.editReply("找尋不到對應幣值！");
+        await interaction.reply("找尋不到對應幣值！");
       }
     } catch (error) {
-      console.error("錯誤：", error);
-      await interaction.editReply("發生錯誤，無法完成查詢。");
+      await interaction.reply("發生錯誤，無法完成查詢。");
+      console.log(
+        `[ERROR] An error occurred inside the cryptocurrency:\n${error}`.red
+      );
     }
   },
 };
