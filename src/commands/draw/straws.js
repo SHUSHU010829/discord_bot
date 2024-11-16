@@ -35,19 +35,30 @@ module.exports = {
     const randomOutcome =
       strawList[Math.floor(Math.random() * strawList.length)];
     const poem = await getPoem();
-    const origin = await changeTraditional(poem.origin);
-    const content = await changeTraditional(poem.content);
-    const author = await changeTraditional(poem.author);
+    let embed;
 
-    const embed = new EmbedBuilder()
-      .setTitle(`${randomOutcome}`)
-      .setDescription(`🔖 問題:${question || "日常求籤"}`)
-      .setColor("Random")
-      .addFields(
-        { name: "\u200B", value: "\u200B" },
-        { name: content.text, value: `《${origin.text}》${author.text}` }
-      )
-      .setTimestamp();
+    if (poem) {
+      const origin = await changeTraditional(poem.origin);
+      const content = await changeTraditional(poem.content);
+      const author = await changeTraditional(poem.author);
+
+      embed = new EmbedBuilder()
+        .setTitle(`${randomOutcome}`)
+        .setDescription(`🔖 問題:${question || "日常求籤"}`)
+        .setColor("Random")
+        .addFields(
+          { name: "\u200B", value: "\u200B" },
+          { name: content.text, value: `《${origin.text}》${author.text}` }
+        )
+        .setTimestamp();
+    } else {
+      embed = new EmbedBuilder()
+        .setTitle(`${randomOutcome}`)
+        .setDescription(`🔖 問題:${question || "日常求籤"}`)
+        .setColor("Random")
+        .setTimestamp();
+    }
+
 
     try {
       interaction.editReply("求籤結果 ⬇️");

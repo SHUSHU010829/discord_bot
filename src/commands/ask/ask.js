@@ -19,6 +19,12 @@ module.exports = {
     const { options } = interaction;
     const question = options.getString("問題");
     const answer = await getAnswer();
+    if (!answer) {
+      return interaction.reply({
+        content: "無法取得答案，請稍後再試。",
+        ephemeral: true,
+      });
+    }
     const final = await changeTraditional(answer.data.zh);
 
     const embed = new EmbedBuilder()
