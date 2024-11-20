@@ -1,10 +1,8 @@
 require("colors");
 
-const {
-  SlashCommandBuilder,
-  EmbedBuilder,
-} = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const getPoem = require("../../utils/getPoem");
+const getStraw = require("../../utils/getStraw");
 const changeTraditional = require("../../utils/changeTraditional");
 
 module.exports = {
@@ -18,34 +16,13 @@ module.exports = {
   run: async (client, interaction) => {
     const { options } = interaction;
     const question = options.getString("諮詢方向");
-    const strawList = [
-      { outcome: "🌈 大吉", weight: 5 },
-      { outcome: "🔆 中吉", weight: 15 },
-      { outcome: "✨ 小吉", weight: 30 },
-      { outcome: "💤 沒想法", weight: 30 },
-      { outcome: "💥 凶", weight: 15 },
-      { outcome: "🔥 大凶", weight: 5 },
-    ];
-
-    function getRandomOutcome(list) {
-      const totalWeight = list.reduce((sum, item) => sum + item.weight, 0);
-      const randomNum = Math.random() * totalWeight;
-      let weightSum = 0;
-
-      for (const item of list) {
-        weightSum += item.weight;
-        if (randomNum <= weightSum) {
-          return item.outcome;
-        }
-      }
-    }
 
     await interaction.reply({
       content: "抽籤中... 🧧",
       fetchReply: true,
     });
 
-    const randomOutcome = getRandomOutcome(strawList);
+    const strawResult = await getStraw();
     const poem = await getPoem();
     let embed;
 
@@ -55,7 +32,7 @@ module.exports = {
       const author = await changeTraditional(poem.author);
 
       embed = new EmbedBuilder()
-        .setTitle(`${randomOutcome}`)
+        .setTitle(`${strawResult}`)
         .setDescription(`🔖 問題:${question || "日常求籤"}`)
         .setColor("Random")
         .addFields(
@@ -65,12 +42,11 @@ module.exports = {
         .setTimestamp();
     } else {
       embed = new EmbedBuilder()
-        .setTitle(`${randomOutcome}`)
+        .setTitle(`${strawResult}`)
         .setDescription(`🔖 問題:${question || "日常求籤"}`)
         .setColor("Random")
         .setTimestamp();
     }
-
 
     try {
       interaction.editReply("求籤結果 ⬇️");

@@ -3,32 +3,11 @@ require("colors");
 const cron = require("node-cron");
 const { DateTime } = require("luxon");
 
-const calenderData = require("../../data/calender.json");
 const { normalChannelId } = require("../../config.json");
 
+const calenderData = require("../../data/calender.json");
+const getStraw = require("../../utils/getStraw");
 const getForeignExchangeRate = require("../../utils/getForeignExchangeRate");
-
-const fortuneList = [
-  { outcome: "大吉", weight: 5 },
-  { outcome: "中吉", weight: 15 },
-  { outcome: "小吉", weight: 30 },
-  { outcome: "平凡無奇", weight: 30 },
-  { outcome: "凶", weight: 15 },
-  { outcome: "大凶", weight: 5 },
-];
-
-function getRandomFortune(list) {
-  const totalWeight = list.reduce((sum, item) => sum + item.weight, 0);
-  const randomNum = Math.random() * totalWeight;
-  let weightSum = 0;
-
-  for (const item of list) {
-    weightSum += item.weight;
-    if (randomNum <= weightSum) {
-      return item.outcome;
-    }
-  }
-}
 
 module.exports = (client) => {
   // Schedule createMorningMessage to run every day at 10:00 AM
@@ -46,7 +25,7 @@ module.exports = (client) => {
         const formattedDate = DateTime.now()
           .setZone("Asia/Taipei")
           .toFormat("yyyy-MM-dd");
-        const randomFortune = getRandomFortune(fortuneList);
+        const strawResult = await getStraw();
 
         if (calenderData) {
           const matchingData = calenderData.find(
@@ -74,8 +53,8 @@ module.exports = (client) => {
           const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 早上八點鐘\n逼逼機器人開工了！各位起床起床起床床！！<a:nesuDance:1182636277602992169>\n(今天太神秘了，找不到假期資料？)`;
           channel.send(message);
         }
-        if (randomFortune) {
-          const message = `今日抽卡運勢：**${randomFortune}** <:PrideFloat:1220032890658619452>`;
+        if (strawResult) {
+          const message = `今日抽卡運勢：**${strawResult}** <:PrideFloat:1220032890658619452>`;
           channel.send(message);
         }
         const foreignExchangeRate = await getForeignExchangeRate(client);
