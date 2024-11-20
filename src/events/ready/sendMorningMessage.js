@@ -8,6 +8,28 @@ const { normalChannelId } = require("../../config.json");
 
 const getForeignExchangeRate = require("../../utils/getForeignExchangeRate");
 
+const fortuneList = [
+  { outcome: "大吉", weight: 5 },
+  { outcome: "中吉", weight: 15 },
+  { outcome: "小吉", weight: 30 },
+  { outcome: "平凡無奇", weight: 30 },
+  { outcome: "凶", weight: 15 },
+  { outcome: "大凶", weight: 5 },
+];
+
+function getRandomFortune(list) {
+  const totalWeight = list.reduce((sum, item) => sum + item.weight, 0);
+  const randomNum = Math.random() * totalWeight;
+  let weightSum = 0;
+
+  for (const item of list) {
+    weightSum += item.weight;
+    if (randomNum <= weightSum) {
+      return item.outcome;
+    }
+  }
+}
+
 module.exports = (client) => {
   // Schedule createMorningMessage to run every day at 10:00 AM
   // 第一個字段（30）代表分鐘，設定為 30。
@@ -24,9 +46,7 @@ module.exports = (client) => {
         const formattedDate = DateTime.now()
           .setZone("Asia/Taipei")
           .toFormat("yyyy-MM-dd");
-        const fortuneList = ["大吉", "中吉", "小吉", "平凡無奇", "凶", "大凶"];
-        const randomFortune =
-          fortuneList[Math.floor(Math.random() * fortuneList.length)];
+        const randomFortune = getRandomFortune(fortuneList);
 
         if (calenderData) {
           const matchingData = calenderData.find(
