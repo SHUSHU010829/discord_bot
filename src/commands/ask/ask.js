@@ -19,28 +19,40 @@ module.exports = {
     const { options } = interaction;
     const question = options.getString("問題");
     const answer = await getAnswer();
-    if (!answer) {
-      return interaction.reply({
-        content: "無法取得答案，請稍後再試。",
-        ephemeral: true,
-      });
-    }
-    const final = await changeTraditional(answer.data.zh);
+    if (answer) {
+      const final = await changeTraditional(answer.data.zh);
 
-    const embed = new EmbedBuilder()
-      .setTitle(`${final.text}`)
-      .setDescription(`📝 問題:${question}`)
-      .setColor("Random")
-      .setTimestamp();
+      const embed = new EmbedBuilder()
+        .setTitle(`${final.text}`)
+        .setDescription(`📝 問題:${question}`)
+        .setColor("Random")
+        .setTimestamp();
 
-    try {
-      return interaction.reply({
-        embeds: [embed],
-      });
-    } catch (error) {
-      console.log(
-        `[ERROR] An error occurred inside the command ask:\n${error}`.red
-      );
+      try {
+        return interaction.reply({
+          embeds: [embed],
+        });
+      } catch (error) {
+        console.log(
+          `[ERROR] An error occurred inside the command ask:\n${error}`.red
+        );
+      }
+    } else {
+      const embed = new EmbedBuilder()
+        .setTitle(`🤔 我不知道`)
+        .setDescription(`📝 問題:${question}`)
+        .setColor("Random")
+        .setTimestamp();
+
+      try {
+        return interaction.reply({
+          embeds: [embed],
+        });
+      } catch (error) {
+        console.log(
+          `[ERROR] An error occurred inside the command ask:\n${error}`.red
+        );
+      }
     }
   },
 };
