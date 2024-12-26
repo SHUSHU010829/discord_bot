@@ -6,7 +6,7 @@ module.exports = async () => {
 
   try {
     const response = await axios.get(apiUrl);
-    return response;
+    return response.data;
   } catch (error) {
     console.log(
       `[ERROR] An error occurred inside the getAnswer:\n${error}`.red
