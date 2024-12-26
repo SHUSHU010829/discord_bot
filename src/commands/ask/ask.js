@@ -20,7 +20,7 @@ module.exports = {
     const question = options.getString("問題");
     const answer = await getAnswer();
     if (answer.status === 200) {
-      const final = await changeTraditional(answer.data.zh);
+      const final = await changeTraditional(answer.data.data.zh);
 
       const embed = new EmbedBuilder()
         .setTitle(`${final.text}`)
