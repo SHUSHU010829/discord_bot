@@ -19,7 +19,7 @@ module.exports = {
     const { options } = interaction;
     const question = options.getString("問題");
     const answer = await getAnswer();
-    if (answer) {
+    if (answer.status === 200) {
       const final = await changeTraditional(answer.data.zh);
 
       const embed = new EmbedBuilder()
