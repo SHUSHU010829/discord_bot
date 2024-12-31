@@ -33,7 +33,7 @@ module.exports = (client) => {
           );
 
           if (matchingData && matchingData.is_holiday === true) {
-            if (matchingData.description === null) {
+            if (matchingData.description === "") {
               const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 早上八點鐘\n逼逼機器人開工了！但今天是週末，大家可以繼續睡！<a:nesuDance:1182636277602992169>`;
               channel.send(message);
             } else {
@@ -41,7 +41,7 @@ module.exports = (client) => {
               channel.send(message);
             }
           } else {
-            if (matchingData.description !== null) {
+            if (matchingData.description !== "") {
               const message = `早安 <:FlushedHug:1220244873064742972> \n現在是 ${formattedDate} 早上八點鐘\n逼逼機器人開工了！順帶一提今天是${matchingData.description}！嗨起來各位！<a:nesuDance:1182636277602992169>`;
               channel.send(message);
             } else {
