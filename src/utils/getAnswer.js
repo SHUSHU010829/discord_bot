@@ -6,6 +6,9 @@ module.exports = async () => {
 
   try {
     const response = await axios.get(apiUrl);
+    if (response.status !== 200) {
+      return "今天回答不出來：）";
+    }
     return response.data;
   } catch (error) {
     console.log(
