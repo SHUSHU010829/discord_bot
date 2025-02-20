@@ -37,20 +37,20 @@ module.exports = (client) => {
               const message = `早安，現在是 ${formattedDate} 08:00AM <a:yaa:1339068116524732436>\n逼逼機器人開工了！但今天是週末，大家可以繼續睡！<:shushu23Happy:1339067589782933535> `;
               channel.send(message);
             } else {
-              const message = `早安，現在是 ${formattedDate} 08:00AM <a:yaa:1339068116524732436>\n逼逼機器人開工了！但今天是${matchingData.description}，大家可以繼續睡！<:shushu23Happy:1339067589782933535>`;
+              const message = `早安，現在是 ${formattedDate} 08:00AM <a:yaa:1339068116524732436>\n逼逼機器人開工了！但今天是${matchingData.description}，大家可以繼續睡！<:shushu23Happy:1339067589782933535> `;
               channel.send(message);
             }
           } else {
             if (matchingData.description !== "") {
-              const message = `早安，現在是 ${formattedDate} 08:00AM <a:yaa:1339068116524732436>\n逼逼機器人開工了！順帶一提今天是${matchingData.description}！嗨起來各位！<:shushu23Happy:1339067589782933535>`;
+              const message = `早安，現在是 ${formattedDate} 08:00AM <a:yaa:1339068116524732436>\n逼逼機器人開工了！順帶一提今天是${matchingData.description}！嗨起來各位！<:shushu23Happy:1339067589782933535> `;
               channel.send(message);
             } else {
-              const message = `早安，現在是 ${formattedDate} 08:00AM <a:yaa:1339068116524732436>\n逼逼機器人繼續睡覺了，晚安 <:shushu23Happy:1339067589782933535>`;
+              const message = `早安，現在是 ${formattedDate} 08:00AM <a:yaa:1339068116524732436>\n逼逼機器人繼續睡覺了，晚安 <:shushu23Happy:1339067589782933535> `;
               channel.send(message);
             }
           }
         } else {
-          const message = `早安，現在是 ${formattedDate} 早上八點鐘\n逼逼機器人開工了！各位起床起床起床床！！<a:nesuDance:1182636277602992169>\n(今天太神秘了，找不到假期資料？)`;
+          const message = `早安，現在是 ${formattedDate} 早上八點鐘\n逼逼機器人開工了！各位起床起床起床床！！<:shushu23Happy:1339067589782933535> \n(今天太神秘了，找不到假期資料？)`;
           channel.send(message);
         }
         if (strawResult) {
