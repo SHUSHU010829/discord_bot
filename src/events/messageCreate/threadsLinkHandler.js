@@ -9,23 +9,27 @@ module.exports = async (client, message) => {
     // Suppress embeds from the original message
     await message.suppressEmbeds(true);
 
-    // Replace threads.net/threads.com with fixthreads.net and remove query parameters
-    const modifiedContent = message.content.replace(
-      threadsRegex,
-      (match, protocol, www, domain, tld, path) => {
-        // Default to https if no protocol specified
-        const finalProtocol = protocol || "https://";
+    // Extract threads links and convert to fixthreads.net
+    const threadsLinks = [];
+    let match;
+    const regex = new RegExp(threadsRegex.source, threadsRegex.flags);
 
-        // Remove query parameters (everything after ?)
-        const cleanPath = path ? path.split("?")[0] : "";
+    while ((match = regex.exec(message.content)) !== null) {
+      const [fullMatch, protocol, www, domain, tld, path] = match;
+      // Default to https if no protocol specified
+      const finalProtocol = protocol || "https://";
+      // Remove query parameters (everything after ?)
+      const cleanPath = path ? path.split("?")[0] : "";
+      const fixthreadsLink = `${finalProtocol}fixthreads.net${cleanPath}`;
+      threadsLinks.push(fixthreadsLink);
+    }
 
-        return `${finalProtocol}fixthreads.net${cleanPath}`;
-      }
-    );
+    // Create reply with arrow links
+    const replyContent = threadsLinks.map((link) => `[⇩](${link})`).join(" ");
 
-    // Reply with the modified version
+    // Reply with the arrow links
     await message.reply({
-      content: `${modifiedContent}`,
+      content: replyContent,
       allowedMentions: { repliedUser: false },
     });
   }
