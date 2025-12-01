@@ -4,6 +4,8 @@ const {
   SlashCommandBuilder,
 } = require("discord.js");
 
+const { commandEmojis, commandMessages } = require("../../config.json");
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("吃什麼")
@@ -12,7 +14,7 @@ module.exports = {
   run: async (client, interaction) => {
     const collection = client.collection;
     const msg = await interaction.reply({
-      content: "抽籤中... 🎰",
+      content: commandMessages.drawingLot,
       fetchReply: true,
     });
     try {
@@ -21,13 +23,13 @@ module.exports = {
         const randomFood =
           foodList[Math.floor(Math.random() * foodList.length)].name;
         interaction.editReply(
-          `逼逼機器人推薦你可以吃... **${randomFood}**！ <:hiiiiii:1191449346777038858> `
+          `逼逼機器人推薦你可以吃... **${randomFood}**！ ${commandEmojis.hiiiiii} `
         );
       } else {
-        interaction.editReply("目前沒有可供選擇的食物選項。");
+        interaction.editReply(commandMessages.noFood);
       }
     } catch (error) {
-      interaction.editReply("🔧 獲取食物清單失敗，請呼叫舒舒！");
+      interaction.editReply(commandMessages.getFoodError);
       console.log(
         `[ERROR] An error occurred inside the draw lot:\n${error}`.red
       );

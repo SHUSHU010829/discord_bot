@@ -1,14 +1,17 @@
 require("colors");
 
 const { ActivityType } = require("discord.js");
-const { serverId } = require("../../config.json");
+const { serverId, memberCountChannelId, memberCountFormat } = require("../../config.json");
 
 module.exports = (client) => {
   let guild = client.guilds.cache.get(serverId);
   let memberCount = guild.memberCount;
-  let memberCountChannel = guild.channels.cache.get("1232546673448849500");
+  let memberCountChannel = guild.channels.cache.get(memberCountChannelId);
+
+  const channelName = memberCountFormat.replace("{count}", memberCount);
+
   memberCountChannel
-    .setName(`😧│很舒禮人數：${memberCount}`)
+    .setName(channelName)
     .then((result) =>
       console.log(`[SETTING] server user count set successfully!`.green)
     )

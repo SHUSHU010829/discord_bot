@@ -1,17 +1,11 @@
 require("colors");
 
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const { roleMessageChannelId, roles, roleMessageContent } = require("../../config.json");
 
 module.exports = async (client) => {
   try {
-    const channelId = "1286145970693869568";
-    const roles = [
-      {
-        id: "1286170878463447133",
-        label: "🎮 LEAGUE OF LEGENDS",
-      },
-    ];
-    const channel = client.channels.cache.get(channelId);
+    const channel = client.channels.cache.get(roleMessageChannelId);
     if (!channel) return;
 
     const row = new ActionRowBuilder();
@@ -26,7 +20,7 @@ module.exports = async (client) => {
     });
 
     // await channel.send({
-    //   content: "想要收到舒舒的開台通知！領取身份組吧！",
+    //   content: roleMessageContent,
     //   components: [row],
     // });
   } catch (error) {
