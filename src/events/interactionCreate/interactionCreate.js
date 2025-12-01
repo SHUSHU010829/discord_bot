@@ -26,7 +26,7 @@ module.exports = async (client, interaction) => {
 
     // 處理票務按鈕
     if (interaction.customId === "create_ticket") {
-      await handleTicketCreation(interaction);
+      await handleTicketCreation(client, interaction);
       return;
     }
 
@@ -58,7 +58,7 @@ module.exports = async (client, interaction) => {
   }
 };
 
-async function handleTicketCreation(interaction) {
+async function handleTicketCreation(client, interaction) {
   try {
     // 獲取此頻道的面板配置（如果存在）
     const panels = loadPanels();
