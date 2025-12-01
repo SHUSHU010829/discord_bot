@@ -1,7 +1,7 @@
 require("colors");
 
 const { ChannelType, PermissionFlagsBits } = require("discord.js");
-const { createVoiceChannelId } = require("../../config.json");
+const { createVoiceChannelId, voiceChannel } = require("../../config.json");
 
 // 存儲動態創建的頻道 ID 和創建者 ID
 const dynamicChannels = new Map();
@@ -35,7 +35,7 @@ module.exports = async (client, oldState, newState) => {
 
       // 創建新的語音頻道
       const newChannel = await guild.channels.create({
-        name: "記得改名喔！",
+        name: voiceChannel.defaultChannelName,
         type: ChannelType.GuildVoice,
         parent: parentId,
         permissionOverwrites: [
@@ -99,7 +99,7 @@ module.exports = async (client, oldState, newState) => {
       const oldChannel = guild.channels.cache.get(oldState.channelId);
       if (oldChannel && oldChannel.members.size === 0) {
         const channelName = oldChannel.name;
-        await oldChannel.delete("動態語音頻道已空，自動刪除");
+        await oldChannel.delete(voiceChannel.deleteReason);
         dynamicChannels.delete(oldState.channelId);
 
         console.log(

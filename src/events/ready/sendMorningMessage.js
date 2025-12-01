@@ -3,27 +3,27 @@ require("colors");
 const cron = require("node-cron");
 const { DateTime } = require("luxon");
 
-const { normalChannelId } = require("../../config.json");
+const { normalChannelId, morningMessage } = require("../../config.json");
 
 const calenderData = require("../../data/calender.json");
 const getStraw = require("../../utils/getStraw");
 const getForeignExchangeRate = require("../../utils/getForeignExchangeRate");
 
 module.exports = (client) => {
-  // Schedule createMorningMessage to run every day at 10:00 AM
+  // Schedule createMorningMessage to run every day at configured time
   // 第一個字段（30）代表分鐘，設定為 30。
   // 第二個字段（2）代表小時，設定為 2。
   // 第三個字段（*）代表一個月中的日子，設定為每天。
   // 第四個字段（*）代表月份，設定為每個月。
   // 第五個字段（*）代表一週中的日子，設定為每天。
   cron.schedule(
-    "0 8 * * *",
+    morningMessage.cronSchedule,
     async () => {
       const channel = client.channels.cache.get(normalChannelId);
 
       if (channel) {
         const formattedDate = DateTime.now()
-          .setZone("Asia/Taipei")
+          .setZone(morningMessage.timezone)
           .toFormat("yyyy-MM-dd");
         const strawResult = await getStraw();
 
@@ -34,32 +34,51 @@ module.exports = (client) => {
 
           if (matchingData && matchingData.is_holiday === true) {
             if (matchingData.description === "") {
-              const message = `早安，現在是 ${formattedDate} 08:00AM <a:yaa:1339068116524732436>\n逼逼機器人開工了！但今天是週末，大家可以繼續睡！<:babySit:1324395529022476379> `;
+              const message = morningMessage.templates.weekendNoDescription
+                .replace("{date}", formattedDate)
+                .replace("{yaa}", morningMessage.emojis.yaa)
+                .replace("{babySit}", morningMessage.emojis.babySit);
               channel.send(message);
             } else {
-              const message = `早安，現在是 ${formattedDate} 08:00AM <a:yaa:1339068116524732436>\n逼逼機器人開工了！但今天是${matchingData.description}，大家可以繼續睡！<:babySit:1324395529022476379> `;
+              const message = morningMessage.templates.holidayWithDescription
+                .replace("{date}", formattedDate)
+                .replace("{holiday}", matchingData.description)
+                .replace("{yaa}", morningMessage.emojis.yaa)
+                .replace("{babySit}", morningMessage.emojis.babySit);
               channel.send(message);
             }
           } else {
             if (matchingData.description !== "") {
-              const message = `早安，現在是 ${formattedDate} 08:00AM <a:yaa:1339068116524732436>\n逼逼機器人開工了！順帶一提今天是${matchingData.description}！嗨起來各位！<:babySit:1324395529022476379> `;
+              const message = morningMessage.templates.workdayWithDescription
+                .replace("{date}", formattedDate)
+                .replace("{description}", matchingData.description)
+                .replace("{yaa}", morningMessage.emojis.yaa)
+                .replace("{babySit}", morningMessage.emojis.babySit);
               channel.send(message);
             } else {
-              const message = `早安，現在是 ${formattedDate} 08:00AM <a:yaa:1339068116524732436>\n逼逼機器人繼續睡覺了，晚安 <:babySit:1324395529022476379> `;
+              const message = morningMessage.templates.workdaySleep
+                .replace("{date}", formattedDate)
+                .replace("{yaa}", morningMessage.emojis.yaa)
+                .replace("{babySit}", morningMessage.emojis.babySit);
               channel.send(message);
             }
           }
         } else {
-          const message = `早安，現在是 ${formattedDate} 早上八點鐘\n逼逼機器人開工了！各位起床起床起床床！！<:babySit:1324395529022476379>  \n(今天太神秘了，找不到假期資料？)`;
+          const message = morningMessage.templates.noCalendarData
+            .replace("{date}", formattedDate)
+            .replace("{babySit}", morningMessage.emojis.babySit);
           channel.send(message);
         }
         if (strawResult) {
-          const message = `今日抽卡運勢：**${strawResult}** <:PrideFloat:1220032890658619452>`;
+          const message = morningMessage.templates.fortune
+            .replace("{fortune}", strawResult)
+            .replace("{prideFloat}", morningMessage.emojis.prideFloat);
           channel.send(message);
         }
         const foreignExchangeRate = await getForeignExchangeRate(client);
         if (foreignExchangeRate) {
-          const message = `\n匯率資訊：USD/NTD - ${foreignExchangeRate["USDTWD"].Exrate}（來源 RTER.info）`;
+          const message = morningMessage.templates.exchangeRate
+            .replace("{rate}", foreignExchangeRate["USDTWD"].Exrate);
           channel.send(message);
         }
       } else {
@@ -68,7 +87,7 @@ module.exports = (client) => {
     },
     {
       scheduled: true,
-      timezone: "Asia/Taipei",
+      timezone: morningMessage.timezone,
     }
   );
 };
