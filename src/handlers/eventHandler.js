@@ -14,11 +14,11 @@ module.exports = (client) => {
 
     eventName === "validations" ? (eventName = "interactionCreate") : eventName;
 
-    client.on(eventName, async (arg) => {
+    client.on(eventName, async (...args) => {
       for (const eventFile of eventFiles) {
         const eventFunction = require(eventFile);
         if (typeof eventFunction === "function") {
-          await eventFunction(client, arg);
+          await eventFunction(client, ...args);
         } else {
           console.log(
             `[ERROR] File ${eventFile} does not export a function`.red
