@@ -78,15 +78,17 @@ module.exports = async (client, oldState, newState) => {
     ) {
       const channel = guild.channels.cache.get(newState.channelId);
       if (channel) {
-        // 給予加入者設置狀態的權限
-        await channel.permissionOverwrites.edit(member.id, {
-          SetVoiceChannelStatus: true,
-        });
+        // 給予加入者設置狀態的權限（如果該權限存在）
+        if (PermissionFlagsBits.SetVoiceChannelStatus) {
+          await channel.permissionOverwrites.edit(member.id, {
+            [PermissionFlagsBits.SetVoiceChannelStatus]: true,
+          });
 
-        console.log(
-          `[VOICE] Granted status edit permission to ${member.user.tag} in ${channel.name}`
-            .cyan
-        );
+          console.log(
+            `[VOICE] Granted status edit permission to ${member.user.tag} in ${channel.name}`
+              .cyan
+          );
+        }
       }
     }
 
