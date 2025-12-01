@@ -99,14 +99,28 @@ module.exports = async (client, oldState, newState) => {
       oldState.channelId !== newState.channelId
     ) {
       const oldChannel = guild.channels.cache.get(oldState.channelId);
-      if (oldChannel && oldChannel.members.size === 0) {
-        const channelName = oldChannel.name;
-        await oldChannel.delete(voiceChannel.deleteReason);
-        dynamicChannels.delete(oldState.channelId);
+      if (oldChannel) {
+        // 使用 setTimeout 來確保 Discord 緩存已更新
+        setTimeout(async () => {
+          try {
+            // 重新獲取頻道以確保成員列表是最新的
+            const channel = guild.channels.cache.get(oldState.channelId);
+            if (channel && channel.members.size === 0) {
+              const channelName = channel.name;
+              await channel.delete(voiceChannel.deleteReason);
+              dynamicChannels.delete(oldState.channelId);
 
-        console.log(
-          `[VOICE] Deleted empty dynamic voice channel: ${channelName}`.yellow
-        );
+              console.log(
+                `[VOICE] Deleted empty dynamic voice channel: ${channelName}`
+                  .yellow
+              );
+            }
+          } catch (error) {
+            console.error(
+              `[ERROR] Failed to delete dynamic voice channel: ${error}`.red
+            );
+          }
+        }, 1000); // 延遲 1 秒以確保緩存更新
       }
     }
   } catch (error) {
