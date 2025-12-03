@@ -30,6 +30,20 @@ module.exports = async (client, interaction) => {
       return;
     }
 
+    // 處理投票按鈕
+    const voteButtons = [
+      "vote_player",
+      "vote_support",
+      "vote_no_interest",
+      "vote_still_playing",
+      "vote_archive_ok"
+    ];
+
+    if (voteButtons.includes(interaction.customId)) {
+      await handleVoteButton(client, interaction);
+      return;
+    }
+
     // 處理身份組按鈕
     const role = interaction.guild.roles.cache.get(interaction.customId);
     if (!role) {
@@ -186,5 +200,191 @@ async function handleTicketCreation(client, interaction) {
     } catch (replyError) {
       console.log(`[ERROR] 回覆錯誤訊息時出錯：\n${replyError}`.red);
     }
+  }
+}
+
+async function handleVoteButton(client, interaction) {
+  try {
+    // 查找對應的投票提案
+    const proposal = await client.votingProposalsCollection.findOne({
+      messageId: interaction.message.id,
+      status: "VOTING",
+    });
+
+    if (!proposal) {
+      return interaction.reply({
+        content: "❌ 找不到對應的投票或投票已結束！",
+        ephemeral: true,
+      });
+    }
+
+    const userId = interaction.user.id;
+    const buttonType = interaction.customId;
+
+    // 處理不同類型的投票
+    if (proposal.proposalType === "create") {
+      await handleCreateVote(client, interaction, proposal, userId, buttonType);
+    } else if (proposal.proposalType === "archive") {
+      await handleArchiveVote(client, interaction, proposal, userId, buttonType);
+    }
+
+  } catch (error) {
+    console.log(`[ERROR] 處理投票按鈕時出錯：\n${error}\n${error.stack}`.red);
+    try {
+      await interaction.reply({
+        content: "❌ 處理投票時發生錯誤！",
+        ephemeral: true,
+      });
+    } catch (replyError) {
+      console.log(`[ERROR] 回覆錯誤訊息時出錯：\n${replyError}`.red);
+    }
+  }
+}
+
+async function handleCreateVote(client, interaction, proposal, userId, buttonType) {
+  // 移除用戶在所有類別中的投票（互斥邏輯）
+  const updates = {
+    $pull: {
+      "votes.players": userId,
+      "votes.supporters": userId,
+      "votes.noInterest": userId,
+    }
+  };
+
+  // 根據按鈕類型添加新投票
+  let voteTypeText = "";
+  let voteEmoji = "";
+
+  switch (buttonType) {
+    case "vote_player":
+      updates.$addToSet = { "votes.players": userId };
+      voteTypeText = "核心玩家 (🔥 我會玩)";
+      voteEmoji = "🔥";
+      break;
+    case "vote_support":
+      updates.$addToSet = { "votes.supporters": userId };
+      voteTypeText = "純支持 (👍 純支持)";
+      voteEmoji = "👍";
+      break;
+    case "vote_no_interest":
+      updates.$addToSet = { "votes.noInterest": userId };
+      voteTypeText = "沒興趣 (😶 沒興趣)";
+      voteEmoji = "😶";
+      break;
+  }
+
+  // 更新資料庫
+  await client.votingProposalsCollection.updateOne(
+    { _id: proposal._id },
+    updates
+  );
+
+  // 回覆用戶
+  await interaction.reply({
+    content: `${voteEmoji} 已將您的票更改為【${voteTypeText}】`,
+    ephemeral: true,
+  });
+
+  // 更新投票訊息顯示當前票數
+  await updateVoteMessage(client, interaction, proposal);
+}
+
+async function handleArchiveVote(client, interaction, proposal, userId, buttonType) {
+  // 移除用戶在所有類別中的投票（互斥邏輯）
+  const updates = {
+    $pull: {
+      "votes.stillPlaying": userId,
+      "votes.archiveOk": userId,
+    }
+  };
+
+  // 根據按鈕類型添加新投票
+  let voteTypeText = "";
+  let voteEmoji = "";
+
+  switch (buttonType) {
+    case "vote_still_playing":
+      updates.$addToSet = { "votes.stillPlaying": userId };
+      voteTypeText = "我還在玩 (✋ 反對封存)";
+      voteEmoji = "✋";
+      break;
+    case "vote_archive_ok":
+      updates.$addToSet = { "votes.archiveOk": userId };
+      voteTypeText = "同意封存 (📦 同意封存)";
+      voteEmoji = "📦";
+      break;
+  }
+
+  // 更新資料庫
+  await client.votingProposalsCollection.updateOne(
+    { _id: proposal._id },
+    updates
+  );
+
+  // 回覆用戶
+  await interaction.reply({
+    content: `${voteEmoji} 已將您的票更改為【${voteTypeText}】`,
+    ephemeral: true,
+  });
+
+  // 更新投票訊息顯示當前票數
+  await updateVoteMessage(client, interaction, proposal);
+}
+
+async function updateVoteMessage(client, interaction, proposal) {
+  try {
+    // 重新獲取最新的投票數據
+    const updatedProposal = await client.votingProposalsCollection.findOne({
+      _id: proposal._id
+    });
+
+    if (!updatedProposal) return;
+
+    const originalEmbed = interaction.message.embeds[0];
+    const { EmbedBuilder } = require("discord.js");
+
+    const updatedEmbed = EmbedBuilder.from(originalEmbed);
+
+    // 清除舊的投票統計欄位
+    updatedEmbed.spliceFields(2, updatedEmbed.data.fields?.length - 2 || 0);
+
+    // 添加新的投票統計
+    if (updatedProposal.proposalType === "create") {
+      const playersCount = updatedProposal.votes.players?.length || 0;
+      const supportersCount = updatedProposal.votes.supporters?.length || 0;
+      const noInterestCount = updatedProposal.votes.noInterest?.length || 0;
+      const totalScore = (playersCount * config.voting.weights.players) +
+                        (supportersCount * config.voting.weights.supporters);
+
+      updatedEmbed.addFields(
+        { name: "🔥 核心玩家", value: `${playersCount} 人`, inline: true },
+        { name: "👍 純支持", value: `${supportersCount} 人`, inline: true },
+        { name: "😶 沒興趣", value: `${noInterestCount} 人`, inline: true },
+        { name: "📊 總分", value: `${totalScore} 分`, inline: true },
+        {
+          name: "✅ 通過門檻",
+          value: `總分 ≥ ${config.voting.passThresholds.totalScore} 且 核心玩家 ≥ ${config.voting.passThresholds.minPlayers}`,
+          inline: false
+        }
+      );
+    } else {
+      const stillPlayingCount = updatedProposal.votes.stillPlaying?.length || 0;
+      const archiveOkCount = updatedProposal.votes.archiveOk?.length || 0;
+
+      updatedEmbed.addFields(
+        { name: "✋ 我還在玩", value: `${stillPlayingCount} 人`, inline: true },
+        { name: "📦 同意封存", value: `${archiveOkCount} 人`, inline: true },
+        {
+          name: "📌 封存條件",
+          value: `如果「我還在玩」< ${config.voting.archiveThresholds.minActivePlayers} 人，則封存頻道`,
+          inline: false
+        }
+      );
+    }
+
+    await interaction.message.edit({ embeds: [updatedEmbed] });
+
+  } catch (error) {
+    console.log(`[ERROR] 更新投票訊息時出錯：\n${error}`.red);
   }
 }

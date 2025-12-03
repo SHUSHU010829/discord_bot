@@ -17,12 +17,16 @@ module.exports = async (client) => {
     const voiceStatsCollection = database.collection("VoiceStats");
     const channelActivityCollection = database.collection("ChannelActivity");
 
+    // Voting system collection
+    const votingProposalsCollection = database.collection("VotingProposals");
+
     client.database = database;
     client.collection = collection;
     client.gaslightCollection = gaslightCollection;
     client.messageStatsCollection = messageStatsCollection;
     client.voiceStatsCollection = voiceStatsCollection;
     client.channelActivityCollection = channelActivityCollection;
+    client.votingProposalsCollection = votingProposalsCollection;
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
   } catch (error) {
     console.log(

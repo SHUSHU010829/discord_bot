@@ -49,6 +49,22 @@
     "ticketCreated": "✅ 票務已創建！\n請前往 {channel}"
   },
 
+  "voting": {
+    "votingChannelId": "YOUR_VOTING_CHANNEL_ID",
+    "voteDurationHours": 24,
+    "passThresholds": {
+      "totalScore": 15,
+      "minPlayers": 3
+    },
+    "archiveThresholds": {
+      "minActivePlayers": 2
+    },
+    "weights": {
+      "players": 3,
+      "supporters": 1
+    }
+  },
+
   "roles": [
     {
       "id": "1286170878463447133",
