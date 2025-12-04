@@ -242,41 +242,47 @@ async function handleVoteButton(client, interaction) {
 }
 
 async function handleCreateVote(client, interaction, proposal, userId, buttonType) {
-  // 移除用戶在所有類別中的投票（互斥邏輯）
-  const updates = {
-    $pull: {
-      "votes.players": userId,
-      "votes.supporters": userId,
-      "votes.noInterest": userId,
-    }
-  };
-
-  // 根據按鈕類型添加新投票
+  // 根據按鈕類型決定要添加的欄位
+  let targetField = "";
   let voteTypeText = "";
   let voteEmoji = "";
 
   switch (buttonType) {
     case "vote_player":
-      updates.$addToSet = { "votes.players": userId };
+      targetField = "votes.players";
       voteTypeText = "核心玩家 (🔥 我會玩)";
       voteEmoji = "🔥";
       break;
     case "vote_support":
-      updates.$addToSet = { "votes.supporters": userId };
+      targetField = "votes.supporters";
       voteTypeText = "純支持 (👍 純支持)";
       voteEmoji = "👍";
       break;
     case "vote_no_interest":
-      updates.$addToSet = { "votes.noInterest": userId };
+      targetField = "votes.noInterest";
       voteTypeText = "沒興趣 (😶 沒興趣)";
       voteEmoji = "😶";
       break;
   }
 
-  // 更新資料庫
+  // 步驟 1：先從所有類別中移除用戶（互斥邏輯）
   await client.votingProposalsCollection.updateOne(
     { _id: proposal._id },
-    updates
+    {
+      $pull: {
+        "votes.players": userId,
+        "votes.supporters": userId,
+        "votes.noInterest": userId,
+      }
+    }
+  );
+
+  // 步驟 2：將用戶添加到目標類別
+  await client.votingProposalsCollection.updateOne(
+    { _id: proposal._id },
+    {
+      $addToSet: { [targetField]: userId }
+    }
   );
 
   // 回覆用戶
@@ -290,35 +296,41 @@ async function handleCreateVote(client, interaction, proposal, userId, buttonTyp
 }
 
 async function handleArchiveVote(client, interaction, proposal, userId, buttonType) {
-  // 移除用戶在所有類別中的投票（互斥邏輯）
-  const updates = {
-    $pull: {
-      "votes.stillPlaying": userId,
-      "votes.archiveOk": userId,
-    }
-  };
-
-  // 根據按鈕類型添加新投票
+  // 根據按鈕類型決定要添加的欄位
+  let targetField = "";
   let voteTypeText = "";
   let voteEmoji = "";
 
   switch (buttonType) {
     case "vote_still_playing":
-      updates.$addToSet = { "votes.stillPlaying": userId };
+      targetField = "votes.stillPlaying";
       voteTypeText = "我還在玩 (✋ 反對封存)";
       voteEmoji = "✋";
       break;
     case "vote_archive_ok":
-      updates.$addToSet = { "votes.archiveOk": userId };
+      targetField = "votes.archiveOk";
       voteTypeText = "同意封存 (📦 同意封存)";
       voteEmoji = "📦";
       break;
   }
 
-  // 更新資料庫
+  // 步驟 1：先從所有類別中移除用戶（互斥邏輯）
   await client.votingProposalsCollection.updateOne(
     { _id: proposal._id },
-    updates
+    {
+      $pull: {
+        "votes.stillPlaying": userId,
+        "votes.archiveOk": userId,
+      }
+    }
+  );
+
+  // 步驟 2：將用戶添加到目標類別
+  await client.votingProposalsCollection.updateOne(
+    { _id: proposal._id },
+    {
+      $addToSet: { [targetField]: userId }
+    }
   );
 
   // 回覆用戶
