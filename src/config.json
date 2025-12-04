@@ -50,7 +50,7 @@
   },
 
   "voting": {
-    "votingChannelId": "YOUR_VOTING_CHANNEL_ID",
+    "votingChannelId": "1445987524291072152",
     "voteDurationHours": 24,
     "passThresholds": {
       "totalScore": 15,
