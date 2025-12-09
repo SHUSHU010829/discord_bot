@@ -57,54 +57,51 @@ module.exports = async (interaction, pages, time = 30 * 1000) => {
     mc.on("collect", async (i) => {
       if (i.user.id !== interaction.user.id)
         return i.reply({
-          content: "You are not allowed to do this!",
+          content: "只有發起者可以操作此按鈕！",
           ephemeral: true,
         });
 
       await i.deferUpdate();
 
       if (i.customId === "prev") {
-        if (index > 0) {
-          index--;
-        } else if (i.customId === "home") {
-          index = 0;
-        } else if (i.customId === "next") {
-          if (index < pages.length - 1) {
-            index++;
-          }
-        }
-
-        if (index === 0) {
-          prev.setDisabled(true);
-          home.setDisabled(true);
-        } else {
-          prev.setDisabled(false);
-          home.setDisabled(false);
-        }
-
-        if (index === pages.length - 1) {
-          next.setDisabled(true);
-        } else {
-          next.setDisabled(false);
-        }
-
-        await message.edit({
-          embeds: [pages[index]],
-          components: [buttons],
-        });
-
-        mc.resetTimer();
+        if (index > 0) index--;
+      } else if (i.customId === "home") {
+        index = 0;
+      } else if (i.customId === "next") {
+        if (index < pages.length - 1) index++;
       }
 
-      mc.on("end", async () => {
-        await message.edit({
-          embeds: [pages[index]],
-          components: [],
-        });
+      // 更新按鈕狀態
+      if (index === 0) {
+        prev.setDisabled(true);
+        home.setDisabled(true);
+      } else {
+        prev.setDisabled(false);
+        home.setDisabled(false);
+      }
+
+      if (index === pages.length - 1) {
+        next.setDisabled(true);
+      } else {
+        next.setDisabled(false);
+      }
+
+      await message.edit({
+        embeds: [pages[index]],
+        components: [buttons],
       });
 
-      return message;
+      mc.resetTimer();
     });
+
+    mc.on("end", async () => {
+      await message.edit({
+        embeds: [pages[index]],
+        components: [],
+      });
+    });
+
+    return message;
   } catch (error) {
     console.log(
       `[ERROR] An error occurred inside the button pagination:\n${error}`.red
