@@ -76,6 +76,7 @@ module.exports = {
         const foodData = {
           name: foodName,
           category: category,
+          drawCount: 0, // 初始化抽選次數
         };
 
         // 如果是飲料且有填寫店名，加入店名

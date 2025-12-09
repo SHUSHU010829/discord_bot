@@ -166,8 +166,14 @@ async function initializeFoodData(collection, clearExisting = false) {
       );
     }
 
+    // 為每個食物項目添加 drawCount: 0
+    const foodDataWithCount = initialFoodData.map((food) => ({
+      ...food,
+      drawCount: 0,
+    }));
+
     // 插入新資料
-    const insertResult = await collection.insertMany(initialFoodData);
+    const insertResult = await collection.insertMany(foodDataWithCount);
     console.log(
       `[SUCCESS] Inserted ${insertResult.insertedCount} food items!`.green
     );

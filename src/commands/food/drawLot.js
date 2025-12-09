@@ -72,6 +72,13 @@ module.exports = {
 
       if (foodList.length > 0) {
         const randomFood = foodList[Math.floor(Math.random() * foodList.length)];
+
+        // 更新抽選次數（drawCount +1）
+        await collection.updateOne(
+          { _id: randomFood._id },
+          { $inc: { drawCount: 1 } }
+        );
+
         let replyMessage = `逼逼機器人推薦你可以`;
 
         if (category) {
