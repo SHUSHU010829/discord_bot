@@ -85,11 +85,15 @@ module.exports = {
             dinner: [],
             snack: [],
             beverage: [],
+            uncategorized: [], // 未分類（舊資料）
           };
 
           foodList.forEach((food) => {
             if (food.category && categorizedFood[food.category]) {
               categorizedFood[food.category].push(food);
+            } else if (!food.category) {
+              // 沒有 category 的舊資料
+              categorizedFood.uncategorized.push(food);
             }
           });
 
@@ -116,12 +120,25 @@ module.exports = {
                 fieldValue = foods.map((food) => food.name).join(", ");
               }
 
+              // 設定欄位名稱
+              let fieldName = CATEGORY_DISPLAY[cat] || cat;
+              if (cat === "uncategorized") {
+                fieldName = "⚠️ 未分類（舊資料）";
+              }
+
               embed.addFields({
-                name: CATEGORY_DISPLAY[cat],
+                name: fieldName,
                 value: fieldValue || "無",
                 inline: false,
               });
             }
+          }
+
+          // 如果有未分類的資料，添加提示
+          if (categorizedFood.uncategorized.length > 0) {
+            embed.setFooter({
+              text: `發現 ${categorizedFood.uncategorized.length} 筆未分類的舊資料，請執行遷移腳本：node scripts/migrateFoodData.js`,
+            });
           }
 
           interaction.editReply({ content: "", embeds: [embed] });
