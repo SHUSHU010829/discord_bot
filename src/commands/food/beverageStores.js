@@ -47,7 +47,7 @@ module.exports = {
         });
 
         embed.setFooter({
-          text: "使用「/喝什麼 飲料店:店名」來抽選特定店家的飲品",
+          text: "使用「/喝什麼」指令，在飲料店選項中輸入店名即可看到下拉選單",
         });
 
         interaction.editReply({ content: "", embeds: [embed] });
