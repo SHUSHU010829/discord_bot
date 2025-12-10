@@ -14,15 +14,31 @@ module.exports = {
       option
         .setName("飲料店")
         .setDescription("選擇飲料店（不選則隨機所有飲料店）")
-        .addChoices(
-          { name: "🥤 可不可紅茶", value: "可不可紅茶" },
-          { name: "🧋 50嵐", value: "50嵐" },
-          { name: "🍹 迷客夏", value: "迷客夏" },
-          { name: "🍵 清心福全", value: "清心福全" },
-          { name: "🫖 麻古茶坊", value: "麻古茶坊" },
-          { name: "🥛 CoCo都可", value: "CoCo都可" }
-        )
+        .setAutocomplete(true)
     ),
+
+  autocomplete: async (client, interaction) => {
+    const collection = client.collection;
+    const focusedValue = interaction.options.getFocused();
+
+    try {
+      // 從資料庫取得所有飲料店名稱（不重複）
+      const beverageStores = await collection.distinct("beverageStore", {
+        category: "beverage",
+      });
+
+      // 過濾符合使用者輸入的選項
+      const filtered = beverageStores
+        .filter(store => store.toLowerCase().includes(focusedValue.toLowerCase()))
+        .slice(0, 25) // Discord 限制最多 25 個選項
+        .map(store => ({ name: store, value: store }));
+
+      await interaction.respond(filtered);
+    } catch (error) {
+      console.log(`[ERROR] An error occurred in drink autocomplete:\n${error}`.red);
+      await interaction.respond([]);
+    }
+  },
 
   run: async (client, interaction) => {
     const collection = client.collection;
