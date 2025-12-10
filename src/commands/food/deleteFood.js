@@ -40,6 +40,14 @@ module.exports = {
       option
         .setName("飲料店")
         .setDescription("飲料店名稱（僅在類別為飲料時需要填寫）")
+        .addChoices(
+          { name: "🥤 可不可紅茶", value: "可不可紅茶" },
+          { name: "🧋 50嵐", value: "50嵐" },
+          { name: "🍹 迷客夏", value: "迷客夏" },
+          { name: "🍵 清心福全", value: "清心福全" },
+          { name: "🫖 麻古茶坊", value: "麻古茶坊" },
+          { name: "🥛 CoCo都可", value: "CoCo都可" }
+        )
     ),
 
   run: async (client, interaction) => {
