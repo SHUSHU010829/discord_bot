@@ -35,20 +35,13 @@ module.exports = {
           { name: "🌅 早餐", value: "breakfast" },
           { name: "🌞 午餐", value: "lunch" },
           { name: "🌙 晚餐", value: "dinner" },
-          { name: "🌃 宵夜", value: "snack" },
-          { name: "🥤 飲料", value: "beverage" }
+          { name: "🌃 宵夜", value: "snack" }
         )
-    )
-    .addStringOption((option) =>
-      option
-        .setName("飲料店")
-        .setDescription("選擇飲料店（僅在類別為飲料時有效）")
     ),
 
   run: async (client, interaction) => {
     const collection = client.collection;
     const category = interaction.options.getString("類別");
-    const beverageStore = interaction.options.getString("飲料店");
 
     await interaction.reply({
       content: commandMessages.drawingLot,
@@ -56,16 +49,14 @@ module.exports = {
     });
 
     try {
-      // 構建查詢條件
+      // 構建查詢條件 - 排除飲料
       let query = {};
 
       if (category) {
         query.category = category;
-
-        // 如果是飲料且指定了飲料店
-        if (category === "beverage" && beverageStore) {
-          query.beverageStore = beverageStore;
-        }
+      } else {
+        // 沒有指定類別時，排除飲料
+        query.category = { $ne: "beverage" };
       }
 
       const foodList = await collection.find(query).toArray();
@@ -87,21 +78,13 @@ module.exports = {
           replyMessage += `吃... `;
         }
 
-        // 如果是飲料且有店名，顯示店名
-        if (randomFood.category === "beverage" && randomFood.beverageStore) {
-          replyMessage += `**${randomFood.beverageStore}** 的 **${randomFood.name}**！ ${commandEmojis.hiiiiii}`;
-        } else {
-          replyMessage += `**${randomFood.name}**！ ${commandEmojis.hiiiiii}`;
-        }
+        replyMessage += `**${randomFood.name}**！ ${commandEmojis.hiiiiii}`;
 
         interaction.editReply(replyMessage);
       } else {
         let noFoodMsg = "目前沒有可供選擇的";
         if (category) {
           noFoodMsg += `${CATEGORY_DISPLAY[category]}`;
-        }
-        if (beverageStore) {
-          noFoodMsg += `（${beverageStore}）`;
         }
         noFoodMsg += "選項。";
         interaction.editReply(noFoodMsg);
