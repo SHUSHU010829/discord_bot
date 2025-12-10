@@ -27,7 +27,7 @@ module.exports = {
       if (beverageStores.length > 0) {
         const embed = new EmbedBuilder()
           .setTitle("🥤 飲料店清單")
-          .setDescription("使用 `/吃什麼` 指令時可以指定以下飲料店：")
+          .setDescription("使用 `/喝什麼` 指令時可以選擇以下飲料店：")
           .setColor(0x00ae86);
 
         // 為每個飲料店添加飲品數量
@@ -47,7 +47,7 @@ module.exports = {
         });
 
         embed.setFooter({
-          text: "使用「/吃什麼 類別:飲料 飲料店:店名」來抽選特定店家的飲品",
+          text: "使用「/喝什麼 飲料店:店名」來抽選特定店家的飲品",
         });
 
         interaction.editReply({ content: "", embeds: [embed] });
