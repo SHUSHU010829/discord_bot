@@ -76,6 +76,7 @@ function createPaginationButtons(currentPage, totalPages) {
  */
 function createCategoryPages(category, foodList) {
   const pages = [];
+  const header = `**${CATEGORY_DISPLAY[category]}** 選項：\n\n`;
 
   if (category === "beverage") {
     // 飲料按店家分組
@@ -88,42 +89,67 @@ function createCategoryPages(category, foodList) {
       beveragesByStore[store].push(food.name);
     });
 
-    // 將店家分頁（每頁最多顯示幾家店）
+    // 將店家分頁
     const storeEntries = Object.entries(beveragesByStore);
-    let currentPage = "";
-    let currentPageLength = 0;
-    const headerLength = `**${CATEGORY_DISPLAY[category]}** 選項：\n\n`.length;
+    let currentPageContent = "";
 
     for (const [store, items] of storeEntries) {
       const storeText = `**${store}**：${items.join(", ")}\n`;
 
-      // 如果加上這個店家會超過限制，先保存當前頁面
-      if (currentPageLength + storeText.length + headerLength > MAX_MESSAGE_LENGTH - 100) {
-        if (currentPage) {
-          pages.push(`**${CATEGORY_DISPLAY[category]}** 選項：\n\n${currentPage}`);
-          currentPage = "";
-          currentPageLength = 0;
-        }
-      }
+      // 檢查加上這個店家是否會超過限制
+      const wouldExceedLimit = (header + currentPageContent + storeText).length > MAX_MESSAGE_LENGTH - 100;
 
-      currentPage += storeText;
-      currentPageLength += storeText.length;
+      if (wouldExceedLimit && currentPageContent) {
+        // 當前頁面已有內容且會超過限制，保存當前頁
+        pages.push(header + currentPageContent);
+        currentPageContent = storeText;
+      } else if (wouldExceedLimit && !currentPageContent) {
+        // 單個店家內容就超長，需要分割這個店家的飲料
+        const storeName = `**${store}**：`;
+        let storePageContent = "";
+
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          const itemWithComma = (i === 0 ? "" : ", ") + item;
+
+          if ((header + storeName + storePageContent + itemWithComma + "\n").length > MAX_MESSAGE_LENGTH - 100) {
+            // 保存當前頁
+            if (storePageContent) {
+              pages.push(header + storeName + storePageContent + "\n");
+              storePageContent = item; // 開始新的一頁，不加逗號
+            } else {
+              // 單個項目就太長，強制添加
+              pages.push(header + storeName + item + "\n");
+            }
+          } else {
+            storePageContent += itemWithComma;
+          }
+        }
+
+        // 添加這個店家的最後一頁
+        if (storePageContent) {
+          currentPageContent = storeName + storePageContent + "\n";
+        }
+      } else {
+        // 可以添加到當前頁
+        currentPageContent += storeText;
+      }
     }
 
     // 添加最後一頁
-    if (currentPage) {
-      pages.push(`**${CATEGORY_DISPLAY[category]}** 選項：\n\n${currentPage}`);
+    if (currentPageContent) {
+      pages.push(header + currentPageContent);
     }
   } else {
     // 一般食物分頁
     const itemPages = paginateArray(foodList, ITEMS_PER_PAGE);
     itemPages.forEach((pageItems) => {
       const itemNames = pageItems.map((food) => food.name).join(", ");
-      pages.push(`**${CATEGORY_DISPLAY[category]}** 選項：\n\n${itemNames}`);
+      pages.push(header + itemNames);
     });
   }
 
-  return pages.length > 0 ? pages : [`**${CATEGORY_DISPLAY[category]}** 選項：\n\n（無資料）`];
+  return pages.length > 0 ? pages : [header + "（無資料）"];
 }
 
 /**
