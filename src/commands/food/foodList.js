@@ -13,6 +13,28 @@ const CATEGORY_DISPLAY = {
   beverage: "🥤 飲料",
 };
 
+// Discord 限制常數
+const MAX_FIELD_LENGTH = 1024; // Discord embed field value 最大長度
+const MAX_MESSAGE_LENGTH = 2000; // Discord 訊息最大長度
+
+/**
+ * 截斷文字並添加省略提示
+ */
+function truncateText(text, maxLength, suffix = "") {
+  if (text.length <= maxLength) {
+    return text;
+  }
+  const truncated = text.substring(0, maxLength - suffix.length - 20);
+  const lastComma = truncated.lastIndexOf(",");
+  const lastNewline = truncated.lastIndexOf("\n");
+  const cutPoint = Math.max(lastComma, lastNewline);
+
+  if (cutPoint > 0) {
+    return text.substring(0, cutPoint) + suffix;
+  }
+  return truncated + suffix;
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("有什麼能吃")
@@ -71,6 +93,12 @@ module.exports = {
             replyMsg += foodList.map((food) => food.name).join(", ");
           }
 
+          // 檢查訊息長度，超過限制則截斷
+          if (replyMsg.length > MAX_MESSAGE_LENGTH) {
+            const suffix = `\n\n⚠️ 清單過長，僅顯示部分內容（共 ${foodList.length} 項）`;
+            replyMsg = truncateText(replyMsg, MAX_MESSAGE_LENGTH, suffix);
+          }
+
           interaction.editReply(replyMsg);
         } else {
           // 顯示所有類別（使用 Embed）
@@ -118,6 +146,12 @@ module.exports = {
                 }
               } else {
                 fieldValue = foods.map((food) => food.name).join(", ");
+              }
+
+              // 檢查 field value 長度，超過 Discord 限制則截斷
+              if (fieldValue.length > MAX_FIELD_LENGTH) {
+                const suffix = `\n... 等 ${foods.length} 項（使用 /有什麼能吃 並選擇「${CATEGORY_DISPLAY[cat] || cat}」查看完整清單）`;
+                fieldValue = truncateText(fieldValue, MAX_FIELD_LENGTH, suffix);
               }
 
               // 設定欄位名稱
