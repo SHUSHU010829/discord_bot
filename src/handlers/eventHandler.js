@@ -7,7 +7,7 @@ module.exports = (client) => {
   const eventFolders = getAllFiles(join(__dirname, "..", "events"), true);
 
   for (const eventFolder of eventFolders) {
-    const eventFiles = getAllFiles(eventFolder);
+    const eventFiles = getAllFiles(eventFolder).sort(); // 確保按字母順序執行
     let eventName;
 
     eventName = eventFolder.replace(/\\/g, "/").split("/").pop();
