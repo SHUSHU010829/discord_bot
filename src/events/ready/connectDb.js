@@ -28,6 +28,12 @@ module.exports = async (client) => {
     client.channelActivityCollection = channelActivityCollection;
     client.votingProposalsCollection = votingProposalsCollection;
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
+
+    // 確認有多少飲料店資料
+    const beverageStoreCount = await collection.distinct("beverageStore", {
+      category: "beverage",
+    });
+    console.log(`[DATA] Found ${beverageStoreCount.length} beverage stores in database`.cyan);
   } catch (error) {
     console.log(
       `[ERROR] An error occurred inside the command ask:\n${error}`.red
