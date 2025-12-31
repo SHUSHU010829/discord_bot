@@ -24,7 +24,7 @@ module.exports = (client) => {
       if (channel) {
         const formattedDate = DateTime.now()
           .setZone(morningMessage.timezone)
-          .toFormat("yyyy-MM-dd");
+          .toFormat("yyyyMMdd");
         const strawResult = await getStraw();
 
         if (calenderData) {
@@ -32,7 +32,7 @@ module.exports = (client) => {
             (data) => data.date === formattedDate
           );
 
-          if (matchingData && matchingData.is_holiday === true) {
+          if (matchingData && matchingData.isHoliday === true) {
             if (matchingData.description === "") {
               const message = morningMessage.templates.weekendNoDescription
                 .replace("{date}", formattedDate)
