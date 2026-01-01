@@ -6,9 +6,6 @@ module.exports = async (client, message) => {
   const threadsRegex = /(https?:\/\/)?(www\.)?(threads\.(net|com))([^\s]*)/gi;
 
   if (threadsRegex.test(message.content)) {
-    // Suppress embeds from the original message
-    await message.suppressEmbeds(true);
-
     // Extract threads links and convert to fixthreads.net
     const threadsLinks = [];
     let match;
@@ -28,9 +25,26 @@ module.exports = async (client, message) => {
     const replyContent = threadsLinks.map((link) => `[⇩](${link})`).join(" ");
 
     // Reply with the arrow links
-    await message.reply({
+    const replyMessage = await message.reply({
       content: replyContent,
       allowedMentions: { repliedUser: false },
     });
+
+    // Wait for Discord to generate embeds (3 seconds)
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    try {
+      // Fetch the reply message to check if embeds were generated
+      const fetchedReply = await replyMessage.fetch();
+
+      // If fixthreads link successfully generated embeds, suppress the original message embeds
+      if (fetchedReply.embeds && fetchedReply.embeds.length > 0) {
+        await message.suppressEmbeds(true);
+      }
+      // If no embeds were generated, keep the original message embeds
+    } catch (error) {
+      console.error("Error checking fixthreads embed:", error);
+      // On error, don't suppress original embeds to be safe
+    }
   }
 };
