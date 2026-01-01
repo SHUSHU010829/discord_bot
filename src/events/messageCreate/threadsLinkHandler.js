@@ -40,11 +40,13 @@ module.exports = async (client, message) => {
       // If fixthreads link successfully generated embeds, suppress the original message embeds
       if (fetchedReply.embeds && fetchedReply.embeds.length > 0) {
         await message.suppressEmbeds(true);
+      } else {
+        // If no embeds were generated, delete the fixthreads message as it's not useful
+        await replyMessage.delete();
       }
-      // If no embeds were generated, keep the original message embeds
     } catch (error) {
       console.error("Error checking fixthreads embed:", error);
-      // On error, don't suppress original embeds to be safe
+      // On error, keep both messages to be safe
     }
   }
 };
