@@ -41,12 +41,36 @@ npm run update-calendar
 1. 自動下載當前年份和下一年度的行事曆資料
 2. 備份現有的 `calender.json` 檔案（命名為 `calender.backup_[timestamp].json`）
 3. 合併兩年的資料並更新到 `src/data/calender.json`
+4. **如果下一年度的資料尚未發布，會繼續使用當前年份的資料（不會失敗）**
 
 ### 方法二：手動執行腳本
 
 ```bash
 node src/scripts/updateCalendar.js
 ```
+
+### 方法三：驗證現有資料
+
+```bash
+npm run verify-calendar
+```
+
+這會檢查：
+- 檔案是否存在
+- 日期格式是否正確
+- 資料完整性
+- 涵蓋的年份範圍
+- 假日統計等資訊
+
+### 方法四：轉換舊格式資料
+
+如果你的 `calender.json` 還是舊格式 (YYYY-MM-DD)，可以執行：
+
+```bash
+npm run convert-calendar
+```
+
+這會自動將所有日期從 `2025-01-01` 轉換成 `20250101` 格式。
 
 ### 建議更新時機
 

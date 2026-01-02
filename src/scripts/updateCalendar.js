@@ -57,12 +57,32 @@ async function updateCalendarData() {
   try {
     console.log('開始更新行事曆資料...\n');
 
-    // 下載當前年份和下一年的資料
-    const currentYearData = await fetchCalendarData(currentYear);
-    const nextYearData = await fetchCalendarData(nextYear);
+    let allData = [];
+    let successCount = 0;
 
-    // 合併資料
-    const mergedData = [...currentYearData, ...nextYearData];
+    // 下載當前年份的資料（必要）
+    try {
+      const currentYearData = await fetchCalendarData(currentYear);
+      allData = [...allData, ...currentYearData];
+      successCount++;
+    } catch (error) {
+      console.error(`✗ 無法下載 ${currentYear} 年的資料`);
+      throw error; // 當前年份是必要的，如果失敗就終止
+    }
+
+    // 下載下一年的資料（可選）
+    try {
+      const nextYearData = await fetchCalendarData(nextYear);
+      allData = [...allData, ...nextYearData];
+      successCount++;
+    } catch (error) {
+      console.warn(`⚠ 無法下載 ${nextYear} 年的資料，可能尚未發布`);
+      console.warn('  將只使用當前年份的資料');
+    }
+
+    if (allData.length === 0) {
+      throw new Error('沒有成功下載任何資料');
+    }
 
     // 備份現有檔案
     if (fs.existsSync(OUTPUT_PATH)) {
@@ -72,9 +92,14 @@ async function updateCalendarData() {
     }
 
     // 寫入新資料
-    fs.writeFileSync(OUTPUT_PATH, JSON.stringify(mergedData, null, 2), 'utf8');
+    fs.writeFileSync(OUTPUT_PATH, JSON.stringify(allData, null, 2), 'utf8');
     console.log(`✓ 成功更新行事曆資料至: ${OUTPUT_PATH}`);
-    console.log(`✓ 總共 ${mergedData.length} 筆資料 (${currentYear}: ${currentYearData.length} 筆, ${nextYear}: ${nextYearData.length} 筆)`);
+    console.log(`✓ 總共 ${allData.length} 筆資料 (成功下載 ${successCount} 個年份)`);
+
+    // 顯示詳細資訊
+    const years = [...new Set(allData.map(item => item.date.substring(0, 4)))];
+    console.log(`✓ 涵蓋年份: ${years.join(', ')}`);
+
     console.log('\n更新完成！');
   } catch (error) {
     console.error(`\n✗ 更新失敗: ${error.message}`);
