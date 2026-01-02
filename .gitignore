@@ -2,3 +2,6 @@
 pnpm-lock.yaml
 
 .env
+
+# Calendar backup files
+src/data/calender.backup_*.json
