@@ -39,15 +39,40 @@ module.exports = (client) => {
             (data) => data.date === searchDate
           );
 
+          // 計算倒數計時
+          const dayOfWeek = now.weekday; // 1=週一, 7=週日
+          const daysUntilWeekend = dayOfWeek >= 6 ? 0 : 6 - dayOfWeek; // 距離週六的天數
+
+          // 查找下一個假期
+          let nextHoliday = null;
+          let daysUntilHoliday = null;
+          if (calenderData) {
+            const sortedHolidays = calenderData
+              .filter((data) => data.isHoliday && data.date > searchDate)
+              .sort((a, b) => a.date.localeCompare(b.date));
+
+            if (sortedHolidays.length > 0) {
+              nextHoliday = sortedHolidays[0];
+              const holidayDate = DateTime.fromFormat(
+                nextHoliday.date,
+                "yyyyMMdd",
+                { zone: morningMessage.timezone }
+              );
+              daysUntilHoliday = Math.ceil(
+                holidayDate.diff(now, "days").days
+              );
+            }
+          }
+
           // 建立 embed
           const embed = new EmbedBuilder()
             .setColor(0xFFB347) // 溫暖的橘黃色（早晨的顏色）
-            .setTitle(`☀️ 早安！${morningMessage.emojis.yaa}`)
+            .setTitle(`早安！${morningMessage.emojis.yaa}`)
             .setTimestamp();
 
           // 添加日期時間欄位
           embed.addFields({
-            name: "📅 日期時間",
+            name: "日期時間",
             value: `${displayDate} 早上八點`,
             inline: false,
           });
@@ -57,30 +82,56 @@ module.exports = (client) => {
             if (matchingData.isHoliday) {
               if (matchingData.description) {
                 embed.addFields({
-                  name: "🎉 節日資訊",
+                  name: "節日資訊",
                   value: `今天是 **${matchingData.description}**，祝大家假期愉快！`,
                   inline: false,
                 });
               } else {
                 embed.addFields({
-                  name: "🎉 節日資訊",
+                  name: "節日資訊",
                   value: "今天是週末，好好休息吧！",
                   inline: false,
                 });
               }
             } else if (matchingData.description) {
               embed.addFields({
-                name: "📌 特殊日",
+                name: "特殊日",
                 value: `今天是 **${matchingData.description}**`,
                 inline: false,
               });
             }
           }
 
+          // 添加倒數計時資訊
+          const countdownParts = [];
+
+          if (daysUntilWeekend === 0) {
+            countdownParts.push("🎊 今天就是週末了！");
+          } else if (daysUntilWeekend === 1) {
+            countdownParts.push("距離週末還有 **1 天**");
+          } else {
+            countdownParts.push(`距離週末還有 **${daysUntilWeekend} 天**`);
+          }
+
+          if (nextHoliday && daysUntilHoliday) {
+            const holidayName = nextHoliday.description || "假期";
+            countdownParts.push(
+              `距離 **${holidayName}** 還有 **${daysUntilHoliday} 天**`
+            );
+          }
+
+          if (countdownParts.length > 0) {
+            embed.addFields({
+              name: "倒數計時",
+              value: countdownParts.join("\n"),
+              inline: false,
+            });
+          }
+
           // 添加抽卡運勢
           if (strawResult) {
             embed.addFields({
-              name: `🎴 今日抽卡運勢 ${morningMessage.emojis.prideFloat}`,
+              name: `今日抽卡運勢 ${morningMessage.emojis.prideFloat}`,
               value: `**${strawResult}**`,
               inline: true,
             });
@@ -89,7 +140,7 @@ module.exports = (client) => {
           // 添加匯率資訊
           if (foreignExchangeRate && foreignExchangeRate["USDTWD"]) {
             embed.addFields({
-              name: "💱 即時匯率",
+              name: "即時匯率",
               value: `USD/TWD - **${foreignExchangeRate["USDTWD"].Exrate}**`,
               inline: true,
             });
