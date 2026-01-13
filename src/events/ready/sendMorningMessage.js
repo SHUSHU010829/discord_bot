@@ -27,7 +27,6 @@ module.exports = (client) => {
           const now = DateTime.now().setZone(morningMessage.timezone);
 
           // 格式化日期為 yyyy-MM-dd
-          const displayDate = now.toFormat("yyyy-MM-dd");
           const searchDate = now.toFormat("yyyyMMdd");
 
           // 獲取所有需要的資料
@@ -39,27 +38,27 @@ module.exports = (client) => {
             (data) => data.date === searchDate
           );
 
-          // 計算倒數計時
-          const dayOfWeek = now.weekday; // 1=週一, 7=週日
-          const daysUntilWeekend = dayOfWeek >= 6 ? 0 : 6 - dayOfWeek; // 距離週六的天數
+          // 格式化日期，包含星期
+          const weekDay = matchingData?.week || now.toFormat("ccc");
+          const displayDate = `${now.toFormat("yyyy-MM-dd")}（${weekDay}）`;
 
-          // 查找下一個假期
-          let nextHoliday = null;
-          let daysUntilHoliday = null;
+          // 查找下一個有 description 的日子（不管是否為假期）
+          let nextSpecialDay = null;
+          let daysUntilSpecialDay = null;
           if (calenderData) {
-            const sortedHolidays = calenderData
-              .filter((data) => data.isHoliday && data.date > searchDate)
+            const sortedSpecialDays = calenderData
+              .filter((data) => data.description && data.description.trim() !== "" && data.date > searchDate)
               .sort((a, b) => a.date.localeCompare(b.date));
 
-            if (sortedHolidays.length > 0) {
-              nextHoliday = sortedHolidays[0];
-              const holidayDate = DateTime.fromFormat(
-                nextHoliday.date,
+            if (sortedSpecialDays.length > 0) {
+              nextSpecialDay = sortedSpecialDays[0];
+              const specialDate = DateTime.fromFormat(
+                nextSpecialDay.date,
                 "yyyyMMdd",
                 { zone: morningMessage.timezone }
               );
-              daysUntilHoliday = Math.ceil(
-                holidayDate.diff(now, "days").days
+              daysUntilSpecialDay = Math.ceil(
+                specialDate.diff(now, "days").days
               );
             }
           }
@@ -102,28 +101,16 @@ module.exports = (client) => {
             }
           }
 
-          // 添加倒數計時資訊
-          const countdownParts = [];
+          // 添加倒數計時資訊（只顯示有 description 的特殊日子）
+          if (nextSpecialDay && daysUntilSpecialDay) {
+            const specialDayName = nextSpecialDay.description;
+            const countdownText = daysUntilSpecialDay === 1
+              ? `距離 **${specialDayName}** 還有 **1 天**`
+              : `距離 **${specialDayName}** 還有 **${daysUntilSpecialDay} 天**`;
 
-          if (daysUntilWeekend === 0) {
-            countdownParts.push("🎊 今天就是週末了！");
-          } else if (daysUntilWeekend === 1) {
-            countdownParts.push("距離週末還有 **1 天**");
-          } else {
-            countdownParts.push(`距離週末還有 **${daysUntilWeekend} 天**`);
-          }
-
-          if (nextHoliday && daysUntilHoliday) {
-            const holidayName = nextHoliday.description || "假期";
-            countdownParts.push(
-              `距離 **${holidayName}** 還有 **${daysUntilHoliday} 天**`
-            );
-          }
-
-          if (countdownParts.length > 0) {
             embed.addFields({
               name: "倒數計時",
-              value: countdownParts.join("\n"),
+              value: countdownText,
               inline: false,
             });
           }
