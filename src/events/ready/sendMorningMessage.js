@@ -9,6 +9,7 @@ const { normalChannelId, morningMessage } = require("../../config.json");
 const calenderData = require("../../data/calender.json");
 const getStraw = require("../../utils/getStraw");
 const getForeignExchangeRate = require("../../utils/getForeignExchangeRate");
+const getLunarInfo = require("../../utils/getLunarInfo");
 
 module.exports = (client) => {
   // Schedule createMorningMessage to run every day at configured time
@@ -32,6 +33,7 @@ module.exports = (client) => {
           // 獲取所有需要的資料
           const strawResult = await getStraw();
           const foreignExchangeRate = await getForeignExchangeRate(client);
+          const lunarInfo = await getLunarInfo(now.year, now.month, now.day);
 
           // 查找當日行事曆資料
           const matchingData = calenderData?.find(
@@ -69,10 +71,14 @@ module.exports = (client) => {
             .setTitle(`早安！${morningMessage.emojis.yaa}`)
             .setTimestamp();
 
-          // 添加日期時間欄位
+          // 添加日期時間欄位（包含農曆）
+          let dateValue = `${displayDate} 早上八點`;
+          if (lunarInfo) {
+            dateValue += `\n${lunarInfo.lunarDate}`;
+          }
           embed.addFields({
             name: "日期時間",
-            value: `${displayDate} 早上八點`,
+            value: dateValue,
             inline: false,
           });
 
@@ -131,6 +137,26 @@ module.exports = (client) => {
               value: `USD/TWD - **${foreignExchangeRate["USDTWD"].Exrate}**`,
               inline: true,
             });
+          }
+
+          // 添加每日宜忌
+          if (lunarInfo) {
+            // 宜
+            if (lunarInfo.recommends && lunarInfo.recommends.length > 0) {
+              embed.addFields({
+                name: "今日宜",
+                value: lunarInfo.recommends.join("、"),
+                inline: false,
+              });
+            }
+            // 忌
+            if (lunarInfo.avoids && lunarInfo.avoids.length > 0) {
+              embed.addFields({
+                name: "今日忌",
+                value: lunarInfo.avoids.join("、"),
+                inline: false,
+              });
+            }
           }
 
           // 添加 footer
