@@ -33,7 +33,7 @@ module.exports = (client) => {
           // 獲取所有需要的資料
           const strawResult = await getStraw();
           const foreignExchangeRate = await getForeignExchangeRate(client);
-          const lunarInfo = getLunarInfo(now.year, now.month, now.day);
+          const lunarInfo = await getLunarInfo(now.year, now.month, now.day);
 
           // 查找當日行事曆資料
           const matchingData = calenderData?.find(
