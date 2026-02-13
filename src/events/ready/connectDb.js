@@ -3,10 +3,21 @@ require("colors");
 const { MongoClient } = require("mongodb");
 
 module.exports = async (client) => {
+  // 檢查環境變數
+  if (!process.env.MONGO_PASSWORD) {
+    console.log(`[ERROR] MONGO_PASSWORD environment variable is not set!`.red);
+    console.log(`[ERROR] Please create a .env file with MONGO_PASSWORD variable`.red);
+    console.log(`[WARNING] Database features will be disabled until this is fixed`.yellow);
+    return;
+  }
+
   const uri = `mongodb+srv://SHUSHU:${process.env.MONGO_PASSWORD}@morningbot.ar55cbn.mongodb.net/?retryWrites=true&w=majority`;
   const mongoClient = new MongoClient(uri);
+
   try {
+    console.log(`[DATA] Connecting to MongoDB...`.cyan);
     await mongoClient.connect();
+
     const dbName = "MorningBot";
     const database = mongoClient.db(dbName);
     const collection = database.collection("FoodList");
@@ -36,7 +47,10 @@ module.exports = async (client) => {
     console.log(`[DATA] Found ${beverageStoreCount.length} beverage stores in database`.cyan);
   } catch (error) {
     console.log(
-      `[ERROR] An error occurred inside the command ask:\n${error}`.red
+      `[ERROR] Failed to connect to MongoDB:\n${error}`.red
+    );
+    console.log(
+      `[WARNING] Database features will be disabled. Please check your MONGO_PASSWORD and network connection`.yellow
     );
   }
 };

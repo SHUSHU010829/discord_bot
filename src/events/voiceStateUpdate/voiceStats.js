@@ -7,6 +7,12 @@ const voiceJoinTimes = new Map();
 module.exports = async (client, oldState, newState) => {
   try {
     const voiceStatsCollection = client.voiceStatsCollection;
+
+    // 檢查資料庫集合是否已初始化
+    if (!voiceStatsCollection) {
+      return; // 靜默返回，避免日誌過多
+    }
+
     const member = newState.member || oldState.member;
     const guild = newState.guild || oldState.guild;
 
