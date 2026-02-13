@@ -18,6 +18,12 @@ module.exports = async (client) => {
 
 async function processExpiredVotes(client) {
   try {
+    // 檢查資料庫集合是否已初始化
+    if (!client.votingProposalsCollection) {
+      console.log(`[WARNING] 投票系統暫時無法使用：資料庫連接未建立`.yellow);
+      return;
+    }
+
     // 查找所有過期且狀態為 VOTING 的提案
     const expiredProposals = await client.votingProposalsCollection.find({
       status: "VOTING",
@@ -90,15 +96,17 @@ async function finalizeVote(client, proposal) {
     }
 
     // 更新提案狀態
-    await client.votingProposalsCollection.updateOne(
-      { _id: proposal._id },
-      {
-        $set: {
-          status: passed ? "PASSED" : "FAILED",
-          finalizedAt: new Date()
+    if (client.votingProposalsCollection) {
+      await client.votingProposalsCollection.updateOne(
+        { _id: proposal._id },
+        {
+          $set: {
+            status: passed ? "PASSED" : "FAILED",
+            finalizedAt: new Date()
+          }
         }
-      }
-    );
+      );
+    }
 
     console.log(
       `[VOTE] 投票 ${proposal.voteId} 已結算：${passed ? "通過 ✅" : "未通過 ❌"}`.cyan

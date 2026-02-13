@@ -12,6 +12,11 @@ module.exports = async (client, message) => {
     const messageStatsCollection = client.messageStatsCollection;
     const channelActivityCollection = client.channelActivityCollection;
 
+    // 檢查資料庫集合是否已初始化
+    if (!messageStatsCollection || !channelActivityCollection) {
+      return; // 靜默返回，避免日誌過多
+    }
+
     const today = DateTime.now().setZone("Asia/Taipei").toISODate(); // 格式: 2025-12-01
 
     // 更新用戶訊息統計
