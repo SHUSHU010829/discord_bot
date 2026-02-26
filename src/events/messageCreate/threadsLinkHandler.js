@@ -6,7 +6,7 @@ module.exports = async (client, message) => {
   const threadsRegex = /(https?:\/\/)?(www\.)?(threads\.(net|com))([^\s]*)/gi;
 
   if (threadsRegex.test(message.content)) {
-    // Extract threads links and convert to fixthreads.net
+    // Extract threads links and convert to vxthreads.net
     const threadsLinks = [];
     let match;
     const regex = new RegExp(threadsRegex.source, threadsRegex.flags);
@@ -17,7 +17,7 @@ module.exports = async (client, message) => {
       const finalProtocol = protocol || "https://";
       // Remove query parameters (everything after ?)
       const cleanPath = path ? path.split("?")[0] : "";
-      const fixthreadsLink = `${finalProtocol}fixthreads.net${cleanPath}`;
+      const fixthreadsLink = `${finalProtocol}vxthreads.net${cleanPath}`;
       threadsLinks.push(fixthreadsLink);
     }
 
@@ -37,7 +37,7 @@ module.exports = async (client, message) => {
       // Fetch the reply message to check if embeds were generated
       const fetchedReply = await replyMessage.fetch();
 
-      // If fixthreads link successfully generated embeds, suppress the original message embeds
+      // If vxthreads link successfully generated embeds, suppress the original message embeds
       if (fetchedReply.embeds && fetchedReply.embeds.length > 0) {
         await message.suppressEmbeds(true);
       } else {
@@ -45,7 +45,7 @@ module.exports = async (client, message) => {
         await replyMessage.delete();
       }
     } catch (error) {
-      console.error("Error checking fixthreads embed:", error);
+      console.error("Error checking vxthreads embed:", error);
       // On error, keep both messages to be safe
     }
   }
