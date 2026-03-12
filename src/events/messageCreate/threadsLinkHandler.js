@@ -35,17 +35,18 @@ async function fetchThreadsMeta(url) {
     const description = html.match(
       /<meta property="og:description" content="([^"]*?)"/
     )?.[1];
-    const image = html.match(
-      /<meta property="og:image" content="([^"]*?)"/
-    )?.[1];
+    // 抓所有圖片
+    const imageMatches = [
+      ...html.matchAll(/<meta property="og:image" content="([^"]*?)"/g),
+    ];
+    const images = imageMatches.map((m) => m[1].replace(/&amp;/g, "&"));
 
     if (!title && !description) return null;
 
     return {
       title: title ? decodeHtmlEntities(title) : null,
       description: description ? decodeHtmlEntities(description) : null,
-      // image URL 裡的 &amp; 也要還原
-      image: image ? image.replace(/&amp;/g, "&") : null,
+      images,
     };
   } catch (error) {
     console.log(`[Threads] 抓取 meta 失敗：${error.message}`);
@@ -71,7 +72,8 @@ module.exports = async (client, message) => {
     const meta = await fetchThreadsMeta(threadsUrl);
     if (!meta) return;
 
-    const embed = new EmbedBuilder()
+    // 主 embed
+    const mainEmbed = new EmbedBuilder()
       .setColor(0x000000)
       .setAuthor({
         name: meta.title || "Threads",
@@ -80,20 +82,29 @@ module.exports = async (client, message) => {
       .setURL(threadsUrl);
 
     if (meta.description) {
-      // 超過 4096 字截斷
       const desc =
         meta.description.length > 400
           ? meta.description.slice(0, 400) + "..."
           : meta.description;
-      embed.setDescription(desc);
+      mainEmbed.setDescription(desc);
     }
 
-    if (meta.image) {
-      embed.setImage(meta.image);
+    // 第一張圖放在主 embed
+    if (meta.images.length > 0) {
+      mainEmbed.setImage(meta.images[0]);
     }
-    
-    await message.suppressEmbeds(true); // 隱藏原本的空白預覽
-    await message.reply({ embeds: [embed] });
+
+    const embeds = [mainEmbed];
+
+    // 第二張之後，用額外的空 embed 帶圖（URL 相同會合併成圖片群組）
+    for (let i = 1; i < Math.min(meta.images.length, 4); i++) {
+      embeds.push(
+        new EmbedBuilder().setURL(threadsUrl).setImage(meta.images[i])
+      );
+    }
+
+    await message.suppressEmbeds(true);
+    await message.reply({ embeds });
   } catch (error) {
     console.log(`[ERROR] Threads link handler 發生錯誤：\n${error}`);
   }
