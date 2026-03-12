@@ -75,8 +75,6 @@ module.exports = async (client, message) => {
       .setColor(0x000000)
       .setAuthor({
         name: meta.title || "Threads",
-        iconURL:
-          "https://static.cdninstagram.com/rsrc.php/v3/yI/r/VsNE-OHk_8a.png",
         url: threadsUrl,
       })
       .setURL(threadsUrl);
@@ -93,13 +91,7 @@ module.exports = async (client, message) => {
     if (meta.image) {
       embed.setImage(meta.image);
     }
-
-    embed.setFooter({
-      text: "Threads",
-      iconURL:
-        "https://static.cdninstagram.com/rsrc.php/v3/yI/r/VsNE-OHk_8a.png",
-    });
-
+    
     await message.suppressEmbeds(true); // 隱藏原本的空白預覽
     await message.reply({ embeds: [embed] });
   } catch (error) {
