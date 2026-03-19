@@ -39,7 +39,9 @@ async function fetchThreadsMeta(url) {
     const imageMatches = [
       ...html.matchAll(/<meta property="og:image" content="([^"]*?)"/g),
     ];
-    const images = imageMatches.map((m) => m[1].replace(/&amp;/g, "&"));
+    const images = imageMatches
+      .map((m) => m[1].replace(/&amp;/g, "&"))
+      .filter((url) => !url.includes("/t51.2885-19/"));
 
     if (!title && !description) return null;
 
