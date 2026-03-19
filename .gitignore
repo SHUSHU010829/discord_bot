@@ -1,5 +1,8 @@
 /node_modules
 pnpm-lock.yaml
+pnpm-lock.json
+
+.claude
 
 .env
 
