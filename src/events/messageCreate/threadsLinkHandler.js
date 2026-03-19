@@ -40,16 +40,8 @@ async function fetchThreadsMeta(url) {
       ...html.matchAll(/<meta property="og:image" content="([^"]*?)"/g),
     ];
     const allImages = imageMatches.map((m) => m[1].replace(/&amp;/g, "&"));
-    const images = allImages.filter((url) => !url.includes("/t51.2885-19/"));
-
-    // Debug: 顯示所有 og:image 網址
-    console.log(`[Threads Debug] URL: ${url}`);
-    console.log(`[Threads Debug] 找到 ${allImages.length} 張 og:image：`);
-    allImages.forEach((img, i) => {
-      const isAvatar = img.includes("/t51.2885-19/");
-      console.log(`  [${i + 1}] ${isAvatar ? "(已過濾-頭像)" : "(保留)"} ${img}`);
-    });
-    console.log(`[Threads Debug] 過濾後剩餘 ${images.length} 張圖片`);
+    // 過濾大頭貼：Instagram CDN 大頭貼路徑格式為 /t51.xxxxx-19/
+    const images = allImages.filter((url) => !/\/t51\.\d+-19\//.test(url));
 
     if (!title && !description) return null;
 
