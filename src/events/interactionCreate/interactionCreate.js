@@ -22,6 +22,8 @@ function loadPanels() {
 
 module.exports = async (client, interaction) => {
   try {
+    // handleRoleSelect.js 會自動處理 StringSelectMenu，這裡不需要再調用
+
     if (!interaction.isButton()) return;
 
     // 處理票務按鈕

@@ -1,0 +1,36 @@
+{
+  "roles": [
+    {
+      "name": "LEAGUE OF LEGENDS",
+      "roleId": "1286170878463447133"
+    },
+    {
+      "name": "MARVEL RIVALS",
+      "roleId": "1286147639372546058"
+    },
+    {
+      "name": "VALORANT",
+      "roleId": "1286147829844279327"
+    },
+    {
+      "name": "APEX LEGENDS",
+      "roleId": "1286147284203208767"
+    },
+    {
+      "name": "MONSTER HUNTER",
+      "roleId": "1346738258679435365"
+    },
+    {
+      "name": "PARTY GAME",
+      "roleId": "1286172515223474248"
+    },
+    {
+      "name": "FRAGPUNK",
+      "roleId": "1346738510618693650"
+    }
+  ],
+  "panels": {
+    "1484247151491158136": 0
+  },
+  "targetChannelId": "1484229450601205881"
+}
