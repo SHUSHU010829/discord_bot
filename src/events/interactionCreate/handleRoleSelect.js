@@ -23,13 +23,12 @@ module.exports = async (client, interaction) => {
   }
 
   // 只處理角色選單
-  if (!interaction.customId || !interaction.customId.startsWith("role_select_")) {
+  if (
+    !interaction.customId ||
+    !interaction.customId.startsWith("role_select_")
+  ) {
     return; // 不是角色選單，直接返回
   }
-
-  console.log(`[DEBUG] handleRoleSelect 處理角色選單`.cyan);
-  console.log(`[DEBUG] customId: ${interaction.customId}`.cyan);
-  console.log(`[DEBUG] user: ${interaction.user?.username}`.cyan);
 
   try {
     // 確保在伺服器中執行
@@ -59,7 +58,6 @@ module.exports = async (client, interaction) => {
     // 確保 roles.cache 存在
     if (!member.roles || !member.roles.cache) {
       console.log(`[ERROR] member.roles.cache 不存在`.red);
-      console.log(`[DEBUG] member 結構:`, Object.keys(member));
       return await interaction.reply({
         content: "❌ 無法獲取你的身份組資訊，請稍後再試。",
         flags: 64,
@@ -69,8 +67,6 @@ module.exports = async (client, interaction) => {
     // 確保 interaction.values 存在
     if (!interaction.values || !Array.isArray(interaction.values)) {
       console.log(`[ERROR] interaction.values 不存在或不是陣列`.red);
-      console.log(`[DEBUG] interaction.customId: ${interaction.customId}`.cyan);
-      console.log(`[DEBUG] interaction.values:`, interaction.values);
       return await interaction.reply({
         content: "❌ 無法讀取你的選擇，請重試。",
         flags: 64,
@@ -81,24 +77,20 @@ module.exports = async (client, interaction) => {
     const selectedRoleIds = interaction.values; // 用戶選擇的角色 ID 陣列
 
     // 取得所有在選單中的角色 ID
-    const allMenuRoleIds = data.roles.map(r => r.roleId);
+    const allMenuRoleIds = data.roles.map((r) => r.roleId);
 
     // 計算目前擁有的選單角色
     const currentRoleIds = [];
-    member.roles.cache.forEach(role => {
+    member.roles.cache.forEach((role) => {
       if (allMenuRoleIds.includes(role.id)) {
         currentRoleIds.push(role.id);
       }
     });
 
-    const toAdd = selectedRoleIds.filter(id => !currentRoleIds.includes(id));
-    const toRemove = currentRoleIds.filter(id => !selectedRoleIds.includes(id));
-
-    console.log(`[DEBUG] 用戶: ${interaction.user.username}`.cyan);
-    console.log(`[DEBUG] 用戶選擇: ${selectedRoleIds.join(", ") || "無"}`.cyan);
-    console.log(`[DEBUG] 目前擁有: ${currentRoleIds.join(", ") || "無"}`.cyan);
-    console.log(`[DEBUG] 要新增: ${toAdd.join(", ") || "無"}`.green);
-    console.log(`[DEBUG] 要移除: ${toRemove.join(", ") || "無"}`.yellow);
+    const toAdd = selectedRoleIds.filter((id) => !currentRoleIds.includes(id));
+    const toRemove = currentRoleIds.filter(
+      (id) => !selectedRoleIds.includes(id),
+    );
 
     // 執行角色變更
     const addedRoles = [];
@@ -139,11 +131,11 @@ module.exports = async (client, interaction) => {
     let message = "";
 
     if (addedRoles.length > 0) {
-      message += `✅ **已新增身份組：**\n${addedRoles.map(name => `• ${name}`).join("\n")}\n\n`;
+      message += `✅ **已新增身份組：**\n${addedRoles.map((name) => `• ${name}`).join("\n")}\n\n`;
     }
 
     if (removedRoles.length > 0) {
-      message += `🗑️ **已移除身份組：**\n${removedRoles.map(name => `• ${name}`).join("\n")}\n\n`;
+      message += `🗑️ **已移除身份組：**\n${removedRoles.map((name) => `• ${name}`).join("\n")}\n\n`;
     }
 
     if (addedRoles.length === 0 && removedRoles.length === 0) {
@@ -159,7 +151,6 @@ module.exports = async (client, interaction) => {
       content: message.trim(),
       flags: 64, // MessageFlags.Ephemeral
     });
-
   } catch (error) {
     console.log(`[ERROR] 處理角色選單互動時出錯：${error}\n${error.stack}`.red);
 

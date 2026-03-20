@@ -22,7 +22,7 @@ function ensureDataFile() {
     const defaultData = {
       roles: [],
       panels: {},
-      targetChannelId: ""
+      targetChannelId: "",
     };
     fs.writeFileSync(PANELS_FILE, JSON.stringify(defaultData, null, 2));
   }
@@ -48,7 +48,7 @@ function createSelectMenus(roles, pageIndex = 0) {
   const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, roles.length);
   const pageRoles = roles.slice(startIndex, endIndex);
 
-  const options = pageRoles.map(role => {
+  const options = pageRoles.map((role) => {
     const option = {
       label: role.name,
       value: role.roleId,
@@ -96,7 +96,9 @@ async function updateAllPanels(client, data) {
           const embed = new EmbedBuilder()
             .setColor("#00ff00")
             .setTitle("🎮 遊戲身份組選單")
-            .setDescription("從下方選單選擇你想要的遊戲身份組！\n你可以同時選擇多個，或取消所有選擇。")
+            .setDescription(
+              "從下方選單選擇你想要的遊戲身份組！\n你可以同時選擇多個，或取消所有選擇。",
+            )
             .setFooter({ text: `第 ${i + 1} 頁，共 ${totalPages} 頁` })
             .setTimestamp();
 
@@ -108,7 +110,9 @@ async function updateAllPanels(client, data) {
           delete panels[messageId];
         }
       } catch (error) {
-        console.log(`[WARNING] 無法更新/刪除訊息 ${messageId}：${error.message}`.yellow);
+        console.log(
+          `[WARNING] 無法更新/刪除訊息 ${messageId}：${error.message}`.yellow,
+        );
         delete panels[messageId];
       }
     }
@@ -121,11 +125,16 @@ async function updateAllPanels(client, data) {
           const embed = new EmbedBuilder()
             .setColor("#00ff00")
             .setTitle("🎮 遊戲身份組選單")
-            .setDescription("從下方選單選擇你想要的遊戲身份組！\n你可以同時選擇多個，或取消所有選擇。")
+            .setDescription(
+              "從下方選單選擇你想要的遊戲身份組！\n你可以同時選擇多個，或取消所有選擇。",
+            )
             .setFooter({ text: `第 ${i + 1} 頁，共 ${totalPages} 頁` })
             .setTimestamp();
 
-          const message = await channel.send({ embeds: [embed], components: [row] });
+          const message = await channel.send({
+            embeds: [embed],
+            components: [row],
+          });
           panels[message.id] = i;
         } catch (error) {
           console.log(`[ERROR] 無法發送新訊息：${error.message}`.red);
@@ -142,12 +151,12 @@ async function updateAllPanels(client, data) {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("身份組選單")
+    .setName("setup-roles")
     .setDescription("🎮 遊戲身份組選單管理")
     .addSubcommand((subcommand) =>
       subcommand
         .setName("send")
-        .setDescription("在固定頻道發送角色選單（管理員）")
+        .setDescription("在固定頻道發送角色選單（管理員）"),
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -157,20 +166,20 @@ module.exports = {
           option
             .setName("name")
             .setDescription("遊戲名稱（全大寫）")
-            .setRequired(true)
+            .setRequired(true),
         )
         .addRoleOption((option) =>
           option
             .setName("role")
             .setDescription("對應的身份組")
-            .setRequired(true)
+            .setRequired(true),
         )
         .addStringOption((option) =>
           option
             .setName("emoji")
             .setDescription("顯示的 emoji（選填）")
-            .setRequired(false)
-        )
+            .setRequired(false),
+        ),
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -180,13 +189,11 @@ module.exports = {
           option
             .setName("name")
             .setDescription("要移除的遊戲名稱")
-            .setRequired(true)
-        )
+            .setRequired(true),
+        ),
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName("list")
-        .setDescription("列出所有已設定的遊戲角色")
+      subcommand.setName("list").setDescription("列出所有已設定的遊戲角色"),
     )
     .setDMPermission(false)
     .toJSON(),
@@ -239,14 +246,16 @@ async function handleSend(client, interaction) {
 
   if (!data.targetChannelId) {
     return interaction.reply({
-      content: "❌ 未設定目標頻道 ID！請在 role-panels.json 中設定 targetChannelId。",
+      content:
+        "❌ 未設定目標頻道 ID！請在 role-panels.json 中設定 targetChannelId。",
       flags: 64, // MessageFlags.Ephemeral
     });
   }
 
   if (data.roles.length === 0) {
     return interaction.reply({
-      content: "❌ 尚未設定任何遊戲角色！請先使用 `/setup-roles add` 新增遊戲。",
+      content:
+        "❌ 尚未設定任何遊戲角色！請先使用 `/setup-roles add` 新增遊戲。",
       flags: 64, // MessageFlags.Ephemeral
     });
   }
@@ -272,8 +281,15 @@ async function handleSend(client, interaction) {
       const embed = new EmbedBuilder()
         .setColor("#00ff00")
         .setTitle("🎮 遊戲身份組選單")
-        .setDescription("從下方選單選擇你想要的遊戲身份組！\n你可以同時選擇多個，或取消所有選擇。")
-        .setFooter({ text: totalPages > 1 ? `第 ${i + 1} 頁，共 ${totalPages} 頁` : "選擇你的遊戲" })
+        .setDescription(
+          "從下方選單選擇你想要的遊戲身份組！\n你可以同時選擇多個，或取消所有選擇。",
+        )
+        .setFooter({
+          text:
+            totalPages > 1
+              ? `第 ${i + 1} 頁，共 ${totalPages} 頁`
+              : "選擇你的遊戲",
+        })
         .setTimestamp();
 
       const message = await channel.send({
@@ -291,7 +307,6 @@ async function handleSend(client, interaction) {
       content: `✅ 已在 <#${data.targetChannelId}> 發送角色選單！（共 ${totalPages} 則訊息）`,
       flags: 64, // MessageFlags.Ephemeral
     });
-
   } catch (error) {
     console.log(`[ERROR] 發送角色選單時出錯：${error}`.red);
 
@@ -321,7 +336,9 @@ async function handleAdd(client, interaction) {
   const data = loadPanels();
 
   // 檢查是否已存在
-  const exists = data.roles.find(r => r.name === name || r.roleId === role.id);
+  const exists = data.roles.find(
+    (r) => r.name === name || r.roleId === role.id,
+  );
   if (exists) {
     return interaction.reply({
       content: "❌ 此遊戲或身份組已存在於選單中！",
@@ -363,7 +380,7 @@ async function handleRemove(client, interaction) {
   const name = interaction.options.getString("name").toUpperCase();
   const data = loadPanels();
 
-  const index = data.roles.findIndex(r => r.name === name);
+  const index = data.roles.findIndex((r) => r.name === name);
   if (index === -1) {
     return interaction.reply({
       content: "❌ 找不到此遊戲！",
@@ -403,7 +420,7 @@ async function handleList(client, interaction) {
           const emojiText = role.emoji ? `${role.emoji} ` : "";
           return `**${index + 1}.** ${emojiText}${role.name} - <@&${role.roleId}>`;
         })
-        .join("\n")
+        .join("\n"),
     )
     .setFooter({ text: `共 ${data.roles.length} 個遊戲` })
     .setTimestamp();

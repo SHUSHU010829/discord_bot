@@ -12,6 +12,15 @@ module.exports = async (client) => {
       getApplicationCommands(client, serverId),
     ]);
 
+    // 清除所有既有指令
+    console.log("🗑️  [COMMAND REGISTRY] Clearing all existing commands...".yellow);
+    const existingCommands = Array.from(applicationCommands.cache.values());
+    for (const existingCommand of existingCommands) {
+      await applicationCommands.delete(existingCommand.id);
+      console.log(`[COMMAND REGISTRY] Deleted existing command: ${existingCommand.name}`.grey);
+    }
+    console.log("✅ [COMMAND REGISTRY] All existing commands cleared".green);
+
     for (const localCommand of localCommands) {
       const { data, deleted } = localCommand;
       let {
@@ -50,60 +59,24 @@ module.exports = async (client) => {
         }
       }
 
-      const existingCommand = applicationCommands.cache.find(
-        (command) => command.name === commandName
-      );
-
+      // 跳過已標記為刪除的指令
       if (deleted) {
-        if (existingCommand) {
-          await applicationCommands.delete(existingCommand.id);
-          console.log(
-            `[COMMAND REGISTRY] Application command ${commandName} has been deleted`
-              .red
-          );
-        } else {
-          console.log(
-            `[COMMAND REGISTRY] Application command ${commandName} has been skipped, since property "deleted" is set.`
-              .grey
-          );
-        }
-      } else if (existingCommand) {
-        // 強制更新 "/喝什麼" 指令以確保 choices 正確設置
-        const needsUpdate = commandComparing(existingCommand, localCommand) ||
-          (commandName === "喝什麼" && commandOptions?.[0]?.choices?.length > 0);
-
-        if (needsUpdate) {
-          console.log(
-            `[COMMAND REGISTRY] Command ${commandName} has changes, updating...`.yellow
-          );
-          if (commandName === "喝什麼") {
-            console.log(`[COMMAND REGISTRY] Forcing update for /喝什麼 with ${commandOptions?.[0]?.choices?.length || 0} beverage store choices`.cyan);
-          }
-          await applicationCommands.edit(existingCommand.id, {
-            name: commandName,
-            description: commandDescription,
-            options: commandOptions,
-          });
-          console.log(
-            `[COMMAND REGISTRY] Application command ${commandName} has been edited`
-              .yellow
-          );
-        } else {
-          console.log(
-            `[COMMAND REGISTRY] Command ${commandName} is up to date`.grey
-          );
-        }
-      } else {
-        await applicationCommands.create({
-          name: commandName,
-          description: commandDescription,
-          options: commandOptions,
-        });
         console.log(
-          `[COMMAND REGISTRY] Application command ${commandName} has been registered.`
-            .green
+          `[COMMAND REGISTRY] Skipping ${commandName} (marked as deleted)`.grey
         );
+        continue;
       }
+
+      // 創建新指令
+      await applicationCommands.create({
+        name: commandName,
+        description: commandDescription,
+        options: commandOptions,
+      });
+      console.log(
+        `[COMMAND REGISTRY] Application command ${commandName} has been registered.`
+          .green
+      );
     }
   } catch (error) {
     console.log(

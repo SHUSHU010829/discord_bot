@@ -15,6 +15,15 @@ const rest = new REST({ version: "10" }).setToken(process.env.BOT_TOKEN);
 
 (async () => {
   try {
+    // 先清除所有既有指令
+    console.log("🗑️  正在清除所有既有應用程式指令...".yellow);
+    await rest.put(
+      Routes.applicationGuildCommands(process.env.CLIENT_ID, serverId),
+      { body: [] }
+    );
+    console.log("✅ 既有指令已清除".green);
+
+    // 重新註冊指令
     console.log("正在註冊應用程式指令...".yellow);
     await rest.put(
       Routes.applicationGuildCommands(process.env.CLIENT_ID, serverId),
