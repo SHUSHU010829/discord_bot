@@ -1,11 +1,19 @@
 require("colors");
-const { PermissionFlagsBits, ChannelType, EmbedBuilder } = require("discord.js");
+const {
+  PermissionFlagsBits,
+  ChannelType,
+  EmbedBuilder,
+} = require("discord.js");
 const config = require("../../config.json");
 const fs = require("fs");
 const path = require("path");
 
 // 票務面板數據文件路徑
 const PANELS_FILE = path.join(__dirname, "../../data/ticket-panels.json");
+const SUGGESTION_PANELS_FILE = path.join(
+  __dirname,
+  "../../data/suggestion-panels.json",
+);
 
 // 讀取面板數據
 function loadPanels() {
@@ -20,15 +28,70 @@ function loadPanels() {
   return { panels: {} };
 }
 
+// 讀取建議面板數據
+function loadSuggestionPanels() {
+  try {
+    if (fs.existsSync(SUGGESTION_PANELS_FILE)) {
+      const data = fs.readFileSync(SUGGESTION_PANELS_FILE, "utf8");
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.log(`[ERROR] 讀取建議面板數據時出錯：\n${error}`.red);
+  }
+  return { panels: {}, pendingDeletions: {} };
+}
+
+// 保存建議面板數據
+function saveSuggestionPanels(data) {
+  try {
+    fs.writeFileSync(SUGGESTION_PANELS_FILE, JSON.stringify(data, null, 2));
+  } catch (error) {
+    console.log(`[ERROR] 保存建議面板數據時出錯：\n${error}`.red);
+  }
+}
+
+// 用於追蹤已處理的互動，防止重複處理
+const processedInteractions = new Set();
+
+// 每 5 分鐘清理一次舊的互動 ID
+setInterval(
+  () => {
+    processedInteractions.clear();
+  },
+  5 * 60 * 1000,
+);
+
 module.exports = async (client, interaction) => {
   try {
     // handleRoleSelect.js 會自動處理 StringSelectMenu，這裡不需要再調用
 
     if (!interaction.isButton()) return;
 
+    // 檢查是否已經處理過這個互動
+    if (processedInteractions.has(interaction.id)) {
+      console.log(
+        `[WARNING] 互動 ${interaction.id} 已被處理過，跳過重複處理`.yellow,
+      );
+      return;
+    }
+
+    // 標記這個互動為已處理
+    processedInteractions.add(interaction.id);
+
     // 處理票務按鈕
     if (interaction.customId === "create_ticket") {
       await handleTicketCreation(client, interaction);
+      return;
+    }
+
+    // 處理建議按鈕
+    if (interaction.customId === "close_suggestion") {
+      await handleCloseSuggestion(client, interaction);
+      return;
+    }
+
+    if (interaction.customId === "cancel_close_suggestion") {
+      await handleCancelCloseSuggestion(client, interaction);
       return;
     }
 
@@ -38,7 +101,7 @@ module.exports = async (client, interaction) => {
       "vote_support",
       "vote_no_interest",
       "vote_still_playing",
-      "vote_archive_ok"
+      "vote_archive_ok",
     ];
 
     if (voteButtons.includes(interaction.customId)) {
@@ -47,6 +110,23 @@ module.exports = async (client, interaction) => {
     }
 
     // 處理身份組按鈕
+    // 先檢查是否是系統按鈕（避免誤處理）
+    const systemButtons = [
+      "create_ticket",
+      "close_suggestion",
+      "cancel_close_suggestion",
+      "vote_player",
+      "vote_support",
+      "vote_no_interest",
+      "vote_still_playing",
+      "vote_archive_ok",
+    ];
+
+    // 如果是系統按鈕或互動已被回應，則不處理
+    if (systemButtons.includes(interaction.customId) || interaction.replied) {
+      return;
+    }
+
     const role = interaction.guild.roles.cache.get(interaction.customId);
     if (!role) {
       return interaction.reply({
@@ -81,21 +161,23 @@ async function handleTicketCreation(client, interaction) {
     const panelConfig = panels.panels[interaction.channel.id];
 
     // 使用頻道特定配置或預設配置
-    const ticketConfig = panelConfig ? {
-      categoryId: panelConfig.categoryId,
-      supportRoleId: panelConfig.supportRoleId,
-      ticketNameFormat: config.ticket.ticketNameFormat,
-      welcomeMessage: config.ticket.welcomeMessage,
-      alreadyHasTicket: config.ticket.alreadyHasTicket,
-      ticketCreating: config.ticket.ticketCreating,
-      ticketCreated: config.ticket.ticketCreated,
-    } : config.ticket;
+    const ticketConfig = panelConfig
+      ? {
+          categoryId: panelConfig.categoryId,
+          supportRoleId: panelConfig.supportRoleId,
+          ticketNameFormat: config.ticket.ticketNameFormat,
+          welcomeMessage: config.ticket.welcomeMessage,
+          alreadyHasTicket: config.ticket.alreadyHasTicket,
+          ticketCreating: config.ticket.ticketCreating,
+          ticketCreated: config.ticket.ticketCreated,
+        }
+      : config.ticket;
 
     // 檢查用戶是否已經有票務
     const existingTicket = interaction.guild.channels.cache.find(
       (channel) =>
         channel.name === `ticket-${interaction.user.username.toLowerCase()}` &&
-        channel.type === ChannelType.GuildText
+        channel.type === ChannelType.GuildText,
     );
 
     if (existingTicket) {
@@ -112,12 +194,20 @@ async function handleTicketCreation(client, interaction) {
 
     // 驗證並獲取父類別
     let parentCategory = null;
-    if (ticketConfig.categoryId && ticketConfig.categoryId !== "YOUR_CATEGORY_ID") {
-      const category = interaction.guild.channels.cache.get(ticketConfig.categoryId);
+    if (
+      ticketConfig.categoryId &&
+      ticketConfig.categoryId !== "YOUR_CATEGORY_ID"
+    ) {
+      const category = interaction.guild.channels.cache.get(
+        ticketConfig.categoryId,
+      );
       if (category && category.type === ChannelType.GuildCategory) {
         parentCategory = ticketConfig.categoryId;
       } else {
-        console.log(`[WARNING] 票務類別 ID ${ticketConfig.categoryId} 無效或不存在，將在沒有類別的情況下創建頻道`.yellow);
+        console.log(
+          `[WARNING] 票務類別 ID ${ticketConfig.categoryId} 無效或不存在，將在沒有類別的情況下創建頻道`
+            .yellow,
+        );
       }
     }
 
@@ -125,7 +215,7 @@ async function handleTicketCreation(client, interaction) {
     const ticketChannel = await interaction.guild.channels.create({
       name: ticketConfig.ticketNameFormat.replace(
         "{username}",
-        interaction.user.username.toLowerCase()
+        interaction.user.username.toLowerCase(),
       ),
       type: ChannelType.GuildText,
       parent: parentCategory,
@@ -155,8 +245,13 @@ async function handleTicketCreation(client, interaction) {
     });
 
     // 如果有支援團隊身份組，添加權限
-    if (ticketConfig.supportRoleId && ticketConfig.supportRoleId !== "YOUR_SUPPORT_ROLE_ID") {
-      const supportRole = interaction.guild.roles.cache.get(ticketConfig.supportRoleId);
+    if (
+      ticketConfig.supportRoleId &&
+      ticketConfig.supportRoleId !== "YOUR_SUPPORT_ROLE_ID"
+    ) {
+      const supportRole = interaction.guild.roles.cache.get(
+        ticketConfig.supportRoleId,
+      );
       if (supportRole) {
         await ticketChannel.permissionOverwrites.create(
           ticketConfig.supportRoleId,
@@ -164,10 +259,13 @@ async function handleTicketCreation(client, interaction) {
             ViewChannel: true,
             SendMessages: true,
             ReadMessageHistory: true,
-          }
+          },
         );
       } else {
-        console.log(`[WARNING] 支援團隊身份組 ID ${ticketConfig.supportRoleId} 無效或不存在`.yellow);
+        console.log(
+          `[WARNING] 支援團隊身份組 ID ${ticketConfig.supportRoleId} 無效或不存在`
+            .yellow,
+        );
       }
     }
 
@@ -176,7 +274,10 @@ async function handleTicketCreation(client, interaction) {
       .setColor("#00ff00")
       .setTitle("🎫 票務已創建")
       .setDescription(
-        ticketConfig.welcomeMessage.replace("{user}", interaction.user.toString())
+        ticketConfig.welcomeMessage.replace(
+          "{user}",
+          interaction.user.toString(),
+        ),
       )
       .setTimestamp();
 
@@ -188,7 +289,7 @@ async function handleTicketCreation(client, interaction) {
     await interaction.editReply({
       content: ticketConfig.ticketCreated.replace(
         "{channel}",
-        ticketChannel.toString()
+        ticketChannel.toString(),
       ),
       ephemeral: true,
     });
@@ -227,9 +328,14 @@ async function handleVoteButton(client, interaction) {
     if (proposal.proposalType === "create") {
       await handleCreateVote(client, interaction, proposal, userId, buttonType);
     } else if (proposal.proposalType === "archive") {
-      await handleArchiveVote(client, interaction, proposal, userId, buttonType);
+      await handleArchiveVote(
+        client,
+        interaction,
+        proposal,
+        userId,
+        buttonType,
+      );
     }
-
   } catch (error) {
     console.log(`[ERROR] 處理投票按鈕時出錯：\n${error}\n${error.stack}`.red);
     try {
@@ -243,14 +349,20 @@ async function handleVoteButton(client, interaction) {
   }
 }
 
-async function handleCreateVote(client, interaction, proposal, userId, buttonType) {
+async function handleCreateVote(
+  client,
+  interaction,
+  proposal,
+  userId,
+  buttonType,
+) {
   // 移除用戶在所有類別中的投票（互斥邏輯）
   const updates = {
     $pull: {
       "votes.players": userId,
       "votes.supporters": userId,
       "votes.noInterest": userId,
-    }
+    },
   };
 
   // 根據按鈕類型添加新投票
@@ -278,7 +390,7 @@ async function handleCreateVote(client, interaction, proposal, userId, buttonTyp
   // 更新資料庫
   await client.votingProposalsCollection.updateOne(
     { _id: proposal._id },
-    updates
+    updates,
   );
 
   // 回覆用戶
@@ -291,13 +403,19 @@ async function handleCreateVote(client, interaction, proposal, userId, buttonTyp
   await updateVoteMessage(client, interaction, proposal);
 }
 
-async function handleArchiveVote(client, interaction, proposal, userId, buttonType) {
+async function handleArchiveVote(
+  client,
+  interaction,
+  proposal,
+  userId,
+  buttonType,
+) {
   // 移除用戶在所有類別中的投票（互斥邏輯）
   const updates = {
     $pull: {
       "votes.stillPlaying": userId,
       "votes.archiveOk": userId,
-    }
+    },
   };
 
   // 根據按鈕類型添加新投票
@@ -320,7 +438,7 @@ async function handleArchiveVote(client, interaction, proposal, userId, buttonTy
   // 更新資料庫
   await client.votingProposalsCollection.updateOne(
     { _id: proposal._id },
-    updates
+    updates,
   );
 
   // 回覆用戶
@@ -337,7 +455,7 @@ async function updateVoteMessage(client, interaction, proposal) {
   try {
     // 重新獲取最新的投票數據
     const updatedProposal = await client.votingProposalsCollection.findOne({
-      _id: proposal._id
+      _id: proposal._id,
     });
 
     if (!updatedProposal) return;
@@ -355,8 +473,9 @@ async function updateVoteMessage(client, interaction, proposal) {
       const playersCount = updatedProposal.votes.players?.length || 0;
       const supportersCount = updatedProposal.votes.supporters?.length || 0;
       const noInterestCount = updatedProposal.votes.noInterest?.length || 0;
-      const totalScore = (playersCount * config.voting.weights.players) +
-                        (supportersCount * config.voting.weights.supporters);
+      const totalScore =
+        playersCount * config.voting.weights.players +
+        supportersCount * config.voting.weights.supporters;
 
       updatedEmbed.addFields(
         { name: "🔥 核心玩家", value: `${playersCount} 人`, inline: true },
@@ -366,8 +485,8 @@ async function updateVoteMessage(client, interaction, proposal) {
         {
           name: "✅ 通過門檻",
           value: `總分 ≥ ${config.voting.passThresholds.totalScore} 且 核心玩家 ≥ ${config.voting.passThresholds.minPlayers}`,
-          inline: false
-        }
+          inline: false,
+        },
       );
     } else {
       const stillPlayingCount = updatedProposal.votes.stillPlaying?.length || 0;
@@ -379,14 +498,186 @@ async function updateVoteMessage(client, interaction, proposal) {
         {
           name: "📌 封存條件",
           value: `如果「我還在玩」< ${config.voting.archiveThresholds.minActivePlayers} 人，則封存頻道`,
-          inline: false
-        }
+          inline: false,
+        },
       );
     }
 
     await interaction.message.edit({ embeds: [updatedEmbed] });
-
   } catch (error) {
     console.log(`[ERROR] 更新投票訊息時出錯：\n${error}`.red);
+  }
+}
+
+async function handleCloseSuggestion(client, interaction) {
+  try {
+    // 檢查互動是否已被回應
+    if (interaction.replied || interaction.deferred) {
+      console.log(`[WARNING] 互動已被回應，跳過處理關閉建議`.yellow);
+      return;
+    }
+
+    console.log(
+      `[SUGGESTION] 開始處理關閉建議，互動 ID: ${interaction.id}`.cyan,
+    );
+
+    const {
+      ActionRowBuilder,
+      ButtonBuilder,
+      ButtonStyle,
+    } = require("discord.js");
+
+    // 計算刪除時間（24小時後）
+    const deleteTime = new Date();
+    deleteTime.setHours(
+      deleteTime.getHours() + config.suggestion.closeDelayHours,
+    );
+    const deleteTimestamp = Math.floor(deleteTime.getTime() / 1000);
+
+    // 更新訊息，顯示關閉狀態和取消按鈕
+    const closeEmbed = new EmbedBuilder()
+      .setColor("#ff9900")
+      .setTitle("🔒 建議已關閉")
+      .setDescription(
+        `此建議頻道已被 ${interaction.user} 關閉。\n\n` +
+          `⏰ 頻道將在 <t:${deleteTimestamp}:R>（<t:${deleteTimestamp}:F>）自動刪除。\n\n` +
+          `如需取消刪除，請點擊下方按鈕。`,
+      )
+      .setTimestamp();
+
+    const cancelButton = new ButtonBuilder()
+      .setCustomId("cancel_close_suggestion")
+      .setLabel("取消關閉")
+      .setEmoji("↩️")
+      .setStyle(ButtonStyle.Secondary);
+
+    const row = new ActionRowBuilder().addComponents(cancelButton);
+
+    // 直接編輯訊息，不使用 interaction 方法
+    await interaction.message.edit({
+      embeds: [closeEmbed],
+      components: [row],
+    });
+
+    // 最後才確認互動（避免阻塞）
+    try {
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.deferUpdate();
+      }
+    } catch (err) {
+      // 忽略互動確認錯誤
+      console.log(`[DEBUG] 互動確認失敗（已忽略）: ${err.message}`.gray);
+    }
+
+    // 記錄待刪除的頻道
+    const data = loadSuggestionPanels();
+    data.pendingDeletions[interaction.channel.id] = {
+      channelId: interaction.channel.id,
+      guildId: interaction.guild.id,
+      deleteAt: deleteTime.toISOString(),
+      closedBy: interaction.user.id,
+      closedAt: new Date().toISOString(),
+    };
+    saveSuggestionPanels(data);
+
+    console.log(
+      `[SUGGESTION] 建議頻道 ${interaction.channel.name} 已標記為將於 ${deleteTime.toISOString()} 刪除`
+        .yellow,
+    );
+  } catch (error) {
+    console.log(`[ERROR] 處理關閉票務時出錯：\n${error}\n${error.stack}`.red);
+
+    // 只有在互動尚未被回應時才嘗試回覆
+    if (!interaction.replied && !interaction.deferred) {
+      try {
+        await interaction.reply({
+          content: "❌ 關閉票務時發生錯誤！",
+          ephemeral: true,
+        });
+      } catch (replyError) {
+        console.log(`[ERROR] 回覆錯誤訊息時出錯：\n${replyError}`.red);
+      }
+    }
+  }
+}
+
+async function handleCancelCloseSuggestion(client, interaction) {
+  try {
+    // 檢查互動是否已被回應
+    if (interaction.replied || interaction.deferred) {
+      console.log(`[WARNING] 互動已被回應，跳過處理取消關閉建議`.yellow);
+      return;
+    }
+
+    console.log(
+      `[SUGGESTION] 開始處理取消關閉，互動 ID: ${interaction.id}`.cyan,
+    );
+
+    const {
+      ActionRowBuilder,
+      ButtonBuilder,
+      ButtonStyle,
+    } = require("discord.js");
+
+    // 從待刪除列表中移除
+    const data = loadSuggestionPanels();
+    if (data.pendingDeletions[interaction.channel.id]) {
+      delete data.pendingDeletions[interaction.channel.id];
+      saveSuggestionPanels(data);
+    }
+
+    // 恢復原始關閉按鈕
+    const cancelEmbed = new EmbedBuilder()
+      .setColor("#00ff00")
+      .setTitle("✅ 已取消關閉")
+      .setDescription(
+        `${interaction.user} 已取消關閉此建議頻道。\n\n` +
+          `如需關閉，請點擊下方按鈕。`,
+      )
+      .setTimestamp();
+
+    const closeButton = new ButtonBuilder()
+      .setCustomId("close_suggestion")
+      .setLabel("關閉票務")
+      .setEmoji("🔒")
+      .setStyle(ButtonStyle.Danger);
+
+    const row = new ActionRowBuilder().addComponents(closeButton);
+
+    // 直接編輯訊息，不使用 interaction 方法
+    await interaction.message.edit({
+      embeds: [cancelEmbed],
+      components: [row],
+    });
+
+    // 最後才確認互動（避免阻塞）
+    try {
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.deferUpdate();
+      }
+    } catch (err) {
+      // 忽略互動確認錯誤
+      console.log(`[DEBUG] 互動確認失敗（已忽略）: ${err.message}`.gray);
+    }
+
+    console.log(
+      `[SUGGESTION] 建議頻道 ${interaction.channel.name} 的刪除已取消`.green,
+    );
+  } catch (error) {
+    console.log(
+      `[ERROR] 處理取消關閉票務時出錯：\n${error}\n${error.stack}`.red,
+    );
+
+    // 只有在互動尚未被回應時才嘗試回覆
+    if (!interaction.replied && !interaction.deferred) {
+      try {
+        await interaction.reply({
+          content: "❌ 取消關閉時發生錯誤！",
+          ephemeral: true,
+        });
+      } catch (replyError) {
+        console.log(`[ERROR] 回覆錯誤訊息時出錯：\n${replyError}`.red);
+      }
+    }
   }
 }

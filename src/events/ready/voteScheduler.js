@@ -95,6 +95,22 @@ async function finalizeVote(client, proposal) {
       }
     }
 
+    // 如果投票通過，發送通知到指定頻道
+    if (passed) {
+      try {
+        const resultChannelId = "1181144417277595669";
+        const resultChannel = await guild.channels.fetch(resultChannelId).catch(() => null);
+
+        if (resultChannel) {
+          await notifyResultChannel(client, resultChannel, proposal);
+        } else {
+          console.log(`[WARNING] 找不到結果通知頻道 ${resultChannelId}`.yellow);
+        }
+      } catch (error) {
+        console.log(`[ERROR] 發送結果通知時出錯：\n${error}`.red);
+      }
+    }
+
     // 更新提案狀態
     if (client.votingProposalsCollection) {
       await client.votingProposalsCollection.updateOne(
@@ -288,6 +304,80 @@ async function notifyTicketChannel(client, ticketChannel, proposal, passed) {
 
   } catch (error) {
     console.log(`[ERROR] 發送通知到票務頻道時出錯：\n${error}`.red);
+    throw error;
+  }
+}
+
+async function notifyResultChannel(client, resultChannel, proposal) {
+  try {
+    const proposer = await client.users.fetch(proposal.proposerId).catch(() => null);
+    const proposerTag = proposer ? proposer.tag : "未知用戶";
+
+    const resultEmbed = new EmbedBuilder()
+      .setColor("#00ff00")
+      .setTitle("✅ 投票通過通知")
+      .setDescription(
+        `**遊戲名稱：** ${proposal.gameName}\n` +
+        `**提案類型：** ${proposal.proposalType === "create" ? "新增頻道" : "封存頻道"}`
+      );
+
+    if (proposal.proposalType === "create") {
+      // 獲取投了「我會玩」的玩家列表
+      const players = proposal.votes.players || [];
+      const supporters = proposal.votes.supporters || [];
+      const playersCount = players.length;
+      const supportersCount = supporters.length;
+      const totalScore = (playersCount * config.voting.weights.players) +
+                        (supportersCount * config.voting.weights.supporters);
+
+      resultEmbed.addFields(
+        { name: "🔥 核心玩家", value: `${playersCount} 人`, inline: true },
+        { name: "👍 純支持", value: `${supportersCount} 人`, inline: true },
+        { name: "📊 總分", value: `${totalScore} 分`, inline: true }
+      );
+
+      resultEmbed.addFields({
+        name: "📢 下一步",
+        value: "請管理員為該遊戲建立專屬頻道。",
+        inline: false
+      });
+
+      // 後台 log 核心玩家名單
+      if (players.length > 0) {
+        const playerTags = await Promise.all(
+          players.map(async (id) => {
+            const user = await client.users.fetch(id).catch(() => null);
+            return user ? user.tag : id;
+          })
+        );
+        console.log(`[VOTE] 核心玩家名單：${playerTags.join(", ")}`.cyan);
+      }
+    } else {
+      const stillPlayingCount = proposal.votes.stillPlaying?.length || 0;
+      const archiveOkCount = proposal.votes.archiveOk?.length || 0;
+
+      resultEmbed.addFields(
+        { name: "✋ 我還在玩", value: `${stillPlayingCount} 人`, inline: true },
+        { name: "📦 同意封存", value: `${archiveOkCount} 人`, inline: true },
+        {
+          name: "📢 下一步",
+          value: "請管理員進行頻道封存作業。",
+          inline: false
+        }
+      );
+    }
+
+    resultEmbed.setTimestamp().setFooter({ text: `投票 ID：${proposal.voteId}` });
+
+    await resultChannel.send({ embeds: [resultEmbed] });
+
+    // 後台 log 提案人和詳細資訊
+    console.log(`[VOTE] 已發送通過通知到結果頻道：${resultChannel.name}`.green);
+    console.log(`[VOTE] 提案人：${proposerTag} (${proposal.proposerId})`.cyan);
+    console.log(`[VOTE] 遊戲名稱：${proposal.gameName}`.cyan);
+
+  } catch (error) {
+    console.log(`[ERROR] 發送通知到結果頻道時出錯：\n${error}`.red);
     throw error;
   }
 }

@@ -37,7 +37,7 @@ module.exports = {
     .setDMPermission(false)
     .toJSON(),
 
-  userPermissions: [PermissionFlagsBits.ManageChannels],
+  userPermissions: [PermissionFlagsBits.Administrator],
   botPermissions: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels],
 
   run: async (client, interaction) => {
@@ -49,55 +49,47 @@ module.exports = {
       }
     } catch (error) {
       console.log(`[ERROR] proposal 指令執行時出錯：\n${error}\n${error.stack}`.red);
-      await interaction.reply({
-        content: "❌ 執行指令時發生錯誤！",
-        ephemeral: true,
-      });
+
+      // 根據 interaction 狀態選擇回應方式
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({
+          content: "❌ 執行指令時發生錯誤！",
+        }).catch(() => {});
+      } else {
+        await interaction.reply({
+          content: "❌ 執行指令時發生錯誤！",
+          ephemeral: true,
+        }).catch(() => {});
+      }
     }
   },
 };
 
 async function handleProposalStart(client, interaction) {
   try {
-    // 檢查是否在票務頻道中
-    if (!interaction.channel.name.startsWith("ticket-")) {
-      return interaction.reply({
-        content: "❌ 此指令只能在票務頻道中使用！",
-        ephemeral: true,
-      });
-    }
+    // 先 defer reply，避免超時
+    await interaction.deferReply({ ephemeral: true });
 
     const gameName = interaction.options.getString("game");
     const proposalType = interaction.options.getString("type");
 
-    // 從票務頻道的 topic 中獲取提案人 ID
-    const ticketCreatorMatch = interaction.channel.topic?.match(/票務創建者：(\d+)/);
-    if (!ticketCreatorMatch) {
-      return interaction.reply({
-        content: "❌ 無法識別票務創建者！",
-        ephemeral: true,
-      });
-    }
-    const proposerId = ticketCreatorMatch[1];
+    // 使用執行指令的人作為提案人
+    const proposerId = interaction.user.id;
 
     // 檢查投票頻道是否已設置
     const votingChannelId = config.voting.votingChannelId;
     if (!votingChannelId || votingChannelId === "YOUR_VOTING_CHANNEL_ID") {
-      return interaction.reply({
+      return interaction.editReply({
         content: "❌ 投票頻道尚未設置！請在 config.json 中設置 voting.votingChannelId。",
-        ephemeral: true,
       });
     }
 
     const votingChannel = await interaction.guild.channels.fetch(votingChannelId);
     if (!votingChannel) {
-      return interaction.reply({
+      return interaction.editReply({
         content: "❌ 找不到投票頻道！請檢查配置。",
-        ephemeral: true,
       });
     }
-
-    await interaction.deferReply({ ephemeral: true });
 
     // 建立投票 Embed
     const proposer = await interaction.guild.members.fetch(proposerId);

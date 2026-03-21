@@ -3,15 +3,14 @@ const {
   PermissionFlagsBits,
   EmbedBuilder,
   ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
+  StringSelectMenuBuilder,
 } = require("discord.js");
 const config = require("../../config.json");
 const fs = require("fs");
 const path = require("path");
 
-// 票務面板數據文件路徑
-const PANELS_FILE = path.join(__dirname, "../../data/ticket-panels.json");
+// 建議面板數據文件路徑
+const PANELS_FILE = path.join(__dirname, "../../data/suggestion-panels.json");
 
 // 確保數據目錄和文件存在
 function ensureDataFile() {
@@ -20,7 +19,7 @@ function ensureDataFile() {
     fs.mkdirSync(dataDir, { recursive: true });
   }
   if (!fs.existsSync(PANELS_FILE)) {
-    fs.writeFileSync(PANELS_FILE, JSON.stringify({ panels: {} }, null, 2));
+    fs.writeFileSync(PANELS_FILE, JSON.stringify({ panels: {}, pendingDeletions: {} }, null, 2));
   }
 }
 
@@ -38,47 +37,25 @@ function savePanels(data) {
 }
 
 module.exports = {
-  deleted: true,
-  data: {
-    name: "setup-ticket",
-    description: "🎫 設置票務系統面板（已停用）"
-  }
-};
-
-/*
-// 原始代碼已註解（已停用）
-module.exports = {
   data: new SlashCommandBuilder()
-    .setName("setup-ticket")
-    .setDescription("🎫 設置票務系統面板")
+    .setName("setup-suggestion")
+    .setDescription("💡 設置建議系統面板")
     .addStringOption((option) =>
       option
         .setName("title")
-        .setDescription("票務面板標題（留空使用預設）")
+        .setDescription("建議面板標題（留空使用預設）")
         .setRequired(false)
     )
     .addStringOption((option) =>
       option
         .setName("description")
-        .setDescription("票務面板描述（留空使用預設）")
-        .setRequired(false)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("button_label")
-        .setDescription("按鈕標籤（留空使用預設）")
-        .setRequired(false)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("button_emoji")
-        .setDescription("按鈕 emoji（留空使用預設）")
+        .setDescription("建議面板描述（留空使用預設）")
         .setRequired(false)
     )
     .addStringOption((option) =>
       option
         .setName("category_id")
-        .setDescription("票務類別 ID（留空使用預設）")
+        .setDescription("建議類別 ID（留空使用預設）")
         .setRequired(false)
     )
     .addRoleOption((option) =>
@@ -96,13 +73,11 @@ module.exports = {
   run: async (client, interaction) => {
     try {
       // 獲取自定義選項或使用預設值
-      const title = interaction.options.getString("title") || config.ticket.panelTitle;
-      const description = interaction.options.getString("description") || config.ticket.panelDescription;
-      const buttonLabel = interaction.options.getString("button_label") || config.ticket.buttonLabel;
-      const buttonEmoji = interaction.options.getString("button_emoji") || config.ticket.buttonEmoji;
-      const categoryId = interaction.options.getString("category_id") || config.ticket.categoryId;
+      const title = interaction.options.getString("title") || config.suggestion.panelTitle;
+      const description = interaction.options.getString("description") || config.suggestion.panelDescription;
+      const categoryId = interaction.options.getString("category_id") || config.suggestion.categoryId;
       const supportRole = interaction.options.getRole("support_role");
-      const supportRoleId = supportRole ? supportRole.id : config.ticket.supportRoleId;
+      const supportRoleId = supportRole ? supportRole.id : config.suggestion.supportRoleId;
 
       // 驗證類別 ID（如果提供）
       if (categoryId && categoryId !== "YOUR_CATEGORY_ID") {
@@ -116,22 +91,28 @@ module.exports = {
       }
 
       const embed = new EmbedBuilder()
-        .setColor("#0099ff")
+        .setColor("#FFD700")
         .setTitle(title)
         .setDescription(description)
         .setTimestamp()
         .setFooter({ text: interaction.guild.name });
 
-      const button = new ButtonBuilder()
-        .setCustomId("create_ticket")
-        .setLabel(buttonLabel)
-        .setEmoji(buttonEmoji)
-        .setStyle(ButtonStyle.Primary);
+      // 創建下拉選單選項
+      const selectMenuOptions = Object.entries(config.suggestion.types).map(([key, type]) => ({
+        label: type.label,
+        value: key,
+        emoji: type.emoji,
+      }));
 
-      const row = new ActionRowBuilder().addComponents(button);
+      const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId("suggestion_select")
+        .setPlaceholder(config.suggestion.selectPlaceholder)
+        .addOptions(selectMenuOptions);
+
+      const row = new ActionRowBuilder().addComponents(selectMenu);
 
       await interaction.reply({
-        content: "✅ 票務面板已設置！",
+        content: "✅ 建議系統面板已設置！",
         ephemeral: true,
       });
 
@@ -148,8 +129,6 @@ module.exports = {
         guildId: interaction.guild.id,
         title,
         description,
-        buttonLabel,
-        buttonEmoji,
         categoryId,
         supportRoleId,
         createdAt: new Date().toISOString(),
@@ -158,12 +137,11 @@ module.exports = {
       savePanels(panels);
 
     } catch (error) {
-      console.log(`[ERROR] 設置票務面板時出錯：\n${error}`.red);
+      console.log(`[ERROR] 設置建議面板時出錯：\n${error}`.red);
       await interaction.reply({
-        content: "❌ 設置票務面板時發生錯誤！",
+        content: "❌ 設置建議面板時發生錯誤！",
         ephemeral: true,
       });
     }
   },
 };
-*/

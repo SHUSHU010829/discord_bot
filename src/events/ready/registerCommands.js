@@ -7,19 +7,12 @@ const getLocalCommands = require("../../utils/getLocalCommands");
 
 module.exports = async (client) => {
   try {
-    const [localCommands, applicationCommands] = await Promise.all([
-      getLocalCommands(),
-      getApplicationCommands(client, serverId),
-    ]);
+    console.log("🔄 [COMMAND REGISTRY] Starting command registration...".cyan);
+    const localCommands = await getLocalCommands();
+    const applicationCommands = await getApplicationCommands(client, serverId);
 
-    // 清除所有既有指令
-    console.log("🗑️  [COMMAND REGISTRY] Clearing all existing commands...".yellow);
-    const existingCommands = Array.from(applicationCommands.cache.values());
-    for (const existingCommand of existingCommands) {
-      await applicationCommands.delete(existingCommand.id);
-      console.log(`[COMMAND REGISTRY] Deleted existing command: ${existingCommand.name}`.grey);
-    }
-    console.log("✅ [COMMAND REGISTRY] All existing commands cleared".green);
+    // 準備要註冊的指令數據
+    const commandsToRegister = [];
 
     for (const localCommand of localCommands) {
       const { data, deleted } = localCommand;
@@ -28,6 +21,14 @@ module.exports = async (client) => {
         description: commandDescription,
         options: commandOptions,
       } = data;
+
+      // 跳過已標記為刪除的指令
+      if (deleted) {
+        console.log(
+          `[COMMAND REGISTRY] Skipping ${commandName} (marked as deleted)`.grey
+        );
+        continue;
+      }
 
       // 動態載入飲料店選項
       if (commandName === "喝什麼") {
@@ -59,25 +60,22 @@ module.exports = async (client) => {
         }
       }
 
-      // 跳過已標記為刪除的指令
-      if (deleted) {
-        console.log(
-          `[COMMAND REGISTRY] Skipping ${commandName} (marked as deleted)`.grey
-        );
-        continue;
-      }
-
-      // 創建新指令
-      await applicationCommands.create({
+      commandsToRegister.push({
         name: commandName,
         description: commandDescription,
         options: commandOptions,
       });
-      console.log(
-        `[COMMAND REGISTRY] Application command ${commandName} has been registered.`
-          .green
-      );
     }
+
+    // 使用批量覆蓋 API - Discord 會自動處理差異（新增/更新/刪除）
+    await applicationCommands.set(commandsToRegister);
+    console.log(
+      `✅ [COMMAND REGISTRY] Successfully registered ${commandsToRegister.length} commands (bulk update)`.green
+    );
+
+    commandsToRegister.forEach(cmd => {
+      console.log(`   ✓ ${cmd.name}`.grey);
+    });
   } catch (error) {
     console.log(
       `[ERROR] An error occurred inside the command registry:\n${error}`.red
