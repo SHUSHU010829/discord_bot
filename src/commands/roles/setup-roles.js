@@ -6,55 +6,18 @@ const {
   ButtonBuilder,
   ButtonStyle,
 } = require("discord.js");
-const fs = require("fs");
-const path = require("path");
 require("colors");
 
-// 角色面板數據文件路徑
-const PANELS_FILE = path.join(__dirname, "../../data/role-panels.json");
+const { loadPanels, savePanels } = require("../../utils/rolePanelsStore");
 
-// 確保數據文件存在
-function ensureDataFile() {
-  const dataDir = path.dirname(PANELS_FILE);
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-  if (!fs.existsSync(PANELS_FILE)) {
-    const defaultData = {
-      roles: [],
-      panels: {},
-      targetChannelId: "",
-    };
-    fs.writeFileSync(PANELS_FILE, JSON.stringify(defaultData, null, 2));
-  }
-}
-
-// 讀取面板數據
-function loadPanels() {
-  ensureDataFile();
-  const data = fs.readFileSync(PANELS_FILE, "utf8");
-  return JSON.parse(data);
-}
-
-// 保存面板數據
-function savePanels(data) {
-  ensureDataFile();
-  fs.writeFileSync(PANELS_FILE, JSON.stringify(data, null, 2));
-}
-
-// 面板是靜態按鈕：按下後 bot 會即時讀取 role-panels.json 並回傳個人化選單。
+// 面板是靜態按鈕：按下後 bot 會即時讀取資料庫並回傳個人化選單，
 // 所以新增 / 移除遊戲時不需要編輯這則訊息。
 function createPanelMessage() {
   const embed = new EmbedBuilder()
     .setColor("#00ff00")
     .setTitle("🎮 遊戲身份組領取")
     .setDescription(
-      [
-        "點擊下方按鈕開啟你的個人化遊戲身份組選單。",
-        "",
-        "✨ **選單會自動勾選你目前擁有的身份組**，你只需要調整想新增 / 移除的項目即可。",
-        "未變更的身份組會保留，**不會因為新增遊戲而需要重選**。",
-      ].join("\n"),
+      "點擊下方按鈕開啟個人化選單。\n✨ 已擁有的身份組會自動勾選，未變更的會保留。",
     );
 
   const button = new ButtonBuilder()
@@ -161,7 +124,7 @@ async function handleSend(client, interaction) {
     });
   }
 
-  const data = loadPanels();
+  const data = await loadPanels(client);
 
   if (!data.targetChannelId) {
     return interaction.reply({
@@ -212,7 +175,7 @@ async function handleSend(client, interaction) {
     });
 
     data.panels[message.id] = true;
-    savePanels(data);
+    await savePanels(client, data);
 
     await interaction.reply({
       content: `✅ 已在 <#${data.targetChannelId}> 發送遊戲身份組面板！`,
@@ -244,7 +207,7 @@ async function handleAdd(client, interaction) {
   const role = interaction.options.getRole("role");
   const emoji = interaction.options.getString("emoji");
 
-  const data = loadPanels();
+  const data = await loadPanels(client);
 
   // 檢查是否已存在
   const exists = data.roles.find(
@@ -267,7 +230,7 @@ async function handleAdd(client, interaction) {
   }
   data.roles.push(newRole);
 
-  savePanels(data);
+  await savePanels(client, data);
 
   const emojiText = emoji ? `${emoji} ` : "";
   await interaction.reply({
@@ -286,7 +249,7 @@ async function handleRemove(client, interaction) {
   }
 
   const name = interaction.options.getString("name").toUpperCase();
-  const data = loadPanels();
+  const data = await loadPanels(client);
 
   const index = data.roles.findIndex((r) => r.name === name);
   if (index === -1) {
@@ -297,7 +260,7 @@ async function handleRemove(client, interaction) {
   }
 
   const removed = data.roles.splice(index, 1)[0];
-  savePanels(data);
+  await savePanels(client, data);
 
   const emojiText = removed.emoji ? `${removed.emoji} ` : "";
   await interaction.reply({
@@ -307,7 +270,7 @@ async function handleRemove(client, interaction) {
 }
 
 async function handleList(client, interaction) {
-  const data = loadPanels();
+  const data = await loadPanels(client);
 
   if (data.roles.length === 0) {
     return interaction.reply({

@@ -31,6 +31,9 @@ module.exports = async (client) => {
     // Voting system collection
     const votingProposalsCollection = database.collection("VotingProposals");
 
+    // Role panels collection (遊戲身份組面板設定)
+    const rolePanelsCollection = database.collection("RolePanels");
+
     client.database = database;
     client.collection = collection;
     client.gaslightCollection = gaslightCollection;
@@ -38,6 +41,7 @@ module.exports = async (client) => {
     client.voiceStatsCollection = voiceStatsCollection;
     client.channelActivityCollection = channelActivityCollection;
     client.votingProposalsCollection = votingProposalsCollection;
+    client.rolePanelsCollection = rolePanelsCollection;
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
 
     // 確認有多少飲料店資料
