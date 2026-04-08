@@ -1,5 +1,3 @@
-const fs = require("fs");
-const path = require("path");
 const {
   ActionRowBuilder,
   StringSelectMenuBuilder,
@@ -7,20 +5,9 @@ const {
 } = require("discord.js");
 require("colors");
 
-const PANELS_FILE = path.join(__dirname, "../../data/role-panels.json");
-const ITEMS_PER_MENU = 25; // Discord StringSelectMenu 每頁最多 25 個選項
+const { loadPanels } = require("../../utils/rolePanelsStore");
 
-function loadPanels() {
-  try {
-    if (fs.existsSync(PANELS_FILE)) {
-      const data = fs.readFileSync(PANELS_FILE, "utf8");
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.log(`[ERROR] 讀取角色面板數據時出錯：${error}`.red);
-  }
-  return { roles: [], panels: {}, targetChannelId: "" };
-}
+const ITEMS_PER_MENU = 25; // Discord StringSelectMenu 每頁最多 25 個選項
 
 function buildPersonalizedRows(allRoles, currentRoleIdSet) {
   const rows = [];
@@ -97,12 +84,12 @@ async function ensureMember(interaction) {
   return member;
 }
 
-async function handleOpenPanel(interaction) {
+async function handleOpenPanel(client, interaction) {
   try {
     const member = await ensureMember(interaction);
     if (!member) return;
 
-    const data = loadPanels();
+    const data = await loadPanels(client);
     if (!data.roles || data.roles.length === 0) {
       return await interaction.reply({
         content: "❌ 目前沒有任何遊戲身份組可供選擇，請聯絡管理員設定。",
@@ -123,13 +110,7 @@ async function handleOpenPanel(interaction) {
     const embed = new EmbedBuilder()
       .setColor("#00ff00")
       .setTitle("🎮 你的遊戲身份組")
-      .setDescription(
-        [
-          "下方選單已自動勾選你目前擁有的身份組。",
-          "想新增或移除哪些就直接調整勾選狀態，按下 Enter / 點空白處送出即可。",
-          "未變更的身份組會保留，不會被清除。",
-        ].join("\n"),
-      );
+      .setDescription("已自動勾選你目前擁有的身份組，未變更的會保留。");
 
     await interaction.reply({
       embeds: [embed],
@@ -277,7 +258,7 @@ async function handleRoleSubmit(interaction) {
 module.exports = async (client, interaction) => {
   // 處理「打開個人化選單」按鈕
   if (interaction.isButton() && interaction.customId === "role_panel_open") {
-    return handleOpenPanel(interaction);
+    return handleOpenPanel(client, interaction);
   }
 
   // 處理身份組選單提交
