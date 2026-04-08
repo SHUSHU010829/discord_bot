@@ -126,6 +126,7 @@ module.exports = async (client, interaction) => {
       "vote_no_interest",
       "vote_still_playing",
       "vote_archive_ok",
+      "role_panel_open", // 由 handleRoleSelect.js 處理
     ];
 
     // 如果是系統按鈕或互動已被回應，則不處理
