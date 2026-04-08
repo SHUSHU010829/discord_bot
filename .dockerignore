@@ -1,0 +1,9 @@
+node_modules
+.git
+.gitignore
+.env
+.env.*
+.claude
+*.md
+docs/
+src/data/calender.backup_*.json
