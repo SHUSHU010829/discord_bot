@@ -3,7 +3,8 @@ const {
   PermissionFlagsBits,
   EmbedBuilder,
   ActionRowBuilder,
-  StringSelectMenuBuilder,
+  ButtonBuilder,
+  ButtonStyle,
 } = require("discord.js");
 const fs = require("fs");
 const path = require("path");
@@ -41,112 +42,30 @@ function savePanels(data) {
   fs.writeFileSync(PANELS_FILE, JSON.stringify(data, null, 2));
 }
 
-// 建立選單訊息（每則最多 25 個選項）
-function createSelectMenus(roles, pageIndex = 0) {
-  const ITEMS_PER_PAGE = 25;
-  const startIndex = pageIndex * ITEMS_PER_PAGE;
-  const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, roles.length);
-  const pageRoles = roles.slice(startIndex, endIndex);
+// 面板是靜態按鈕：按下後 bot 會即時讀取 role-panels.json 並回傳個人化選單。
+// 所以新增 / 移除遊戲時不需要編輯這則訊息。
+function createPanelMessage() {
+  const embed = new EmbedBuilder()
+    .setColor("#00ff00")
+    .setTitle("🎮 遊戲身份組領取")
+    .setDescription(
+      [
+        "點擊下方按鈕開啟你的個人化遊戲身份組選單。",
+        "",
+        "✨ **選單會自動勾選你目前擁有的身份組**，你只需要調整想新增 / 移除的項目即可。",
+        "未變更的身份組會保留，**不會因為新增遊戲而需要重選**。",
+      ].join("\n"),
+    );
 
-  const options = pageRoles.map((role) => {
-    const option = {
-      label: role.name,
-      value: role.roleId,
-    };
-    if (role.emoji) {
-      option.emoji = role.emoji;
-    }
-    return option;
-  });
+  const button = new ButtonBuilder()
+    .setCustomId("role_panel_open")
+    .setLabel("領取 / 管理遊戲身份組")
+    .setEmoji("🎮")
+    .setStyle(ButtonStyle.Primary);
 
-  const selectMenu = new StringSelectMenuBuilder()
-    .setCustomId(`role_select_${pageIndex}`)
-    .setPlaceholder("選擇你想要的遊戲身份組")
-    .setMinValues(0)
-    .setMaxValues(options.length)
-    .addOptions(options);
+  const row = new ActionRowBuilder().addComponents(button);
 
-  return new ActionRowBuilder().addComponents(selectMenu);
-}
-
-// 更新所有已存在的選單訊息
-async function updateAllPanels(client, data) {
-  const targetChannelId = data.targetChannelId;
-  if (!targetChannelId) return;
-
-  try {
-    const channel = await client.channels.fetch(targetChannelId);
-    if (!channel) return;
-
-    const panels = data.panels;
-    const messageIds = Object.keys(panels);
-
-    // 計算需要的訊息數量
-    const totalPages = Math.ceil(data.roles.length / 25);
-
-    // 更新現有訊息
-    for (let i = 0; i < messageIds.length; i++) {
-      const messageId = messageIds[i];
-      try {
-        const message = await channel.messages.fetch(messageId);
-
-        if (i < totalPages) {
-          // 此訊息仍需要，更新內容
-          const row = createSelectMenus(data.roles, i);
-          const embed = new EmbedBuilder()
-            .setColor("#00ff00")
-            .setTitle("🎮 遊戲身份組選單")
-            .setDescription(
-              "從下方選單選擇你想要的遊戲身份組！\n你可以同時選擇多個，或取消所有選擇。",
-            )
-            .setFooter({ text: `第 ${i + 1} 頁，共 ${totalPages} 頁` })
-            .setTimestamp();
-
-          await message.edit({ embeds: [embed], components: [row] });
-          panels[messageId] = i; // 更新頁碼
-        } else {
-          // 此訊息不再需要，刪除
-          await message.delete();
-          delete panels[messageId];
-        }
-      } catch (error) {
-        console.log(
-          `[WARNING] 無法更新/刪除訊息 ${messageId}：${error.message}`.yellow,
-        );
-        delete panels[messageId];
-      }
-    }
-
-    // 如果需要更多訊息，發送新的
-    if (totalPages > messageIds.length) {
-      for (let i = messageIds.length; i < totalPages; i++) {
-        try {
-          const row = createSelectMenus(data.roles, i);
-          const embed = new EmbedBuilder()
-            .setColor("#00ff00")
-            .setTitle("🎮 遊戲身份組選單")
-            .setDescription(
-              "從下方選單選擇你想要的遊戲身份組！\n你可以同時選擇多個，或取消所有選擇。",
-            )
-            .setFooter({ text: `第 ${i + 1} 頁，共 ${totalPages} 頁` })
-            .setTimestamp();
-
-          const message = await channel.send({
-            embeds: [embed],
-            components: [row],
-          });
-          panels[message.id] = i;
-        } catch (error) {
-          console.log(`[ERROR] 無法發送新訊息：${error.message}`.red);
-        }
-      }
-    }
-
-    data.panels = panels;
-    savePanels(data);
-  } catch (error) {
-    console.log(`[ERROR] 更新面板時出錯：${error}`.red);
-  }
+  return { embed, row };
 }
 
 module.exports = {
@@ -269,42 +188,34 @@ async function handleSend(client, interaction) {
       });
     }
 
-    // 清空舊的面板記錄
+    // 刪除舊的面板訊息（包含舊版多頁選單）
+    const oldMessageIds = Object.keys(data.panels || {});
+    await Promise.all(
+      oldMessageIds.map(async (oldMessageId) => {
+        try {
+          const oldMessage = await channel.messages.fetch(oldMessageId);
+          await oldMessage.delete();
+        } catch (error) {
+          console.log(
+            `[WARNING] 無法刪除舊面板訊息 ${oldMessageId}：${error.message}`
+              .yellow,
+          );
+        }
+      }),
+    );
     data.panels = {};
 
-    // 計算需要的訊息數量（每則最多 25 個選項）
-    const totalPages = Math.ceil(data.roles.length / 25);
+    const { embed, row } = createPanelMessage();
+    const message = await channel.send({
+      embeds: [embed],
+      components: [row],
+    });
 
-    // 發送所有選單訊息
-    for (let i = 0; i < totalPages; i++) {
-      const row = createSelectMenus(data.roles, i);
-      const embed = new EmbedBuilder()
-        .setColor("#00ff00")
-        .setTitle("🎮 遊戲身份組選單")
-        .setDescription(
-          "從下方選單選擇你想要的遊戲身份組！\n你可以同時選擇多個，或取消所有選擇。",
-        )
-        .setFooter({
-          text:
-            totalPages > 1
-              ? `第 ${i + 1} 頁，共 ${totalPages} 頁`
-              : "選擇你的遊戲",
-        })
-        .setTimestamp();
-
-      const message = await channel.send({
-        embeds: [embed],
-        components: [row],
-      });
-
-      // 記錄訊息 ID 和頁碼
-      data.panels[message.id] = i;
-    }
-
+    data.panels[message.id] = true;
     savePanels(data);
 
     await interaction.reply({
-      content: `✅ 已在 <#${data.targetChannelId}> 發送角色選單！（共 ${totalPages} 則訊息）`,
+      content: `✅ 已在 <#${data.targetChannelId}> 發送遊戲身份組面板！`,
       flags: 64, // MessageFlags.Ephemeral
     });
   } catch (error) {
@@ -358,12 +269,9 @@ async function handleAdd(client, interaction) {
 
   savePanels(data);
 
-  // 自動更新現有選單
-  await updateAllPanels(client, data);
-
   const emojiText = emoji ? `${emoji} ` : "";
   await interaction.reply({
-    content: `✅ 已新增遊戲：${emojiText}${name} (${role})，並更新所有選單！`,
+    content: `✅ 已新增遊戲：${emojiText}${name} (${role})！\n下次使用者點擊面板按鈕時會看到此選項。`,
     flags: 64, // MessageFlags.Ephemeral
   });
 }
@@ -391,12 +299,9 @@ async function handleRemove(client, interaction) {
   const removed = data.roles.splice(index, 1)[0];
   savePanels(data);
 
-  // 自動更新現有選單
-  await updateAllPanels(client, data);
-
   const emojiText = removed.emoji ? `${removed.emoji} ` : "";
   await interaction.reply({
-    content: `✅ 已移除遊戲：${emojiText}${removed.name}，並更新所有選單！`,
+    content: `✅ 已移除遊戲：${emojiText}${removed.name}！\n下次使用者點擊面板按鈕時即看不到此選項。`,
     flags: 64, // MessageFlags.Ephemeral
   });
 }
