@@ -52,9 +52,8 @@ function buildMarkup(data) {
     serialNo,
   } = data;
 
-  const recommendsTrimmed = truncateList(recommends || [], 10);
+  const recommendsLines = chunkByTwo(recommends || []);
   const avoidsTrimmed = truncateList(avoids || [], 6);
-  const recommendsLines = chunkByTwo(recommendsTrimmed);
 
   const hasLunar = Boolean(lunarYearLabel && lunarDay);
   const hasCountdown = Boolean(countdownName && countdownDays);
