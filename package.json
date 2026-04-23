@@ -17,6 +17,7 @@
     "node": "22.x"
   },
   "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "axios": "^1.6.7",
     "colors": "^1.4.0",
     "discord.js": "^14.14.1",
@@ -25,6 +26,9 @@
     "mongodb": "^6.3.0",
     "node-cron": "^3.0.3",
     "nodemon": "^3.1.0",
+    "opencc-js": "^1.0.5",
+    "satori": "^0.26.0",
+    "satori-html": "^0.3.2",
     "tyme4ts": "^1.4.1"
   }
 }

@@ -30,6 +30,10 @@ async function getLunarInfo(year, month, day) {
     // 轉換簡體字為繁體字
     const textToConvert = [
       lunarDateStr,
+      sixtyCycle.toString() + "年",
+      lunarMonth.getName(),
+      lunar.getName(),
+      zodiac,
       ...recommends,
       ...avoids,
     ].join("|");
@@ -39,16 +43,16 @@ async function getLunarInfo(year, month, day) {
     // 如果轉換成功，使用繁體字；否則使用原始簡體字
     if (convertedResult && convertedResult.text) {
       const convertedParts = convertedResult.text.split("|");
-      const convertedLunarDate = convertedParts[0];
-      const convertedRecommends = convertedParts.slice(1, 1 + recommends.length);
-      const convertedAvoids = convertedParts.slice(1 + recommends.length);
+      const [convertedLunarDate, convertedLunarYear, convertedLunarMonth, convertedLunarDay, convertedZodiac] = convertedParts;
+      const convertedRecommends = convertedParts.slice(5, 5 + recommends.length);
+      const convertedAvoids = convertedParts.slice(5 + recommends.length);
 
       return {
         lunarDate: convertedLunarDate,
-        lunarYear: sixtyCycle.toString() + "年",
-        lunarMonth: lunarMonth.getName(),
-        lunarDay: lunar.getName(),
-        zodiac: zodiac,
+        lunarYear: convertedLunarYear,
+        lunarMonth: convertedLunarMonth,
+        lunarDay: convertedLunarDay,
+        zodiac: convertedZodiac,
         recommends: convertedRecommends,
         avoids: convertedAvoids,
       };
