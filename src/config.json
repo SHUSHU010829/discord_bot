@@ -13,18 +13,7 @@
     "cronSchedule": "0 8 * * *",
     "timezone": "Asia/Taipei",
     "emojis": {
-      "yaa": "<a:yaa:1339068116524732436>",
-      "babySit": "<:babySit:1324395529022476379>",
-      "prideFloat": "<:PrideFloat:1220032890658619452>"
-    },
-    "templates": {
-      "weekendNoDescription": "早安，現在是 {date} 08:00AM {yaa}\n逼逼機器人開工了！但今天是週末，大家可以繼續睡！{babySit} ",
-      "holidayWithDescription": "早安，現在是 {date} 08:00AM {yaa}\n逼逼機器人開工了！但今天是{holiday}，大家可以繼續睡！{babySit} ",
-      "workdayWithDescription": "早安，現在是 {date} 08:00AM {yaa}\n逼逼機器人開工了！順帶一提今天是{description}！嗨起來各位！{babySit} ",
-      "workdaySleep": "早安，現在是 {date} 08:00AM {yaa}\n逼逼機器人繼續睡覺了，晚安 {babySit} ",
-      "noCalendarData": "早安，現在是 {date} 早上八點鐘\n逼逼機器人開工了！各位起床起床起床床！！{babySit}  \n(今天太神秘了，找不到假期資料？)",
-      "fortune": "今日抽卡運勢：**{fortune}** {prideFloat}",
-      "exchangeRate": "\n匯率資訊：USD/NTD - {rate}（來源 RTER.info）"
+      "yaa": "<a:yaa:1339068116524732436>"
     }
   },
 
