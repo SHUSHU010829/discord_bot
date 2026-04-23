@@ -32,12 +32,6 @@ function chunkByTwo(arr) {
   return out;
 }
 
-function truncateList(arr, max) {
-  if (arr.length <= max) return arr.slice();
-  const extra = arr.length - (max - 1);
-  return [...arr.slice(0, max - 1), `等 ${extra} 項`];
-}
-
 function buildMarkup(data) {
   const {
     theme,
@@ -52,9 +46,8 @@ function buildMarkup(data) {
     serialNo,
   } = data;
 
-  const recommendsTrimmed = truncateList(recommends || [], 10);
-  const avoidsTrimmed = truncateList(avoids || [], 6);
-  const recommendsLines = chunkByTwo(recommendsTrimmed);
+  const recommendsLines = chunkByTwo(recommends || []);
+  const avoidsItems = avoids || [];
 
   const hasLunar = Boolean(lunarYearLabel && lunarDay);
   const hasCountdown = Boolean(countdownName && countdownDays);
@@ -124,7 +117,7 @@ function buildMarkup(data) {
               <div style="display:flex;font-family:'SpaceMono';font-size:16px;letter-spacing:4px;color:${theme.muted};">DON'T</div>
             </div>
             <div style="display:flex;flex-direction:column;margin-top:14px;font-family:'NotoSansTC';font-weight:500;font-size:20px;letter-spacing:1px;line-height:1.55;">
-              ${avoidsTrimmed.map((a) => `<div style="display:flex;">${a}</div>`).join("")}
+              ${avoidsItems.map((a) => `<div style="display:flex;">${a}</div>`).join("")}
             </div>
           </div>
         </div>
