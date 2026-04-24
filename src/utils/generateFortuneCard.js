@@ -65,6 +65,13 @@ function splitPoem(content) {
     .slice(0, 4);
 }
 
+// 拆出句尾標點，配合左側同寬的透明幽靈標點，做到本文視覺置中
+function parsePoemLine(line) {
+  const m = line.match(/^(.+?)([、。?·]+)$/);
+  if (!m) return { body: line, punct: "" };
+  return { body: m[1], punct: m[2] };
+}
+
 function buildMarkup(data) {
   const {
     theme,
@@ -124,13 +131,18 @@ function buildMarkup(data) {
                   <div style="display:flex;margin:0 16px;font-family:'NotoSansTC';font-weight:900;font-size:18px;letter-spacing:8px;color:${theme.muted};">籤詩</div>
                   <div style="display:flex;width:60px;height:1px;background:${theme.muted};"></div>
                 </div>
-                <div style="display:flex;flex-direction:column;align-items:center;">
+                <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
                   ${poemLines
-                    .map(
-                      (line) => `
-                    <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:38px;line-height:1.7;letter-spacing:6px;color:${theme.ink};">${line}</div>
-                  `
-                    )
+                    .map((line) => {
+                      const { body, punct } = parsePoemLine(line);
+                      return `
+                    <div style="display:flex;justify-content:center;align-items:center;width:100%;font-family:'NotoSansTC';font-weight:500;font-size:38px;line-height:1.7;letter-spacing:6px;">
+                      <div style="display:flex;color:transparent;">${punct}</div>
+                      <div style="display:flex;color:${theme.ink};">${body}</div>
+                      <div style="display:flex;color:${theme.ink};">${punct}</div>
+                    </div>
+                  `;
+                    })
                     .join("")}
                 </div>
                 <div style="display:flex;width:120px;height:1px;margin-top:30px;background:${theme.muted};"></div>
@@ -146,10 +158,10 @@ function buildMarkup(data) {
         <!-- E. Footer -->
         <div style="display:flex;flex-direction:column;width:100%;margin-top:22px;">
           <div style="display:flex;width:100%;height:1px;border-top:1px dashed ${theme.muted};"></div>
-          <div style="display:flex;width:100%;justify-content:space-between;margin-top:14px;align-items:center;">
-            <div style="display:flex;font-family:'SpaceMono';font-size:16px;letter-spacing:3px;color:${theme.muted};">${dateStr}</div>
-            <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:14px;letter-spacing:4px;color:${theme.muted};">娛樂為主·心誠則靈</div>
-            <div style="display:flex;font-family:'SpaceMono';font-size:16px;letter-spacing:8px;color:${theme.muted};">@SHUSHU</div>
+          <div style="display:flex;width:100%;margin-top:14px;align-items:center;">
+            <div style="display:flex;flex:1;justify-content:flex-start;font-family:'SpaceMono';font-size:16px;letter-spacing:3px;color:${theme.muted};">${dateStr}</div>
+            <div style="display:flex;flex:1;justify-content:center;font-family:'NotoSansTC';font-weight:500;font-size:14px;letter-spacing:4px;color:${theme.muted};">娛樂為主·心誠則靈</div>
+            <div style="display:flex;flex:1;justify-content:flex-end;font-family:'SpaceMono';font-size:16px;letter-spacing:8px;color:${theme.muted};">@SHUSHU</div>
           </div>
         </div>
 
