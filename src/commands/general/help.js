@@ -1,331 +1,428 @@
 require("colors");
 
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
-const buttonPaginator = require("../../utils/buttonPagination");
+const fs = require("fs");
+const path = require("path");
+const {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ApplicationCommandOptionType,
+  PermissionFlagsBits,
+} = require("discord.js");
+
+const HOME_COLOR = 0x00ae86;
+const CATEGORY_COLOR = 0x5865f2;
+const TIMEOUT_MS = 3 * 60 * 1000;
+const COMMANDS_ROOT = path.join(__dirname, "..");
+
+// 類別資料夾名稱 → 顯示設定
+const CATEGORY_META = {
+  food: { label: "食物飲料", emoji: "🍽️", order: 1, blurb: "吃/喝什麼、食物清單、排行榜、飲料菜單管理" },
+  draw: { label: "抽選工具", emoji: "🎲", order: 2, blurb: "抽籤、二選一、鹹魚翻身樂透" },
+  weather: { label: "天氣", emoji: "🌤️", order: 3, blurb: "全台與個別縣市天氣查詢" },
+  currency: { label: "匯率", emoji: "💱", order: 4, blurb: "即時匯率與加密貨幣報價" },
+  stats: { label: "統計", emoji: "📊", order: 5, blurb: "訊息/語音統計與排行榜" },
+  roles: { label: "身份組", emoji: "🎮", order: 6, blurb: "遊戲身份組選單管理" },
+  ticket: { label: "票務投票", emoji: "🎫", order: 7, blurb: "建議面板、票務、遊戲頻道提案投票" },
+  general: { label: "一般", emoji: "📰", order: 8, blurb: "每日早報與本手冊" },
+  post: { label: "情勒文", emoji: "📝", order: 9, blurb: "情勒文產生與新增" },
+  ask: { label: "問答", emoji: "💬", order: 10, blurb: "跟逼逼機器人聊天" },
+  misc: { label: "其他", emoji: "🛠️", order: 11, blurb: "雜項小工具" },
+};
+
+const OPTION_TYPE_LABEL = {
+  [ApplicationCommandOptionType.Subcommand]: "子指令",
+  [ApplicationCommandOptionType.SubcommandGroup]: "子指令群組",
+  [ApplicationCommandOptionType.String]: "文字",
+  [ApplicationCommandOptionType.Integer]: "整數",
+  [ApplicationCommandOptionType.Boolean]: "是/否",
+  [ApplicationCommandOptionType.User]: "用戶",
+  [ApplicationCommandOptionType.Channel]: "頻道",
+  [ApplicationCommandOptionType.Role]: "身份組",
+  [ApplicationCommandOptionType.Mentionable]: "可提及對象",
+  [ApplicationCommandOptionType.Number]: "數字",
+  [ApplicationCommandOptionType.Attachment]: "附件",
+};
+
+let cachedIndex = null;
+
+function loadCommandIndex() {
+  if (cachedIndex) return cachedIndex;
+
+  const categories = fs
+    .readdirSync(COMMANDS_ROOT, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name);
+
+  const commands = [];
+  for (const category of categories) {
+    const dirPath = path.join(COMMANDS_ROOT, category);
+    const files = fs.readdirSync(dirPath).filter((f) => f.endsWith(".js"));
+    for (const file of files) {
+      try {
+        const mod = require(path.join(dirPath, file));
+        if (!mod || !mod.data || !mod.data.name) continue;
+        if (mod.deleted) continue;
+        if (mod.data.name === "help") continue;
+
+        commands.push({
+          name: mod.data.name,
+          description: mod.data.description || "（無描述）",
+          options: Array.isArray(mod.data.options) ? mod.data.options : [],
+          defaultMemberPermissions: mod.data.default_member_permissions,
+          userPermissions: mod.userPermissions || [],
+          category,
+        });
+      } catch (err) {
+        console.log(
+          `[WARN] /help 無法載入 ${category}/${file}: ${err.message}`.yellow,
+        );
+      }
+    }
+  }
+
+  commands.sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
+
+  const byCategory = new Map();
+  for (const cmd of commands) {
+    if (!byCategory.has(cmd.category)) byCategory.set(cmd.category, []);
+    byCategory.get(cmd.category).push(cmd);
+  }
+
+  cachedIndex = { commands, byCategory };
+  return cachedIndex;
+}
+
+function isAdminOnly(cmd) {
+  const adminBit = PermissionFlagsBits.Administrator;
+  if (cmd.defaultMemberPermissions != null) {
+    try {
+      const bits = BigInt(cmd.defaultMemberPermissions);
+      if ((bits & adminBit) === adminBit) return true;
+    } catch {
+      /* noop */
+    }
+  }
+  return cmd.userPermissions.some(
+    (p) => p === "Administrator" || p === adminBit,
+  );
+}
+
+function sortedCategories() {
+  const { byCategory } = loadCommandIndex();
+  return [...byCategory.entries()].sort(
+    ([a], [b]) =>
+      (CATEGORY_META[a]?.order ?? 99) - (CATEGORY_META[b]?.order ?? 99),
+  );
+}
+
+function formatOption(option, indent = "") {
+  const typeLabel = OPTION_TYPE_LABEL[option.type] || "參數";
+  const required = option.required ? "必填" : "可選";
+  const desc = option.description || "";
+  return `${indent}• \`${option.name}\` (${required}, ${typeLabel}) — ${desc}`;
+}
+
+function formatSubcommand(sub) {
+  const lines = [`▸ \`${sub.name}\` — ${sub.description || ""}`];
+  for (const opt of sub.options || []) {
+    lines.push(formatOption(opt, "　"));
+  }
+  return lines.join("\n");
+}
+
+function formatCommandBody(cmd) {
+  const lines = [cmd.description];
+  const opts = cmd.options || [];
+  const subs = opts.filter(
+    (o) => o.type === ApplicationCommandOptionType.Subcommand,
+  );
+  const flat = opts.filter(
+    (o) =>
+      o.type !== ApplicationCommandOptionType.Subcommand &&
+      o.type !== ApplicationCommandOptionType.SubcommandGroup,
+  );
+
+  if (flat.length) {
+    lines.push("");
+    lines.push(...flat.map((o) => formatOption(o)));
+  }
+
+  if (subs.length) {
+    if (flat.length) lines.push("");
+    lines.push(...subs.map(formatSubcommand));
+  }
+
+  return lines.join("\n");
+}
+
+function clamp(value, max) {
+  if (!value) return "—";
+  return value.length > max ? value.slice(0, max - 1) + "…" : value;
+}
+
+function buildHomeEmbed() {
+  const categories = sortedCategories();
+  const total = categories.reduce((n, [, arr]) => n + arr.length, 0);
+
+  const embed = new EmbedBuilder()
+    .setTitle("📚 逼逼機器人使用手冊")
+    .setColor(HOME_COLOR)
+    .setDescription(
+      `嗨！我是逼逼機器人 🤖\n` +
+        `共有 **${total}** 個指令，分成 **${categories.length}** 大類。\n\n` +
+        `👇 從下方選單挑一個類別開始看\n` +
+        `🔎 或用 \`/help 指令:<名稱>\` 直接查單一指令`,
+    )
+    .addFields(
+      categories.map(([key, cmds]) => {
+        const meta = CATEGORY_META[key] || {
+          label: key,
+          emoji: "📁",
+          blurb: "",
+        };
+        return {
+          name: `${meta.emoji} ${meta.label} ・ ${cmds.length} 個指令`,
+          value: meta.blurb || "​",
+          inline: false,
+        };
+      }),
+    )
+    .setFooter({ text: "🔒 標記 = 僅管理員可用" });
+
+  return embed;
+}
+
+function buildCategoryEmbed(categoryKey) {
+  const { byCategory } = loadCommandIndex();
+  const cmds = byCategory.get(categoryKey) || [];
+  const meta = CATEGORY_META[categoryKey] || {
+    label: categoryKey,
+    emoji: "📁",
+    blurb: "",
+  };
+
+  const embed = new EmbedBuilder()
+    .setTitle(`${meta.emoji} ${meta.label}`)
+    .setColor(CATEGORY_COLOR)
+    .setDescription(meta.blurb || `共 ${cmds.length} 個指令`)
+    .setFooter({ text: `${cmds.length} 個指令 ・ 選單可切換其他類別` });
+
+  // Embed 限制：最多 25 個 field、每個 field value 最多 1024 字
+  const fields = cmds.slice(0, 25).map((cmd) => ({
+    name: `/${cmd.name}${isAdminOnly(cmd) ? " 🔒" : ""}`,
+    value: clamp(formatCommandBody(cmd), 1024),
+    inline: false,
+  }));
+  embed.addFields(fields);
+
+  return embed;
+}
+
+function buildCommandEmbed(cmd) {
+  const meta = CATEGORY_META[cmd.category] || {
+    label: cmd.category,
+    emoji: "📁",
+  };
+  const embed = new EmbedBuilder()
+    .setTitle(`/${cmd.name}${isAdminOnly(cmd) ? "  🔒" : ""}`)
+    .setColor(CATEGORY_COLOR)
+    .setDescription(cmd.description || "​")
+    .addFields({
+      name: "類別",
+      value: `${meta.emoji} ${meta.label}`,
+      inline: true,
+    });
+
+  const opts = cmd.options || [];
+  const subs = opts.filter(
+    (o) => o.type === ApplicationCommandOptionType.Subcommand,
+  );
+  const flat = opts.filter(
+    (o) =>
+      o.type !== ApplicationCommandOptionType.Subcommand &&
+      o.type !== ApplicationCommandOptionType.SubcommandGroup,
+  );
+
+  if (flat.length) {
+    embed.addFields({
+      name: "參數",
+      value: clamp(flat.map((o) => formatOption(o)).join("\n"), 1024),
+      inline: false,
+    });
+  }
+
+  if (subs.length) {
+    embed.addFields({
+      name: "子指令",
+      value: clamp(subs.map(formatSubcommand).join("\n\n"), 1024),
+      inline: false,
+    });
+  }
+
+  if (isAdminOnly(cmd)) {
+    embed.addFields({
+      name: "權限",
+      value: "🔒 僅限管理員使用",
+      inline: false,
+    });
+  }
+
+  return embed;
+}
+
+function buildComponents(currentCategory) {
+  const categories = sortedCategories();
+
+  const options = categories.slice(0, 25).map(([key, cmds]) => {
+    const meta = CATEGORY_META[key] || { label: key, emoji: "📁", blurb: "" };
+    return {
+      label: `${meta.label} (${cmds.length})`,
+      description: meta.blurb ? clamp(meta.blurb, 100) : undefined,
+      value: key,
+      emoji: meta.emoji,
+      default: key === currentCategory,
+    };
+  });
+
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId("help_category")
+    .setPlaceholder("📖 選擇一個類別...")
+    .addOptions(options);
+
+  const home = new ButtonBuilder()
+    .setCustomId("help_home")
+    .setLabel("回首頁")
+    .setEmoji("🏠")
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(currentCategory == null);
+
+  return [
+    new ActionRowBuilder().addComponents(menu),
+    new ActionRowBuilder().addComponents(home),
+  ];
+}
+
+function findCommand(query) {
+  const { commands } = loadCommandIndex();
+  const normalized = query.trim().replace(/^\//, "").toLowerCase();
+  if (!normalized) return null;
+
+  return (
+    commands.find((c) => c.name.toLowerCase() === normalized) ||
+    commands.find((c) => c.name.toLowerCase().includes(normalized)) ||
+    null
+  );
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("help")
-    .setDescription("逼逼機器人工作介紹！📚"),
+    .setDescription("📚 查看逼逼機器人使用手冊")
+    .addStringOption((opt) =>
+      opt
+        .setName("指令")
+        .setDescription("直接跳到特定指令的說明（例如：吃什麼）")
+        .setRequired(false),
+    ),
 
   run: async (client, interaction) => {
     try {
-      const pages = [];
-      const baseColor = 0x00ae86;
+      const targetName = interaction.options.getString("指令");
 
-      // ========== 第 1 頁：首頁/概覽 ==========
-      const homePage = new EmbedBuilder()
-        .setTitle("📚 逼逼機器人使用手冊")
-        .setDescription(
-          "歡迎使用逼逼機器人！\n使用下方按鈕翻頁查看各功能詳細說明。\n\n" +
-            "**功能目錄：**\n" +
-            "📖 第 1 頁 - 📚 首頁（當前頁）\n" +
-            "📖 第 2 頁 - 🍽️ 食物系統（基本）\n" +
-            "📖 第 3 頁 - 🍽️ 食物系統（進階）\n" +
-            "📖 第 4 頁 - 🥤 飲料管理系統\n" +
-            "📖 第 5 頁 - 🎫 票務系統\n" +
-            "📖 第 6 頁 - 🎮 其他功能"
-        )
-        .setColor(baseColor)
-        .addFields(
-          {
-            name: "💡 使用提示",
-            value:
-              "• 點擊 ⬅️ 返回上一頁\n" +
-              "• 點擊 🏠 返回首頁\n" +
-              "• 點擊 ➡️ 前往下一頁",
-            inline: false,
-          },
-          {
-            name: "🔗 快速連結",
-            value:
-              "需要幫助？使用 `/help` 隨時查看本手冊\n" +
-              "遇到問題？使用 `/create-ticket` 建立支援票務",
-            inline: false,
+      // 直接查詢特定指令
+      if (targetName) {
+        const cmd = findCommand(targetName);
+        if (!cmd) {
+          const { commands } = loadCommandIndex();
+          const hint = commands
+            .filter((c) =>
+              c.name
+                .toLowerCase()
+                .includes(targetName.trim().toLowerCase().charAt(0) || ""),
+            )
+            .slice(0, 5)
+            .map((c) => `\`/${c.name}\``)
+            .join("、");
+          return interaction.reply({
+            content:
+              `❌ 找不到指令 \`/${targetName}\`。\n` +
+              (hint
+                ? `你是不是要找：${hint}？`
+                : "使用 `/help` 看完整指令清單。"),
+            ephemeral: true,
+          });
+        }
+        return interaction.reply({
+          embeds: [buildCommandEmbed(cmd)],
+          ephemeral: true,
+        });
+      }
+
+      // 瀏覽模式
+      await interaction.deferReply({ ephemeral: true });
+
+      let currentCategory = null;
+      const message = await interaction.editReply({
+        embeds: [buildHomeEmbed()],
+        components: buildComponents(currentCategory),
+      });
+
+      const collector = message.createMessageComponentCollector({
+        time: TIMEOUT_MS,
+      });
+
+      collector.on("collect", async (i) => {
+        if (i.user.id !== interaction.user.id) {
+          return i.reply({
+            content: "🚫 只有發起者能操作這個選單！",
+            ephemeral: true,
+          });
+        }
+
+        try {
+          await i.deferUpdate();
+
+          if (i.customId === "help_home") {
+            currentCategory = null;
+            await interaction.editReply({
+              embeds: [buildHomeEmbed()],
+              components: buildComponents(currentCategory),
+            });
+          } else if (
+            i.customId === "help_category" &&
+            i.isStringSelectMenu()
+          ) {
+            currentCategory = i.values[0];
+            await interaction.editReply({
+              embeds: [buildCategoryEmbed(currentCategory)],
+              components: buildComponents(currentCategory),
+            });
           }
-        )
-        .setFooter({ text: "第 1 頁 / 6 頁" })
-        .setTimestamp();
 
-      pages.push(homePage);
+          collector.resetTimer();
+        } catch (err) {
+          console.log(`[ERROR] /help 互動處理失敗：${err}`.red);
+        }
+      });
 
-      // ========== 第 2 頁：食物系統 - 基本 ==========
-      const foodBasicPage = new EmbedBuilder()
-        .setTitle("🍽️ 食物系統 - 基本指令")
-        .setDescription("讓逼逼機器人幫你決定吃什麼！支援早餐、午餐、晚餐、宵夜、飲料五大分類。")
-        .setColor(baseColor)
-        .addFields(
-          {
-            name: "🎰 /吃什麼",
-            value:
-              "**功能：** 隨機抽選食物（不含飲料）\n" +
-              "**參數：**\n" +
-              "• `類別`（可選）- 指定分類：早餐/午餐/晚餐/宵夜\n\n" +
-              "**範例：**\n" +
-              "• `/吃什麼` - 隨機所有食物（自動排除飲料）\n" +
-              "• `/吃什麼 類別:早餐` - 隨機早餐\n" +
-              "• `/吃什麼 類別:宵夜` - 隨機宵夜",
-            inline: false,
-          },
-          {
-            name: "🥤 /喝什麼",
-            value:
-              "**功能：** 飲料專用選擇器\n" +
-              "**參數：**\n" +
-              "• `飲料店`（可選）- 指定飲料店名稱\n\n" +
-              "**範例：**\n" +
-              "• `/喝什麼` - 隨機所有飲料店的飲品\n" +
-              "• `/喝什麼 飲料店:可不可紅茶` - 隨機可不可的飲品",
-            inline: false,
-          },
-          {
-            name: "📚 /有什麼能吃",
-            value:
-              "**功能：** 查看食物清單\n" +
-              "**參數：**\n" +
-              "• `類別`（可選）- 篩選特定分類\n\n" +
-              "**範例：**\n" +
-              "• `/有什麼能吃` - 查看所有食物（分類顯示）\n" +
-              "• `/有什麼能吃 類別:飲料` - 只看飲料（按店家分組）",
-            inline: false,
-          },
-          {
-            name: "🏆 /食物排行",
-            value:
-              "**功能：** 查看最受歡迎的食物排行榜\n" +
-              "**參數：**\n" +
-              "• `類別`（可選）- 查看特定分類排行\n" +
-              "• `數量`（可選）- 顯示前幾名（5-20，預設 10）\n\n" +
-              "**範例：**\n" +
-              "• `/食物排行` - 總排行 Top 10\n" +
-              "• `/食物排行 類別:飲料 數量:20` - 飲料排行 Top 20",
-            inline: false,
-          },
-          {
-            name: "🥤 /查看飲料店",
-            value:
-              "**功能：** 查看所有可用的飲料店清單\n" +
-              "**說明：** 顯示所有飲料店名稱和品項數量",
-            inline: false,
-          }
-        )
-        .setFooter({ text: "第 2 頁 / 6 頁 - 食物系統（基本）" })
-        .setTimestamp();
-
-      pages.push(foodBasicPage);
-
-      // ========== 第 3 頁：食物系統 - 進階 ==========
-      const foodAdvancedPage = new EmbedBuilder()
-        .setTitle("🍽️ 食物系統 - 進階管理")
-        .setDescription("管理和維護食物資料庫的進階指令。")
-        .setColor(baseColor)
-        .addFields(
-          {
-            name: "➕ /新增食物",
-            value:
-              "**功能：** 新增單一食物\n" +
-              "**參數：**\n" +
-              "• `食物名稱`（必填）- 食物的名稱\n" +
-              "• `類別`（必填）- 早餐/午餐/晚餐/宵夜/飲料\n" +
-              "• `飲料店`（可選）- 飲料店名稱（僅飲料需要）\n\n" +
-              "**範例：**\n" +
-              "• `/新增食物 食物名稱:蛋餅 類別:早餐`\n" +
-              "• `/新增食物 食物名稱:熟成紅茶 類別:飲料 飲料店:可不可紅茶`",
-            inline: false,
-          },
-          {
-            name: "📝 /批次新增食物",
-            value:
-              "**功能：** 一次新增多個食物（用逗號分隔）\n" +
-              "**參數：**\n" +
-              "• `食物清單`（必填）- 用逗號分隔的食物名稱\n" +
-              "• `類別`（必填）- 食物分類\n" +
-              "• `飲料店`（可選）- 飲料店名稱\n\n" +
-              "**範例：**\n" +
-              "`/批次新增食物 食物清單:蛋餅,三明治,漢堡 類別:早餐`",
-            inline: false,
-          },
-          {
-            name: "🗑️ /刪除食物",
-            value:
-              "**功能：** 刪除食物\n" +
-              "**參數：**\n" +
-              "• `食物名稱`（必填）- 要刪除的食物名稱\n" +
-              "• `類別`（可選）- 如有同名食物請指定\n" +
-              "• `飲料店`（可選）- 飲料店名稱\n\n" +
-              "**說明：** 如果有同名食物，系統會提示你選擇正確的分類。",
-            inline: false,
-          }
-        )
-        .setFooter({ text: "第 3 頁 / 6 頁 - 食物系統（進階）" })
-        .setTimestamp();
-
-      pages.push(foodAdvancedPage);
-
-      // ========== 第 4 頁：飲料管理系統 ==========
-      const beveragePage = new EmbedBuilder()
-        .setTitle("🥤 飲料管理系統")
-        .setDescription("專門用於管理手搖飲店菜單的強大工具！")
-        .setColor(baseColor)
-        .addFields(
-          {
-            name: "📥 /匯入飲料店菜單",
-            value:
-              "**功能：** 快速匯入整個飲料店的完整菜單\n" +
-              "**參數：**\n" +
-              "• `飲料店`（必填）- 飲料店名稱\n" +
-              "• `菜單`（必填）- 品項清單（支援換行、逗號、分號分隔）\n" +
-              "• `覆蓋現有`（可選）- 是否刪除現有菜單後重建\n\n" +
-              "**支援的輸入格式：**\n" +
-              "1️⃣ 換行分隔（推薦）\n" +
-              "```\n菜單:翡翠檸檬\n珍珠奶茶\n黑糖鮮奶\n```\n" +
-              "2️⃣ 逗號分隔\n" +
-              "```\n菜單:翡翠檸檬,珍珠奶茶,黑糖鮮奶\n```\n" +
-              "3️⃣ 混合格式也可以！",
-            inline: false,
-          },
-          {
-            name: "💡 使用技巧",
-            value:
-              "• 從飲料店官網複製菜單，直接貼上即可\n" +
-              "• 支援一次匯入數十項品項\n" +
-              "• 自動去重，不會重複新增\n" +
-              "• 顯示詳細的匯入報告",
-            inline: false,
-          },
-          {
-            name: "📊 匯入報告包含",
-            value:
-              "✅ 成功新增數量\n" +
-              "⏭️ 已存在跳過數量\n" +
-              "📝 總共處理數量\n" +
-              "📋 新增品項列表\n" +
-              "📊 店家總品項數",
-            inline: false,
-          },
-          {
-            name: "🔄 更新菜單",
-            value:
-              "使用 `覆蓋現有:是` 參數可以刪除舊菜單並重新匯入，\n" +
-              "適合用於飲料店推出新品或停售舊品時。",
-            inline: false,
-          }
-        )
-        .setFooter({ text: "第 4 頁 / 6 頁 - 飲料管理系統" })
-        .setTimestamp();
-
-      pages.push(beveragePage);
-
-      // ========== 第 5 頁：票務系統 ==========
-      const ticketPage = new EmbedBuilder()
-        .setTitle("🎫 票務系統")
-        .setDescription("需要幫助？使用票務系統聯繫支援團隊！")
-        .setColor(baseColor)
-        .addFields(
-          {
-            name: "🎫 /create-ticket",
-            value:
-              "**功能：** 創建支援票務\n" +
-              "**說明：** 創建一個私人頻道，只有你和支援團隊能看到。\n" +
-              "適合用於回報問題、提出建議或尋求協助。",
-            inline: false,
-          },
-          {
-            name: "🔒 /close-ticket",
-            value:
-              "**功能：** 關閉當前票務\n" +
-              "**說明：** 在票務頻道中使用此指令關閉票務。\n" +
-              "頻道將在 5 秒後自動刪除。",
-            inline: false,
-          },
-          {
-            name: "💡 使用流程",
-            value:
-              "1️⃣ 使用 `/create-ticket` 創建票務\n" +
-              "2️⃣ 在專屬頻道中描述你的問題\n" +
-              "3️⃣ 等待支援團隊回覆\n" +
-              "4️⃣ 問題解決後使用 `/close-ticket` 關閉",
-            inline: false,
-          },
-          {
-            name: "⚠️ 注意事項",
-            value:
-              "• 一次只能開啟一個票務\n" +
-              "• 請詳細描述你的問題\n" +
-              "• 支援團隊會盡快回覆",
-            inline: false,
-          }
-        )
-        .setFooter({ text: "第 5 頁 / 6 頁 - 票務系統" })
-        .setTimestamp();
-
-      pages.push(ticketPage);
-
-      // ========== 第 6 頁：其他功能 ==========
-      const otherPage = new EmbedBuilder()
-        .setTitle("🎮 其他功能")
-        .setDescription("更多實用的機器人功能！")
-        .setColor(baseColor)
-        .addFields(
-          {
-            name: "📊 統計系統",
-            value:
-              "機器人會自動記錄以下統計資訊：\n" +
-              "• 💬 訊息統計\n" +
-              "• 🎤 語音統計\n" +
-              "• 📈 頻道活躍度\n" +
-              "• 🏆 食物排行榜",
-            inline: false,
-          },
-          {
-            name: "🗳️ 投票系統",
-            value:
-              "遊戲提案投票功能：\n" +
-              "• 自動收集玩家和支持者意見\n" +
-              "• 24 小時投票期限\n" +
-              "• 達到門檻自動通過",
-            inline: false,
-          },
-          {
-            name: "🌅 每日早安 / 今日早報",
-            value:
-              "每天早上 8 點自動發送早安早報圖片：\n" +
-              "• 復古廟口抽籤風設計\n" +
-              "• 今日抽卡運勢（6 種主題色調）\n" +
-              "• 日期、農曆、倒數計時\n" +
-              "• 每日宜忌\n" +
-              "• 使用 `/今日早報` 可隨時手動觸發",
-            inline: false,
-          },
-          {
-            name: "🎭 趣味指令",
-            value:
-              "• `/gaslight` - 查看 Gaslight 貼文列表\n" +
-              "• 更多趣味功能持續開發中...",
-            inline: false,
-          },
-          {
-            name: "💡 小提示",
-            value:
-              "定期使用 `/help` 查看是否有新功能更新！\n" +
-              "有建議或問題？使用 `/create-ticket` 聯繫我們！",
-            inline: false,
-          }
-        )
-        .setFooter({ text: "第 6 頁 / 6 頁 - 其他功能" })
-        .setTimestamp();
-
-      pages.push(otherPage);
-
-      // 使用 buttonPaginator 顯示翻頁
-      await buttonPaginator(interaction, pages, 60 * 1000); // 60 秒超時
+      collector.on("end", async () => {
+        try {
+          await interaction.editReply({ components: [] });
+        } catch {
+          /* 訊息可能已被刪除，忽略 */
+        }
+      });
     } catch (error) {
       console.log(
-        `[ERROR] An error occurred inside the help command:\n${error}`.red
+        `[ERROR] /help 指令出錯：\n${error}\n${error.stack}`.red,
       );
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({
-          content: "❌ 載入幫助手冊時發生錯誤，請稍後再試！",
+          content: "❌ 載入幫助手冊時發生錯誤，請稍後再試。",
           ephemeral: true,
         });
       }
