@@ -60,7 +60,6 @@ module.exports = {
       });
 
       await interaction.editReply({
-        content: `求籤結果 ⬇️　${strawResult}`,
         files: [attachment],
       });
     } catch (error) {
