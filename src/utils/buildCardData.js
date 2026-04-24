@@ -30,7 +30,7 @@ function buildCardData({
     fortuneText,
     recommends: lunarInfo?.recommends || [],
     avoids: lunarInfo?.avoids || [],
-    serialNo: now.toFormat("MMdd"),
+    serialNo: "0829",
   };
 }
 
