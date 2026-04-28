@@ -4,13 +4,11 @@ const {
   SlashCommandBuilder,
 } = require("discord.js");
 
-const CATEGORY_DISPLAY = {
-  breakfast: "早餐",
-  lunch: "午餐",
-  dinner: "晚餐",
-  snack: "宵夜",
-  beverage: "飲料",
-};
+const autocompleteBeverageStore = require("../../utils/autocompleteBeverageStore");
+const {
+  CATEGORY_LABEL,
+  CATEGORY_CHOICES,
+} = require("../../constants/foodCategories");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -28,33 +26,22 @@ module.exports = {
       option
         .setName("類別")
         .setDescription("選擇食物類別（如有同名食物請指定）")
-        .addChoices(
-          { name: "🌅 早餐", value: "breakfast" },
-          { name: "🌞 午餐", value: "lunch" },
-          { name: "🌙 晚餐", value: "dinner" },
-          { name: "🌃 宵夜", value: "snack" },
-          { name: "🥤 飲料", value: "beverage" }
-        )
+        .addChoices(...CATEGORY_CHOICES)
     )
     .addStringOption((option) =>
       option
         .setName("飲料店")
         .setDescription("飲料店名稱（僅在類別為飲料時需要填寫）")
-        .addChoices(
-          { name: "🥤 可不可紅茶", value: "可不可紅茶" },
-          { name: "🧋 50嵐", value: "50嵐" },
-          { name: "🍹 迷客夏", value: "迷客夏" },
-          { name: "🍵 清心福全", value: "清心福全" },
-          { name: "🫖 麻古茶坊", value: "麻古茶坊" },
-          { name: "🥛 CoCo都可", value: "CoCo都可" }
-        )
+        .setAutocomplete(true)
     ),
+
+  autocomplete: autocompleteBeverageStore,
 
   run: async (client, interaction) => {
     const { options } = interaction;
-    const foodToDelete = options.getString("食物名稱");
+    const foodToDelete = options.getString("食物名稱")?.trim();
     const category = options.getString("類別");
-    const beverageStore = options.getString("飲料店");
+    const beverageStore = options.getString("飲料店")?.trim() || null;
 
     const collection = client.collection;
 
@@ -82,7 +69,7 @@ module.exports = {
         // 有多個同名項目但沒有指定類別
         let msg = `找到多個「${foodToDelete}」選項，請指定類別：\n`;
         matchingItems.forEach((item) => {
-          let itemDesc = `- ${CATEGORY_DISPLAY[item.category]}`;
+          let itemDesc = `- ${CATEGORY_LABEL[item.category]}`;
           if (item.beverageStore) {
             itemDesc += `（${item.beverageStore}）`;
           }
@@ -98,7 +85,7 @@ module.exports = {
       if (deleteResult.deletedCount === 1) {
         let msg = `已刪除食物選項：${foodToDelete}`;
         if (category) {
-          msg += `（${CATEGORY_DISPLAY[category]}`;
+          msg += `（${CATEGORY_LABEL[category]}`;
           if (beverageStore) {
             msg += ` - ${beverageStore}`;
           }
@@ -109,7 +96,7 @@ module.exports = {
       } else {
         let msg = `找不到要刪除的食物選項：${foodToDelete}`;
         if (category) {
-          msg += `（${CATEGORY_DISPLAY[category]}`;
+          msg += `（${CATEGORY_LABEL[category]}`;
           if (beverageStore) {
             msg += ` - ${beverageStore}`;
           }

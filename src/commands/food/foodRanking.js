@@ -5,13 +5,10 @@ const {
   EmbedBuilder,
 } = require("discord.js");
 
-const CATEGORY_DISPLAY = {
-  breakfast: "🌅 早餐",
-  lunch: "🌞 午餐",
-  dinner: "🌙 晚餐",
-  snack: "🌃 宵夜",
-  beverage: "🥤 飲料",
-};
+const {
+  CATEGORY_DISPLAY,
+  CATEGORY_CHOICES,
+} = require("../../constants/foodCategories");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -21,13 +18,7 @@ module.exports = {
       option
         .setName("類別")
         .setDescription("選擇要查看的食物類別（不選則顯示總排行）")
-        .addChoices(
-          { name: "🌅 早餐", value: "breakfast" },
-          { name: "🌞 午餐", value: "lunch" },
-          { name: "🌙 晚餐", value: "dinner" },
-          { name: "🌃 宵夜", value: "snack" },
-          { name: "🥤 飲料", value: "beverage" }
-        )
+        .addChoices(...CATEGORY_CHOICES)
     )
     .addIntegerOption((option) =>
       option

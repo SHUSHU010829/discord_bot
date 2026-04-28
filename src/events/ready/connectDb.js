@@ -44,6 +44,22 @@ module.exports = async (client) => {
     client.rolePanelsCollection = rolePanelsCollection;
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
 
+    // 建立 FoodList 索引（防止同名同類別重複，加速排行榜排序）
+    try {
+      await collection.createIndex(
+        { name: 1, category: 1, beverageStore: 1 },
+        { unique: true, name: "uniq_food_identity" }
+      );
+      await collection.createIndex(
+        { drawCount: -1 },
+        { name: "drawCount_desc" }
+      );
+    } catch (indexError) {
+      console.log(
+        `[WARNING] Failed to create FoodList index (可能有重複資料需要先清理):\n${indexError.message}`.yellow
+      );
+    }
+
     // 確認有多少飲料店資料
     const beverageStoreCount = await collection.distinct("beverageStore", {
       category: "beverage",
