@@ -4,40 +4,95 @@ const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 
 const getCryptocurrency = require("../../utils/getCryptocurrency");
 
+// 常見幣種，提供 autocomplete 建議
+const POPULAR_COINS = [
+  { code: "BTC", label: "比特幣 BTC" },
+  { code: "ETH", label: "以太幣 ETH" },
+  { code: "USDT", label: "泰達幣 USDT" },
+  { code: "BNB", label: "幣安幣 BNB" },
+  { code: "SOL", label: "Solana SOL" },
+  { code: "XRP", label: "瑞波幣 XRP" },
+  { code: "USDC", label: "USDC" },
+  { code: "ADA", label: "Cardano ADA" },
+  { code: "DOGE", label: "狗狗幣 DOGE" },
+  { code: "TRX", label: "波場幣 TRX" },
+  { code: "AVAX", label: "Avalanche AVAX" },
+  { code: "DOT", label: "波卡 DOT" },
+  { code: "MATIC", label: "Polygon MATIC" },
+  { code: "LTC", label: "萊特幣 LTC" },
+  { code: "SHIB", label: "柴犬幣 SHIB" },
+  { code: "LINK", label: "Chainlink LINK" },
+  { code: "ATOM", label: "Cosmos ATOM" },
+  { code: "BCH", label: "比特幣現金 BCH" },
+  { code: "NEAR", label: "NEAR Protocol NEAR" },
+  { code: "APT", label: "Aptos APT" },
+];
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("加密貨幣")
-    .setDescription("預設用美金報價。")
+    .setDescription("查詢加密貨幣即時美金報價（資料來源：CryptoCompare）")
     .addStringOption((option) =>
       option
         .setName("貨幣代碼")
-        .setDescription("請輸入要查詢的加密貨幣代碼")
+        .setDescription("輸入或選擇幣種代碼，例：BTC、ETH、SOL")
         .setRequired(true)
+        .setAutocomplete(true)
     ),
 
+  autocomplete: async (client, interaction) => {
+    const focused = interaction.options.getFocused(true);
+    if (focused.name !== "貨幣代碼") {
+      return interaction.respond([]).catch(() => {});
+    }
+    const query = (focused.value || "").trim().toLowerCase();
+    const results = POPULAR_COINS.filter(
+      (c) =>
+        !query ||
+        c.code.toLowerCase().includes(query) ||
+        c.label.toLowerCase().includes(query)
+    )
+      .slice(0, 25)
+      .map((c) => ({ name: c.label, value: c.code }));
+    await interaction.respond(results).catch(() => {});
+  },
+
   run: async (client, interaction) => {
-    const { options } = interaction;
-    const coin = options.getString("貨幣代碼");
+    const rawCoin = interaction.options.getString("貨幣代碼") || "";
+    const coin = rawCoin.trim().toUpperCase();
+
+    if (!coin) {
+      return interaction.reply({
+        content: "❌ 請輸入加密貨幣代碼（例：BTC）。",
+        ephemeral: true,
+      });
+    }
 
     await interaction.deferReply();
 
     try {
-      const cryptocurrencyData = await getCryptocurrency(coin.trim());
+      const cryptocurrencyData = await getCryptocurrency(coin);
 
-      if (cryptocurrencyData && cryptocurrencyData.USD) {
+      if (cryptocurrencyData && cryptocurrencyData.USD != null) {
+        const price = Number(cryptocurrencyData.USD);
+        const formattedPrice =
+          price >= 1
+            ? price.toLocaleString("en-US", { maximumFractionDigits: 2 })
+            : price.toString();
+
         const embed = new EmbedBuilder()
-          .setTitle(`貨幣：${coin}`)
-          .setColor("Random")
-          .addFields({ name: "價格", value: `$${cryptocurrencyData.USD}` })
+          .setTitle(`💰 ${coin} 即時報價`)
+          .setColor(0xf7931a)
+          .addFields({ name: "價格 (USD)", value: `\`$${formattedPrice}\`` })
           .setTimestamp()
-          .setFooter({ text: "對應幣值：USD" });
+          .setFooter({ text: "資料來源：CryptoCompare" });
 
-        await interaction.editReply({
-          content: "即時價格 ⬇️",
-          embeds: [embed],
-        });
+        await interaction.editReply({ content: "即時價格 ⬇️", embeds: [embed] });
       } else {
-        await interaction.editReply("找尋不到對應幣值！");
+        await interaction.editReply(
+          `❌ 找不到 \`${coin}\` 的報價。\n` +
+            `💡 請輸入有效的幣種代碼（如：BTC、ETH），輸入時可從建議清單挑選。`
+        );
       }
     } catch (error) {
       await interaction.editReply("發生錯誤，無法完成查詢。");

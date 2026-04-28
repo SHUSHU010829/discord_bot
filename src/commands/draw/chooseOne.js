@@ -40,33 +40,34 @@ module.exports = {
   run: async (client, interaction) => {
     const { options } = interaction;
 
-    // 收集所有非空的選項
-    const choices = [];
-    for (let i = 1; i <= 5; i++) {
-      const choiceName = i === 1 ? "選擇一" : i === 2 ? "選擇二" : i === 3 ? "選擇三" : i === 4 ? "選擇四" : "選擇五";
-      const choice = options.getString(choiceName);
-      if (choice) {
-        choices.push(choice);
-      }
-    }
+    const CHOICE_NAMES = ["選擇一", "選擇二", "選擇三", "選擇四", "選擇五"];
+    const COUNT_LABEL = ["", "一", "二", "三", "四", "五"];
+
+    // 收集所有非空的選項並去除前後空白
+    const choices = CHOICE_NAMES
+      .map((name) => options.getString(name)?.trim())
+      .filter((value) => value);
 
     await interaction.deferReply();
 
-    const result = choices[Math.floor(Math.random() * choices.length)];
-
-    // 生成選項對比文字
-    const choicesText = choices.map((c, i) => `${i + 1}. "${c}"`).join(" v.s ");
-
-    const embed = new EmbedBuilder()
-      .setTitle(`機器人選了"${result}"！`)
-      .setDescription(`➡️ ${choicesText}`)
-      .setColor("Random")
-      .setFooter({ text: `從 ${choices.length} 個選項中選出` })
-      .setTimestamp();
-
     try {
-      await interaction.editReply(`${choices.length === 2 ? "二" : choices.length === 3 ? "三" : choices.length === 4 ? "四" : choices.length === 5 ? "五" : "多"}選一結果 ⬇️`);
-      await interaction.editReply({ embeds: [embed] });
+      const result = choices[Math.floor(Math.random() * choices.length)];
+      const choicesText = choices
+        .map((c, i) => `${i + 1}. "${c}"`)
+        .join(" v.s ");
+      const headerLabel = COUNT_LABEL[choices.length] || "多";
+
+      const embed = new EmbedBuilder()
+        .setTitle(`機器人選了 "${result}"！`)
+        .setDescription(`➡️ ${choicesText}`)
+        .setColor("Random")
+        .setFooter({ text: `從 ${choices.length} 個選項中選出` })
+        .setTimestamp();
+
+      await interaction.editReply({
+        content: `${headerLabel}選一結果 ⬇️`,
+        embeds: [embed],
+      });
     } catch (error) {
       await interaction.editReply("哎呀！今天懶得選擇 💤");
       console.log(
