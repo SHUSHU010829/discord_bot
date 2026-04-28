@@ -25,10 +25,7 @@ module.exports = {
     const collection = client.collection;
     const beverageStore = interaction.options.getString("飲料店");
 
-    await interaction.reply({
-      content: "抽選中... 🥤",
-      fetchReply: true,
-    });
+    await interaction.deferReply();
 
     try {
       // 構建查詢條件 - 只查詢飲料

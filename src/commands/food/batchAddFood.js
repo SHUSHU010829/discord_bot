@@ -46,10 +46,7 @@ module.exports = {
 
     const collection = client.collection;
 
-    await interaction.reply({
-      content: "批次處理中... 🌭",
-      fetchReply: true,
-    });
+    await interaction.deferReply();
 
     try {
       // 分割食物清單、去空白、去重複

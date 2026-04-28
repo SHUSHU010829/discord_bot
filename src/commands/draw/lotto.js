@@ -7,11 +7,8 @@ module.exports = {
     .setName("鹹魚翻身")
     .setDescription("不保證中獎樂透號碼... 🎰"),
 
-  run: async (interaction) => {
-    await interaction.reply({
-      content: "預測中... 🎰",
-      fetchReply: true,
-    });
+  run: async (client, interaction) => {
+    await interaction.deferReply();
 
     const getLottoNumbers = () => {
       const numbers = new Set();
@@ -20,19 +17,18 @@ module.exports = {
         numbers.add(Math.floor(Math.random() * 49) + 1);
       }
       // 從小到大排序
-      const sortedNumbers = [...numbers].sort((a, b) => a - b);
-      return sortedNumbers;
+      return [...numbers].sort((a, b) => a - b);
     };
 
     const lottoNumbers = getLottoNumbers();
 
     try {
-      interaction.editReply(
+      await interaction.editReply(
         `本期樂透 ➡️ \n\n${lottoNumbers.join(", ")}` +
-        `\n\n祝您中大獎！🔥\n中了記得分舒舒，不客氣 ✨`
+          `\n\n祝您中大獎！🔥\n中了記得分舒舒，不客氣 ✨`
       );
     } catch (error) {
-      interaction.editReply("哎呀！今天不適合簽大樂透 💤");
+      await interaction.editReply("哎呀！今天不適合簽大樂透 💤");
       console.log(
         `[ERROR] An error occurred inside the lotto ask:\n${error}`.red
       );

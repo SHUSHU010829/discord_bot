@@ -13,10 +13,7 @@ module.exports = {
   run: async (client, interaction) => {
     const collection = client.collection;
 
-    await interaction.reply({
-      content: "查詢飲料店清單中... 🥤",
-      fetchReply: true,
-    });
+    await interaction.deferReply();
 
     try {
       // 取得所有飲料店名稱（不重複）

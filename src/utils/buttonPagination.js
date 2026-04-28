@@ -18,7 +18,6 @@ module.exports = async (interaction, pages, time = 30 * 1000) => {
       return await interaction.editReply({
         embeds: pages,
         components: [],
-        fetchReply: true,
       });
     }
 
@@ -46,7 +45,6 @@ module.exports = async (interaction, pages, time = 30 * 1000) => {
     const message = await interaction.editReply({
       embeds: [pages[index]],
       components: [buttons],
-      fetchReply: true,
     });
 
     const mc = message.createMessageComponentCollector({

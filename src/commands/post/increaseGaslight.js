@@ -21,26 +21,21 @@ module.exports = {
 
     const collection = client.gaslightCollection;
 
-    await interaction.reply({
-      content: "處理中... 📝",
-      fetchReply: true,
-    });
+    await interaction.deferReply();
 
-     try {
-       // Check if the food item already exists in the database
-       const existingPost = await collection.findOne({ post: newPost });
-       if (existingPost) {
-         interaction.editReply(`有重複文章了！`);
-       } else {
-         // Insert the new food item into MongoDB
-         await collection.insertOne({ post: newPost });
-         interaction.editReply(`已新增新的情勒文！`);
-       }
-     } catch (error) {
-       interaction.editReply("新增文章失敗，看來文筆有待加強 :(");
-       console.log(
-         `[ERROR] An error occurred inside the increase gaslight post:\n${error}`.red
-       );
-     }
+    try {
+      const existingPost = await collection.findOne({ post: newPost });
+      if (existingPost) {
+        await interaction.editReply(`有重複文章了！`);
+      } else {
+        await collection.insertOne({ post: newPost });
+        await interaction.editReply(`已新增新的情勒文！`);
+      }
+    } catch (error) {
+      await interaction.editReply("新增文章失敗，看來文筆有待加強 :(");
+      console.log(
+        `[ERROR] An error occurred inside the increase gaslight post:\n${error}`.red
+      );
+    }
   },
 };

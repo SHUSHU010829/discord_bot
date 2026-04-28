@@ -11,12 +11,10 @@ module.exports = {
   botPermissions: [PermissionFlagsBits.Connect],
 
   run: async (client, interaction) => {
-    const msg = await interaction.reply({
-      content: "Pong! 🏓",
-      fetchReply: true,
-    });
+    await interaction.reply({ content: "Pong! 🏓" });
+    const msg = await interaction.fetchReply();
     const ping = msg.createdTimestamp - interaction.createdTimestamp;
-    interaction.editReply(
+    await interaction.editReply(
       `Pong! 🏓\n機器人延遲：${ping} ms\n API 延遲：${client.ws.ping} ms`
     );
   },

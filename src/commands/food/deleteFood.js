@@ -58,10 +58,7 @@ module.exports = {
 
     const collection = client.collection;
 
-    await interaction.reply({
-      content: "處理中... 🗑️",
-      fetchReply: true,
-    });
+    await interaction.deferReply();
 
     try {
       // 構建刪除查詢

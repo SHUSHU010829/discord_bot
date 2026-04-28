@@ -47,15 +47,12 @@ module.exports = {
     if (!newFood) {
       await interaction.reply({
         content: "❌ 食物名稱不能為空白！",
-        fetchReply: true,
+        ephemeral: true,
       });
       return;
     }
 
-    await interaction.reply({
-      content: "處理中... 🌭",
-      fetchReply: true,
-    });
+    await interaction.deferReply();
 
     try {
       // 構建食物資料

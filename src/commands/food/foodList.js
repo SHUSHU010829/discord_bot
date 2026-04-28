@@ -255,10 +255,7 @@ module.exports = {
     const collection = client.collection;
     const category = interaction.options.getString("類別");
 
-    await interaction.reply({
-      content: "查看現在食物列表... 📚",
-      fetchReply: true,
-    });
+    await interaction.deferReply();
 
     try {
       let query = {};

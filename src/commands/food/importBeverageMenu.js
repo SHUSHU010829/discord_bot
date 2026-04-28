@@ -42,10 +42,7 @@ module.exports = {
 
     const collection = client.collection;
 
-    await interaction.reply({
-      content: "正在匯入菜單... 🥤",
-      fetchReply: true,
-    });
+    await interaction.deferReply();
 
     try {
       if (!beverageStore) {
