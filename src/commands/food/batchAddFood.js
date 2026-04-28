@@ -2,6 +2,7 @@ require("colors");
 
 const {
   SlashCommandBuilder,
+  PermissionFlagsBits,
 } = require("discord.js");
 
 const autocompleteBeverageStore = require("../../utils/autocompleteBeverageStore");
@@ -14,6 +15,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("批次新增食物")
     .setDescription("一次新增多個食物（用逗號分隔）")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addStringOption((option) =>
       option
         .setName("食物清單")

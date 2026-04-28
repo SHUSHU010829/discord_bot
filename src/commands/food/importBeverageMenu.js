@@ -3,6 +3,7 @@ require("colors");
 const {
   SlashCommandBuilder,
   EmbedBuilder,
+  PermissionFlagsBits,
 } = require("discord.js");
 
 const autocompleteBeverageStore = require("../../utils/autocompleteBeverageStore");
@@ -11,6 +12,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("匯入飲料店菜單")
     .setDescription("快速匯入整個飲料店的菜單（支援大量品項）🥤")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addStringOption((option) =>
       option
         .setName("飲料店")

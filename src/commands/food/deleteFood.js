@@ -2,9 +2,11 @@ require("colors");
 
 const {
   SlashCommandBuilder,
+  PermissionFlagsBits,
 } = require("discord.js");
 
 const autocompleteBeverageStore = require("../../utils/autocompleteBeverageStore");
+const autocompleteFoodName = require("../../utils/autocompleteFoodName");
 const {
   CATEGORY_LABEL,
   CATEGORY_CHOICES,
@@ -14,6 +16,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("刪除食物")
     .setDescription("刪除現有食物")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addStringOption((option) =>
       option
         .setName("食物名稱")
@@ -21,6 +24,7 @@ module.exports = {
           "刪除食物的名稱(不知道食物名稱可以用「有什麼能吃」查看)"
         )
         .setRequired(true)
+        .setAutocomplete(true)
     )
     .addStringOption((option) =>
       option
@@ -35,7 +39,16 @@ module.exports = {
         .setAutocomplete(true)
     ),
 
-  autocomplete: autocompleteBeverageStore,
+  autocomplete: async (client, interaction) => {
+    const focused = interaction.options.getFocused(true);
+    if (focused.name === "飲料店") {
+      return autocompleteBeverageStore(client, interaction);
+    }
+    if (focused.name === "食物名稱") {
+      return autocompleteFoodName(client, interaction);
+    }
+    return interaction.respond([]).catch(() => {});
+  },
 
   run: async (client, interaction) => {
     const { options } = interaction;

@@ -44,6 +44,27 @@ module.exports = async (client) => {
     client.rolePanelsCollection = rolePanelsCollection;
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
 
+    // 自動修補沒有 category / drawCount 的舊資料（idempotent，沒事就不動）
+    try {
+      const missingCategory = await collection.updateMany(
+        { $or: [{ category: { $exists: false } }, { category: null }] },
+        { $set: { category: "lunch" } }
+      );
+      const missingDrawCount = await collection.updateMany(
+        { drawCount: { $exists: false } },
+        { $set: { drawCount: 0 } }
+      );
+      if (missingCategory.modifiedCount > 0 || missingDrawCount.modifiedCount > 0) {
+        console.log(
+          `[DATA] 自動修補舊資料：補 category ${missingCategory.modifiedCount} 筆（預設 lunch）、補 drawCount ${missingDrawCount.modifiedCount} 筆`.cyan
+        );
+      }
+    } catch (migrateError) {
+      console.log(
+        `[WARNING] 修補舊資料失敗：${migrateError.message}`.yellow
+      );
+    }
+
     // 建立 FoodList 索引（防止同名同類別重複，加速排行榜排序）
     try {
       await collection.createIndex(
