@@ -4,21 +4,25 @@ const fs = require("fs");
 const path = require("path");
 const {
   SlashCommandBuilder,
-  EmbedBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
   ApplicationCommandOptionType,
   PermissionFlagsBits,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  MessageFlags,
 } = require("discord.js");
 
 const HOME_COLOR = 0x00ae86;
 const CATEGORY_COLOR = 0x5865f2;
+const COMMAND_COLOR = 0xfaa61a;
 const TIMEOUT_MS = 3 * 60 * 1000;
 const COMMANDS_ROOT = path.join(__dirname, "..");
 
-// 類別資料夾名稱 → 顯示設定
 const CATEGORY_META = {
   food: { label: "食物飲料", emoji: "🍽️", order: 1, blurb: "吃/喝什麼、食物清單、排行榜、飲料菜單管理" },
   draw: { label: "抽選工具", emoji: "🎲", order: 2, blurb: "抽籤、二選一、鹹魚翻身樂透" },
@@ -119,23 +123,22 @@ function sortedCategories() {
   );
 }
 
-function formatOption(option, indent = "") {
+function formatOptionLine(option, indent = "") {
   const typeLabel = OPTION_TYPE_LABEL[option.type] || "參數";
   const required = option.required ? "必填" : "可選";
   const desc = option.description || "";
   return `${indent}• \`${option.name}\` (${required}, ${typeLabel}) — ${desc}`;
 }
 
-function formatSubcommand(sub) {
+function formatSubcommandBlock(sub) {
   const lines = [`▸ \`${sub.name}\` — ${sub.description || ""}`];
   for (const opt of sub.options || []) {
-    lines.push(formatOption(opt, "　"));
+    lines.push(formatOptionLine(opt, "　"));
   }
   return lines.join("\n");
 }
 
-function formatCommandBody(cmd) {
-  const lines = [cmd.description];
+function buildCommandText(cmd) {
   const opts = cmd.options || [];
   const subs = opts.filter(
     (o) => o.type === ApplicationCommandOptionType.Subcommand,
@@ -146,57 +149,126 @@ function formatCommandBody(cmd) {
       o.type !== ApplicationCommandOptionType.SubcommandGroup,
   );
 
+  const lock = isAdminOnly(cmd) ? " 🔒" : "";
+  const lines = [`### \`/${cmd.name}\`${lock}`, cmd.description];
+
   if (flat.length) {
     lines.push("");
-    lines.push(...flat.map((o) => formatOption(o)));
+    lines.push(...flat.map((o) => formatOptionLine(o)));
   }
-
   if (subs.length) {
     if (flat.length) lines.push("");
-    lines.push(...subs.map(formatSubcommand));
+    lines.push(...subs.map(formatSubcommandBlock));
   }
 
   return lines.join("\n");
 }
 
-function clamp(value, max) {
-  if (!value) return "—";
-  return value.length > max ? value.slice(0, max - 1) + "…" : value;
+// V2 TextDisplay 上限 ~4000 字，把多筆指令分段塞，避免單塊爆長
+function chunkCommandTexts(texts, limit = 3500) {
+  const chunks = [];
+  let current = "";
+  for (const text of texts) {
+    if (current && current.length + text.length + 2 > limit) {
+      chunks.push(current);
+      current = text;
+    } else {
+      current = current ? `${current}\n\n${text}` : text;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
 }
 
-function buildHomeEmbed() {
+function buildCategorySelect(currentCategory, disabled = false) {
+  const categories = sortedCategories();
+  const options = categories.slice(0, 25).map(([key, cmds]) => {
+    const meta = CATEGORY_META[key] || { label: key, emoji: "📁", blurb: "" };
+    return {
+      label: `${meta.label} (${cmds.length})`,
+      description: meta.blurb ? meta.blurb.slice(0, 100) : undefined,
+      value: key,
+      emoji: meta.emoji,
+      default: key === currentCategory,
+    };
+  });
+  return new StringSelectMenuBuilder()
+    .setCustomId("help_category")
+    .setPlaceholder("📖 選擇一個類別...")
+    .setDisabled(disabled)
+    .addOptions(options);
+}
+
+function buildHomeButton({ disabled }) {
+  return new ButtonBuilder()
+    .setCustomId("help_home")
+    .setLabel("回首頁")
+    .setEmoji("🏠")
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(disabled);
+}
+
+function appendControls(container, { currentCategory, disabled }) {
+  container
+    .addActionRowComponents(
+      new ActionRowBuilder().addComponents(
+        buildCategorySelect(currentCategory, disabled),
+      ),
+    )
+    .addActionRowComponents(
+      new ActionRowBuilder().addComponents(
+        buildHomeButton({ disabled: disabled || currentCategory == null }),
+      ),
+    );
+}
+
+function buildHomeContainer({ controlsDisabled = false } = {}) {
   const categories = sortedCategories();
   const total = categories.reduce((n, [, arr]) => n + arr.length, 0);
 
-  const embed = new EmbedBuilder()
-    .setTitle("📚 逼逼機器人使用手冊")
-    .setColor(HOME_COLOR)
-    .setDescription(
-      `嗨！我是逼逼機器人 🤖\n` +
-        `共有 **${total}** 個指令，分成 **${categories.length}** 大類。\n\n` +
-        `👇 從下方選單挑一個類別開始看\n` +
-        `🔎 或用 \`/help 指令:<名稱>\` 直接查單一指令`,
+  const container = new ContainerBuilder()
+    .setAccentColor(HOME_COLOR)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `# 📚 逼逼機器人使用手冊\n` +
+          `嗨！我是逼逼機器人 🤖\n` +
+          `共 **${total}** 個指令、**${categories.length}** 大類。\n\n` +
+          `👇 從下方選單挑類別瀏覽\n` +
+          `🔎 或用 \`/help 指令:<名稱>\` 直接查單一指令`,
+      ),
     )
-    .addFields(
-      categories.map(([key, cmds]) => {
-        const meta = CATEGORY_META[key] || {
-          label: key,
-          emoji: "📁",
-          blurb: "",
-        };
-        return {
-          name: `${meta.emoji} ${meta.label} ・ ${cmds.length} 個指令`,
-          value: meta.blurb || "​",
-          inline: false,
-        };
-      }),
-    )
-    .setFooter({ text: "🔒 標記 = 僅管理員可用" });
+    .addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large),
+    );
 
-  return embed;
+  const categoryLines = categories.map(([key, cmds]) => {
+    const meta = CATEGORY_META[key] || { label: key, emoji: "📁", blurb: "" };
+    return `${meta.emoji} **${meta.label}** ・ ${cmds.length} 個指令\n-# ${meta.blurb || ""}`;
+  });
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(categoryLines.join("\n\n")),
+  );
+
+  container
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        controlsDisabled
+          ? "-# 🔒 標記 = 僅管理員可用 ・ 互動已逾時，請重新執行 /help"
+          : "-# 🔒 標記 = 僅管理員可用",
+      ),
+    );
+
+  appendControls(container, {
+    currentCategory: null,
+    disabled: controlsDisabled,
+  });
+
+  return container;
 }
 
-function buildCategoryEmbed(categoryKey) {
+function buildCategoryContainer(categoryKey, { controlsDisabled = false } = {}) {
   const { byCategory } = loadCommandIndex();
   const cmds = byCategory.get(categoryKey) || [];
   const meta = CATEGORY_META[categoryKey] || {
@@ -205,37 +277,71 @@ function buildCategoryEmbed(categoryKey) {
     blurb: "",
   };
 
-  const embed = new EmbedBuilder()
-    .setTitle(`${meta.emoji} ${meta.label}`)
-    .setColor(CATEGORY_COLOR)
-    .setDescription(meta.blurb || `共 ${cmds.length} 個指令`)
-    .setFooter({ text: `${cmds.length} 個指令 ・ 選單可切換其他類別` });
+  const container = new ContainerBuilder()
+    .setAccentColor(CATEGORY_COLOR)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `# ${meta.emoji} ${meta.label}\n${meta.blurb || `共 ${cmds.length} 個指令`}`,
+      ),
+    )
+    .addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large),
+    );
 
-  // Embed 限制：最多 25 個 field、每個 field value 最多 1024 字
-  const fields = cmds.slice(0, 25).map((cmd) => ({
-    name: `/${cmd.name}${isAdminOnly(cmd) ? " 🔒" : ""}`,
-    value: clamp(formatCommandBody(cmd), 1024),
-    inline: false,
-  }));
-  embed.addFields(fields);
+  if (cmds.length === 0) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent("（此分類目前沒有可用指令）"),
+    );
+  } else {
+    const cmdTexts = cmds.map(buildCommandText);
+    const chunks = chunkCommandTexts(cmdTexts);
+    chunks.forEach((chunk, idx) => {
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(chunk),
+      );
+      if (idx < chunks.length - 1) {
+        container.addSeparatorComponents(new SeparatorBuilder());
+      }
+    });
+  }
 
-  return embed;
+  container
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        controlsDisabled
+          ? `-# ${cmds.length} 個指令 ・ 互動已逾時，請重新執行 /help`
+          : `-# ${cmds.length} 個指令・選單可切換其他類別`,
+      ),
+    );
+
+  appendControls(container, {
+    currentCategory: categoryKey,
+    disabled: controlsDisabled,
+  });
+
+  return container;
 }
 
-function buildCommandEmbed(cmd) {
+function buildCommandContainer(cmd) {
   const meta = CATEGORY_META[cmd.category] || {
     label: cmd.category,
     emoji: "📁",
   };
-  const embed = new EmbedBuilder()
-    .setTitle(`/${cmd.name}${isAdminOnly(cmd) ? "  🔒" : ""}`)
-    .setColor(CATEGORY_COLOR)
-    .setDescription(cmd.description || "​")
-    .addFields({
-      name: "類別",
-      value: `${meta.emoji} ${meta.label}`,
-      inline: true,
-    });
+  const lock = isAdminOnly(cmd) ? "  🔒" : "";
+
+  const container = new ContainerBuilder()
+    .setAccentColor(COMMAND_COLOR)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `# /${cmd.name}${lock}\n${cmd.description || ""}`,
+      ),
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `-# 類別：${meta.emoji} ${meta.label}`,
+      ),
+    );
 
   const opts = cmd.options || [];
   const subs = opts.filter(
@@ -247,63 +353,33 @@ function buildCommandEmbed(cmd) {
       o.type !== ApplicationCommandOptionType.SubcommandGroup,
   );
 
+  if (flat.length || subs.length) {
+    container.addSeparatorComponents(new SeparatorBuilder());
+  }
+
   if (flat.length) {
-    embed.addFields({
-      name: "參數",
-      value: clamp(flat.map((o) => formatOption(o)).join("\n"), 1024),
-      inline: false,
-    });
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `**參數**\n${flat.map((o) => formatOptionLine(o)).join("\n")}`,
+      ),
+    );
   }
 
   if (subs.length) {
-    embed.addFields({
-      name: "子指令",
-      value: clamp(subs.map(formatSubcommand).join("\n\n"), 1024),
-      inline: false,
-    });
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `**子指令**\n${subs.map(formatSubcommandBlock).join("\n\n")}`,
+      ),
+    );
   }
 
   if (isAdminOnly(cmd)) {
-    embed.addFields({
-      name: "權限",
-      value: "🔒 僅限管理員使用",
-      inline: false,
-    });
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent("-# 🔒 僅限管理員使用"),
+    );
   }
 
-  return embed;
-}
-
-function buildComponents(currentCategory) {
-  const categories = sortedCategories();
-
-  const options = categories.slice(0, 25).map(([key, cmds]) => {
-    const meta = CATEGORY_META[key] || { label: key, emoji: "📁", blurb: "" };
-    return {
-      label: `${meta.label} (${cmds.length})`,
-      description: meta.blurb ? clamp(meta.blurb, 100) : undefined,
-      value: key,
-      emoji: meta.emoji,
-      default: key === currentCategory,
-    };
-  });
-
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId("help_category")
-    .setPlaceholder("📖 選擇一個類別...")
-    .addOptions(options);
-
-  const home = new ButtonBuilder()
-    .setCustomId("help_home")
-    .setLabel("回首頁")
-    .setEmoji("🏠")
-    .setStyle(ButtonStyle.Secondary)
-    .setDisabled(currentCategory == null);
-
-  return [
-    new ActionRowBuilder().addComponents(menu),
-    new ActionRowBuilder().addComponents(home),
-  ];
+  return container;
 }
 
 function findCommand(query) {
@@ -317,6 +393,8 @@ function findCommand(query) {
     null
   );
 }
+
+const REPLY_FLAGS = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -333,7 +411,6 @@ module.exports = {
     try {
       const targetName = interaction.options.getString("指令");
 
-      // 直接查詢特定指令
       if (targetName) {
         const cmd = findCommand(targetName);
         if (!cmd) {
@@ -357,8 +434,8 @@ module.exports = {
           });
         }
         return interaction.reply({
-          embeds: [buildCommandEmbed(cmd)],
-          ephemeral: true,
+          components: [buildCommandContainer(cmd)],
+          flags: REPLY_FLAGS,
         });
       }
 
@@ -367,8 +444,8 @@ module.exports = {
 
       let currentCategory = null;
       const message = await interaction.editReply({
-        embeds: [buildHomeEmbed()],
-        components: buildComponents(currentCategory),
+        components: [buildHomeContainer()],
+        flags: REPLY_FLAGS,
       });
 
       const collector = message.createMessageComponentCollector({
@@ -389,8 +466,8 @@ module.exports = {
           if (i.customId === "help_home") {
             currentCategory = null;
             await interaction.editReply({
-              embeds: [buildHomeEmbed()],
-              components: buildComponents(currentCategory),
+              components: [buildHomeContainer()],
+              flags: REPLY_FLAGS,
             });
           } else if (
             i.customId === "help_category" &&
@@ -398,8 +475,8 @@ module.exports = {
           ) {
             currentCategory = i.values[0];
             await interaction.editReply({
-              embeds: [buildCategoryEmbed(currentCategory)],
-              components: buildComponents(currentCategory),
+              components: [buildCategoryContainer(currentCategory)],
+              flags: REPLY_FLAGS,
             });
           }
 
@@ -411,7 +488,17 @@ module.exports = {
 
       collector.on("end", async () => {
         try {
-          await interaction.editReply({ components: [] });
+          // 逾時：用同樣版面但停用控制元件，提示重新呼叫 /help
+          const finalContainer =
+            currentCategory == null
+              ? buildHomeContainer({ controlsDisabled: true })
+              : buildCategoryContainer(currentCategory, {
+                  controlsDisabled: true,
+                });
+          await interaction.editReply({
+            components: [finalContainer],
+            flags: REPLY_FLAGS,
+          });
         } catch {
           /* 訊息可能已被刪除，忽略 */
         }

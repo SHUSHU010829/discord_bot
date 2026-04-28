@@ -1,5 +1,18 @@
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  MessageFlags,
+} = require("discord.js");
 const { DateTime } = require("luxon");
+
+const TYPE_META = {
+  messages: { title: "💬 訊息排行榜", emptyHint: "目前還沒有訊息統計資料" },
+  voice: { title: "🎤 語音時長排行榜", emptyHint: "目前還沒有語音統計資料" },
+  channels: { title: "📺 頻道活躍度排行榜", emptyHint: "目前還沒有頻道統計資料" },
+};
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -38,205 +51,160 @@ module.exports = {
     const period = interaction.options.getString("period") || "today";
 
     try {
-      switch (type) {
-        case "messages":
-          await showMessageLeaderboard(client, interaction, period);
-          break;
-        case "voice":
-          await showVoiceLeaderboard(client, interaction, period);
-          break;
-        case "channels":
-          await showChannelLeaderboard(client, interaction, period);
-          break;
+      const rows = await fetchLeaderboard(client, interaction, type, period);
+      const meta = TYPE_META[type];
+
+      if (!rows || rows.length === 0) {
+        await interaction.editReply(`📊 ${meta.emptyHint}`);
+        return;
       }
+
+      const container = buildLeaderboardContainer({
+        title: meta.title,
+        period,
+        rows,
+        type,
+      });
+
+      await interaction.editReply({
+        components: [container],
+        flags: MessageFlags.IsComponentsV2,
+      });
     } catch (error) {
       console.error(`[ERROR] Leaderboard command error: ${error}`.red);
-      await interaction.editReply({
-        content: "❌ 查詢排行榜時發生錯誤",
-        ephemeral: true,
-      });
+      await interaction.editReply("❌ 查詢排行榜時發生錯誤");
     }
   },
 };
 
-async function showMessageLeaderboard(client, interaction, period) {
-  const messageStatsCollection = client.messageStatsCollection;
+async function fetchLeaderboard(client, interaction, type, period) {
   const dateFilter = getDateFilter(period);
   const guildId = interaction.guild.id;
 
-  const leaderboard = await messageStatsCollection
-    .aggregate([
-      {
-        $match: {
-          guildId: guildId,
-          ...dateFilter,
+  if (type === "messages") {
+    const data = await client.messageStatsCollection
+      .aggregate([
+        { $match: { guildId, ...dateFilter } },
+        {
+          $group: {
+            _id: "$userId",
+            username: { $first: "$username" },
+            totalMessages: { $sum: "$messageCount" },
+          },
         },
-      },
-      {
-        $group: {
-          _id: "$userId",
-          username: { $first: "$username" },
-          totalMessages: { $sum: "$messageCount" },
-        },
-      },
-      {
-        $sort: { totalMessages: -1 },
-      },
-      {
-        $limit: 10,
-      },
-    ])
-    .toArray();
-
-  if (leaderboard.length === 0) {
-    await interaction.editReply({
-      content: "📊 目前還沒有統計資料",
-    });
-    return;
+        { $sort: { totalMessages: -1 } },
+        { $limit: 10 },
+      ])
+      .toArray();
+    return data.map((u) => ({
+      mention: `<@${u._id}>`,
+      detail: `**${u.totalMessages}** 則訊息`,
+    }));
   }
 
-  const medals = ["🥇", "🥈", "🥉"];
-  const description = leaderboard
-    .map((user, index) => {
-      const medal = medals[index] || `**${index + 1}.**`;
-      return `${medal} <@${user._id}> - **${user.totalMessages}** 則訊息`;
-    })
-    .join("\n");
+  if (type === "voice") {
+    const data = await client.voiceStatsCollection
+      .aggregate([
+        { $match: { guildId, ...dateFilter } },
+        {
+          $group: {
+            _id: "$userId",
+            username: { $first: "$username" },
+            totalMinutes: { $sum: "$durationMinutes" },
+          },
+        },
+        { $sort: { totalMinutes: -1 } },
+        { $limit: 10 },
+      ])
+      .toArray();
+    return data.map((u) => {
+      const hours = Math.floor(u.totalMinutes / 60);
+      const minutes = u.totalMinutes % 60;
+      return {
+        mention: `<@${u._id}>`,
+        detail: `**${hours}** 小時 **${minutes}** 分鐘`,
+      };
+    });
+  }
 
-  const embed = new EmbedBuilder()
-    .setTitle("🏆 訊息排行榜")
-    .setDescription(description)
-    .setColor(0xffd700)
-    .setFooter({ text: `統計期間：${getPeriodText(period)}` })
-    .setTimestamp();
+  if (type === "channels") {
+    const data = await client.channelActivityCollection
+      .aggregate([
+        { $match: { guildId, ...dateFilter } },
+        {
+          $group: {
+            _id: "$channelId",
+            channelName: { $first: "$channelName" },
+            totalMessages: { $sum: "$messageCount" },
+            allActiveUsers: { $push: "$activeUsers" },
+          },
+        },
+        { $sort: { totalMessages: -1 } },
+        { $limit: 10 },
+      ])
+      .toArray();
+    return data.map((c) => {
+      const uniqueUsers = new Set(c.allActiveUsers.flat()).size;
+      return {
+        mention: `<#${c._id}>`,
+        detail: `**${c.totalMessages}** 則訊息 ・ **${uniqueUsers}** 位活躍用戶`,
+      };
+    });
+  }
 
-  await interaction.editReply({ embeds: [embed] });
+  return [];
 }
 
-async function showVoiceLeaderboard(client, interaction, period) {
-  const voiceStatsCollection = client.voiceStatsCollection;
-  const dateFilter = getDateFilter(period);
-  const guildId = interaction.guild.id;
+function buildLeaderboardContainer({ title, period, rows }) {
+  const medals = ["🥇", "🥈", "🥉"];
+  const renderRow = (row, idx) => {
+    const medal = medals[idx] || `**${idx + 1}.**`;
+    return `${medal} ${row.mention} - ${row.detail}`;
+  };
 
-  const leaderboard = await voiceStatsCollection
-    .aggregate([
-      {
-        $match: {
-          guildId: guildId,
-          ...dateFilter,
-        },
-      },
-      {
-        $group: {
-          _id: "$userId",
-          username: { $first: "$username" },
-          totalMinutes: { $sum: "$durationMinutes" },
-        },
-      },
-      {
-        $sort: { totalMinutes: -1 },
-      },
-      {
-        $limit: 10,
-      },
-    ])
-    .toArray();
+  const top3 = rows.slice(0, 3).map(renderRow).join("\n");
+  const rest = rows.slice(3).map(renderRow).join("\n");
 
-  if (leaderboard.length === 0) {
-    await interaction.editReply({
-      content: "📊 目前還沒有語音統計資料",
-    });
-    return;
+  const container = new ContainerBuilder()
+    .setAccentColor(0xffd700)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`# 🏆 ${title}`),
+    )
+    .addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large),
+    );
+
+  if (top3) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(top3),
+    );
+  }
+  if (rest) {
+    container
+      .addSeparatorComponents(new SeparatorBuilder())
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(rest));
   }
 
-  const medals = ["🥇", "🥈", "🥉"];
-  const description = leaderboard
-    .map((user, index) => {
-      const medal = medals[index] || `**${index + 1}.**`;
-      const hours = Math.floor(user.totalMinutes / 60);
-      const minutes = user.totalMinutes % 60;
-      return `${medal} <@${user._id}> - **${hours}** 小時 **${minutes}** 分鐘`;
-    })
-    .join("\n");
+  container
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `-# 統計期間：${getPeriodText(period)} ・ <t:${Math.floor(Date.now() / 1000)}:R>`,
+      ),
+    );
 
-  const embed = new EmbedBuilder()
-    .setTitle("🏆 語音時長排行榜")
-    .setDescription(description)
-    .setColor(0xffd700)
-    .setFooter({ text: `統計期間：${getPeriodText(period)}` })
-    .setTimestamp();
-
-  await interaction.editReply({ embeds: [embed] });
-}
-
-async function showChannelLeaderboard(client, interaction, period) {
-  const channelActivityCollection = client.channelActivityCollection;
-  const dateFilter = getDateFilter(period);
-  const guildId = interaction.guild.id;
-
-  const leaderboard = await channelActivityCollection
-    .aggregate([
-      {
-        $match: {
-          guildId: guildId,
-          ...dateFilter,
-        },
-      },
-      {
-        $group: {
-          _id: "$channelId",
-          channelName: { $first: "$channelName" },
-          totalMessages: { $sum: "$messageCount" },
-          allActiveUsers: { $push: "$activeUsers" },
-        },
-      },
-      {
-        $sort: { totalMessages: -1 },
-      },
-      {
-        $limit: 10,
-      },
-    ])
-    .toArray();
-
-  if (leaderboard.length === 0) {
-    await interaction.editReply({
-      content: "📊 目前還沒有頻道統計資料",
-    });
-    return;
-  }
-
-  const medals = ["🥇", "🥈", "🥉"];
-  const description = leaderboard
-    .map((channel, index) => {
-      const medal = medals[index] || `**${index + 1}.**`;
-      const uniqueUsers = new Set(channel.allActiveUsers.flat()).size;
-      return `${medal} <#${channel._id}> - **${channel.totalMessages}** 則訊息 | **${uniqueUsers}** 位活躍用戶`;
-    })
-    .join("\n");
-
-  const embed = new EmbedBuilder()
-    .setTitle("🏆 頻道活躍度排行榜")
-    .setDescription(description)
-    .setColor(0xffd700)
-    .setFooter({ text: `統計期間：${getPeriodText(period)}` })
-    .setTimestamp();
-
-  await interaction.editReply({ embeds: [embed] });
+  return container;
 }
 
 function getDateFilter(period) {
   const now = DateTime.now().setZone("Asia/Taipei");
-
   switch (period) {
     case "today":
       return { date: now.toISODate() };
     case "week":
-      const weekStart = now.startOf("week").toISODate();
-      return { date: { $gte: weekStart } };
+      return { date: { $gte: now.startOf("week").toISODate() } };
     case "month":
-      const monthStart = now.startOf("month").toISODate();
-      return { date: { $gte: monthStart } };
+      return { date: { $gte: now.startOf("month").toISODate() } };
     case "all":
     default:
       return {};

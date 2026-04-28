@@ -2,7 +2,11 @@ require("colors");
 
 const {
   SlashCommandBuilder,
-  EmbedBuilder,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  MessageFlags,
 } = require("discord.js");
 
 const {
@@ -36,90 +40,89 @@ module.exports = {
     await interaction.deferReply();
 
     try {
-      // 構建查詢條件
-      let query = { drawCount: { $gt: 0 } }; // 只顯示被抽過的
-      if (category) {
-        query.category = category;
-      }
+      const query = { drawCount: { $gt: 0 } };
+      if (category) query.category = category;
 
-      // 查詢並按 drawCount 降序排序
       const topFoods = await collection
         .find(query)
         .sort({ drawCount: -1 })
         .limit(limit)
         .toArray();
 
-      if (topFoods.length > 0) {
-        const embed = new EmbedBuilder()
-          .setColor(0xffd700) // 金色
-          .setTimestamp();
+      if (topFoods.length === 0) {
+        const msg = category
+          ? `目前還沒有 ${CATEGORY_DISPLAY[category]} 被抽選的記錄。\n快使用 \`/吃什麼\` 來抽選吧！`
+          : "目前還沒有食物被抽選的記錄。\n快使用 `/吃什麼` 來抽選吧！";
+        await interaction.editReply(msg);
+        return;
+      }
 
-        if (category) {
-          embed.setTitle(`🏆 ${CATEGORY_DISPLAY[category]} 熱門排行榜 Top ${limit}`);
-        } else {
-          embed.setTitle(`🏆 食物熱門排行榜 Top ${limit}`);
+      const totalDraws = topFoods.reduce(
+        (sum, f) => sum + (f.drawCount || 0),
+        0
+      );
+      const medals = ["🥇", "🥈", "🥉"];
+
+      // 將前三名與其他分成兩段，視覺上有層次
+      const renderRow = (food, index) => {
+        const rank = index + 1;
+        const medal = medals[index] || `**${rank}.**`;
+        const drawCount = food.drawCount || 0;
+        const percentage = ((drawCount / totalDraws) * 100).toFixed(1);
+        let foodDisplay =
+          food.category === "beverage" && food.beverageStore
+            ? `${food.beverageStore} - ${food.name}`
+            : food.name;
+        let categoryTag = "";
+        if (!category && food.category) {
+          const icon = (CATEGORY_DISPLAY[food.category] || "").split(" ")[0];
+          if (icon) categoryTag = ` ${icon}`;
         }
+        return `${medal} **${foodDisplay}**${categoryTag}\n　└ ${drawCount} 次（${percentage}%）`;
+      };
 
-        // 計算總抽選次數
-        const totalDraws = topFoods.reduce(
-          (sum, food) => sum + (food.drawCount || 0),
-          0
+      const top3 = topFoods.slice(0, 3).map(renderRow).join("\n\n");
+      const rest = topFoods.slice(3).map(renderRow).join("\n");
+
+      const titleText = category
+        ? `# 🏆 ${CATEGORY_DISPLAY[category]} 熱門排行榜 Top ${topFoods.length}`
+        : `# 🏆 食物熱門排行榜 Top ${topFoods.length}`;
+
+      const container = new ContainerBuilder()
+        .setAccentColor(0xffd700)
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(titleText))
+        .addSeparatorComponents(
+          new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large),
         );
 
-        // 構建排行榜
-        let rankingText = "";
-        const medals = ["🥇", "🥈", "🥉"];
-
-        topFoods.forEach((food, index) => {
-          const rank = index + 1;
-          const medal = medals[index] || `**${rank}.**`;
-          const drawCount = food.drawCount || 0;
-          const percentage = ((drawCount / totalDraws) * 100).toFixed(1);
-
-          let foodDisplay = food.name;
-
-          // 如果是飲料且有店名，顯示店名
-          if (food.category === "beverage" && food.beverageStore) {
-            foodDisplay = `${food.beverageStore} - ${food.name}`;
-          }
-
-          // 添加分類標籤（僅在總排行時顯示）
-          let categoryTag = "";
-          if (!category && food.category) {
-            const categoryIcon = CATEGORY_DISPLAY[food.category].split(" ")[0];
-            categoryTag = ` ${categoryIcon}`;
-          }
-
-          rankingText += `${medal} **${foodDisplay}**${categoryTag}\n`;
-          rankingText += `   └ ${drawCount} 次 (${percentage}%)\n\n`;
-        });
-
-        embed.setDescription(rankingText);
-
-        // 添加統計資訊
-        let footerText = `共抽選了 ${totalDraws} 次`;
-
-        // 如果有查詢類別，顯示該類別的總數
-        if (category) {
-          const categoryTotal = await collection.countDocuments({
-            category: category,
-          });
-          footerText += ` | 此分類共 ${categoryTotal} 項食物`;
-        }
-
-        embed.setFooter({ text: footerText });
-
-        interaction.editReply({ content: "", embeds: [embed] });
-      } else {
-        let msg = "目前還沒有";
-        if (category) {
-          msg += `${CATEGORY_DISPLAY[category]}`;
-        }
-        msg += "被抽選的記錄。\n快使用 `/吃什麼` 來抽選吧！";
-        interaction.editReply(msg);
+      if (top3) {
+        container.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(top3),
+        );
       }
+
+      if (rest) {
+        container
+          .addSeparatorComponents(new SeparatorBuilder())
+          .addTextDisplayComponents(new TextDisplayBuilder().setContent(rest));
+      }
+
+      // 統計腳註
+      let footerText = `-# 共抽選了 **${totalDraws}** 次`;
+      if (category) {
+        const categoryTotal = await collection.countDocuments({ category });
+        footerText += ` ・ 此分類共 **${categoryTotal}** 項食物`;
+      }
+      container
+        .addSeparatorComponents(new SeparatorBuilder())
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(footerText));
+
+      await interaction.editReply({
+        components: [container],
+        flags: MessageFlags.IsComponentsV2,
+      });
     } catch (error) {
-      interaction.editReply("🔧 獲取排行榜失敗，請呼叫舒舒！");
+      await interaction.editReply("🔧 獲取排行榜失敗，請呼叫舒舒！");
       console.log(
         `[ERROR] An error occurred inside the food ranking:\n${error}`.red
       );

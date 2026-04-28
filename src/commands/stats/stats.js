@@ -1,4 +1,13 @@
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  ContainerBuilder,
+  SectionBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  ThumbnailBuilder,
+  MessageFlags,
+} = require("discord.js");
 const { DateTime } = require("luxon");
 
 module.exports = {
@@ -72,31 +81,18 @@ module.exports = {
       }
     } catch (error) {
       console.error(`[ERROR] Stats command error: ${error}`.red);
-      await interaction.editReply({
-        content: "❌ 查詢統計資料時發生錯誤",
-        ephemeral: true,
-      });
+      await interaction.editReply("❌ 查詢統計資料時發生錯誤");
     }
   },
 };
 
 async function showUserStats(client, interaction, user, period) {
-  const messageStatsCollection = client.messageStatsCollection;
-  const voiceStatsCollection = client.voiceStatsCollection;
-
   const dateFilter = getDateFilter(period);
   const guildId = interaction.guild.id;
 
-  // 查詢訊息統計
-  const messageStats = await messageStatsCollection
+  const messageStats = await client.messageStatsCollection
     .aggregate([
-      {
-        $match: {
-          userId: user.id,
-          guildId: guildId,
-          ...dateFilter,
-        },
-      },
+      { $match: { userId: user.id, guildId, ...dateFilter } },
       {
         $group: {
           _id: null,
@@ -107,16 +103,9 @@ async function showUserStats(client, interaction, user, period) {
     ])
     .toArray();
 
-  // 查詢語音統計
-  const voiceStats = await voiceStatsCollection
+  const voiceStats = await client.voiceStatsCollection
     .aggregate([
-      {
-        $match: {
-          userId: user.id,
-          guildId: guildId,
-          ...dateFilter,
-        },
-      },
+      { $match: { userId: user.id, guildId, ...dateFilter } },
       {
         $group: {
           _id: null,
@@ -131,48 +120,62 @@ async function showUserStats(client, interaction, user, period) {
   const messageChannelCount = messageStats[0]?.channelCount?.length || 0;
   const totalMinutes = voiceStats[0]?.totalMinutes || 0;
   const voiceChannelCount = voiceStats[0]?.channelCount?.length || 0;
-
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
-  const embed = new EmbedBuilder()
-    .setTitle(`📊 ${user.username} 的統計資料`)
-    .setThumbnail(user.displayAvatarURL())
-    .setColor(0x5865f2)
-    .addFields(
-      {
-        name: "💬 訊息統計",
-        value: `總訊息數：**${totalMessages}** 則\n活躍頻道：**${messageChannelCount}** 個`,
-        inline: true,
-      },
-      {
-        name: "🎤 語音統計",
-        value: `總時長：**${hours}** 小時 **${minutes}** 分鐘\n語音頻道：**${voiceChannelCount}** 個`,
-        inline: true,
-      }
+  const headerSection = new SectionBuilder()
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `# 📊 ${user.username} 的統計資料\n-# 統計期間：${getPeriodText(period)}`,
+      ),
     )
-    .setFooter({ text: `統計期間：${getPeriodText(period)}` })
-    .setTimestamp();
+    .setThumbnailAccessory(
+      new ThumbnailBuilder()
+        .setURL(user.displayAvatarURL({ size: 256 }))
+        .setDescription(`${user.username} avatar`),
+    );
 
-  await interaction.editReply({ embeds: [embed] });
+  const container = new ContainerBuilder()
+    .setAccentColor(0x5865f2)
+    .addSectionComponents(headerSection)
+    .addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large),
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `**💬 訊息統計**\n` +
+          `總訊息數：**${totalMessages}** 則\n` +
+          `活躍頻道：**${messageChannelCount}** 個`,
+      ),
+    )
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `**🎤 語音統計**\n` +
+          `總時長：**${hours}** 小時 **${minutes}** 分鐘\n` +
+          `語音頻道：**${voiceChannelCount}** 個`,
+      ),
+    )
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `-# <t:${Math.floor(Date.now() / 1000)}:R> 查詢`,
+      ),
+    );
+
+  await interaction.editReply({
+    components: [container],
+    flags: MessageFlags.IsComponentsV2,
+  });
 }
 
 async function showChannelStats(client, interaction, channel, period) {
-  const channelActivityCollection = client.channelActivityCollection;
-
   const dateFilter = getDateFilter(period);
   const guildId = interaction.guild.id;
 
-  // 查詢頻道統計
-  const channelStats = await channelActivityCollection
+  const channelStats = await client.channelActivityCollection
     .aggregate([
-      {
-        $match: {
-          channelId: channel.id,
-          guildId: guildId,
-          ...dateFilter,
-        },
-      },
+      { $match: { channelId: channel.id, guildId, ...dateFilter } },
       {
         $group: {
           _id: null,
@@ -187,39 +190,49 @@ async function showChannelStats(client, interaction, channel, period) {
   const allUsers = channelStats[0]?.allActiveUsers || [];
   const uniqueUsers = new Set(allUsers.flat()).size;
 
-  const embed = new EmbedBuilder()
-    .setTitle(`📊 #${channel.name} 的統計資料`)
-    .setColor(0x5865f2)
-    .addFields(
-      {
-        name: "💬 訊息統計",
-        value: `總訊息數：**${totalMessages}** 則`,
-        inline: true,
-      },
-      {
-        name: "👥 活躍用戶",
-        value: `活躍用戶數：**${uniqueUsers}** 人`,
-        inline: true,
-      }
+  const container = new ContainerBuilder()
+    .setAccentColor(0x5865f2)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `# 📊 #${channel.name} 的統計資料\n-# 統計期間：${getPeriodText(period)}`,
+      ),
     )
-    .setFooter({ text: `統計期間：${getPeriodText(period)}` })
-    .setTimestamp();
+    .addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large),
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `**💬 訊息統計**\n總訊息數：**${totalMessages}** 則`,
+      ),
+    )
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `**👥 活躍用戶**\n活躍用戶數：**${uniqueUsers}** 人`,
+      ),
+    )
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `-# <t:${Math.floor(Date.now() / 1000)}:R> 查詢`,
+      ),
+    );
 
-  await interaction.editReply({ embeds: [embed] });
+  await interaction.editReply({
+    components: [container],
+    flags: MessageFlags.IsComponentsV2,
+  });
 }
 
 function getDateFilter(period) {
   const now = DateTime.now().setZone("Asia/Taipei");
-
   switch (period) {
     case "today":
       return { date: now.toISODate() };
     case "week":
-      const weekStart = now.startOf("week").toISODate();
-      return { date: { $gte: weekStart } };
+      return { date: { $gte: now.startOf("week").toISODate() } };
     case "month":
-      const monthStart = now.startOf("month").toISODate();
-      return { date: { $gte: monthStart } };
+      return { date: { $gte: now.startOf("month").toISODate() } };
     case "all":
     default:
       return {};

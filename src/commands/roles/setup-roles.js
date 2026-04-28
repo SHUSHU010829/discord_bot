@@ -5,6 +5,11 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  MessageFlags,
 } = require("discord.js");
 require("colors");
 
@@ -12,23 +17,35 @@ const { loadPanels, savePanels } = require("../../utils/rolePanelsStore");
 
 // 面板是靜態按鈕：按下後 bot 會即時讀取資料庫並回傳個人化選單，
 // 所以新增 / 移除遊戲時不需要編輯這則訊息。
-function createPanelMessage() {
-  const embed = new EmbedBuilder()
-    .setColor("#00ff00")
-    .setTitle("🎮 遊戲身份組領取")
-    .setDescription(
-      "點擊下方按鈕開啟個人化選單。\n✨ 已擁有的身份組會自動勾選，未變更的會保留。",
-    );
-
+function createPanelContainer() {
   const button = new ButtonBuilder()
     .setCustomId("role_panel_open")
     .setLabel("領取 / 管理遊戲身份組")
     .setEmoji("🎮")
     .setStyle(ButtonStyle.Primary);
 
-  const row = new ActionRowBuilder().addComponents(button);
-
-  return { embed, row };
+  return new ContainerBuilder()
+    .setAccentColor(0x57f287)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent("# 🎮 遊戲身份組領取"),
+    )
+    .addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large),
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        "點擊下方按鈕開啟個人化選單。\n" +
+          "✨ 已擁有的身份組會自動勾選，未變更的會保留。",
+      ),
+    )
+    .addActionRowComponents(
+      new ActionRowBuilder().addComponents(button),
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        "-# 操作只有你看得到，放心點 👀",
+      ),
+    );
 }
 
 module.exports = {
@@ -168,10 +185,10 @@ async function handleSend(client, interaction) {
     );
     data.panels = {};
 
-    const { embed, row } = createPanelMessage();
+    const container = createPanelContainer();
     const message = await channel.send({
-      embeds: [embed],
-      components: [row],
+      components: [container],
+      flags: MessageFlags.IsComponentsV2,
     });
 
     data.panels[message.id] = true;
