@@ -1,6 +1,15 @@
 require("colors");
 
-const { SlashCommandBuilder, AttachmentBuilder } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  AttachmentBuilder,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  MessageFlags,
+} = require("discord.js");
 const { DateTime } = require("luxon");
 
 const { morningMessage } = require("../../config.json");
@@ -36,23 +45,58 @@ module.exports = {
       });
 
       const pngBuffer = await generateMorningCard(cardData);
-      const attachment = new AttachmentBuilder(pngBuffer, {
-        name: `morning-${cardData.serialNo}.png`,
-      });
+      const fileName = `morning-${cardData.serialNo}.png`;
+      const attachment = new AttachmentBuilder(pngBuffer, { name: fileName });
+
+      const headerLine = [cardData.dateStr, cardData.lunarYearLabel, cardData.lunarDay]
+        .filter(Boolean)
+        .join("・");
+
+      const container = new ContainerBuilder()
+        .setAccentColor(0xc8553d)
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`## 📰 今日早報`)
+        );
+
+      if (headerLine) {
+        container.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`-# ${headerLine}`)
+        );
+      }
+
+      container
+        .addSeparatorComponents(new SeparatorBuilder())
+        .addMediaGalleryComponents(
+          new MediaGalleryBuilder().addItems(
+            new MediaGalleryItemBuilder()
+              .setURL(`attachment://${fileName}`)
+              .setDescription(`早報 No.${cardData.serialNo}・${cardData.dateStr}`)
+          )
+        );
+
+      if (cardData.countdownName && cardData.countdownDays != null) {
+        container.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(
+            `🗓️ 距離「**${cardData.countdownName}**」還有 **${cardData.countdownDays}** 天`
+          )
+        );
+      }
 
       await interaction.editReply({
-        content: "今日早報 📰",
+        components: [container],
         files: [attachment],
+        flags: MessageFlags.IsComponentsV2,
       });
     } catch (error) {
       console.log(`[ERROR] /今日早報 生成失敗：\n${error}`.red);
       if (interaction.deferred || interaction.replied) {
-        await interaction.editReply("🔧 早報生成失敗，請呼叫舒舒！");
+        await interaction
+          .editReply({ content: "🔧 早報生成失敗，請呼叫舒舒！", components: [] })
+          .catch(() => {});
       } else {
-        await interaction.reply({
-          content: "🔧 早報生成失敗，請呼叫舒舒！",
-          ephemeral: true,
-        });
+        await interaction
+          .reply({ content: "🔧 早報生成失敗，請呼叫舒舒！", ephemeral: true })
+          .catch(() => {});
       }
     }
   },

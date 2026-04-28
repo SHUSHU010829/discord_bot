@@ -1,6 +1,15 @@
 require("colors");
 
-const { SlashCommandBuilder, AttachmentBuilder } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  AttachmentBuilder,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  MessageFlags,
+} = require("discord.js");
 const { DateTime } = require("luxon");
 
 const { morningMessage } = require("../../config.json");
@@ -55,24 +64,47 @@ module.exports = {
         serialNo,
       });
 
-      const attachment = new AttachmentBuilder(pngBuffer, {
-        name: `fortune-${serialNo}.png`,
-      });
+      const fileName = `fortune-${serialNo}.png`;
+      const attachment = new AttachmentBuilder(pngBuffer, { name: fileName });
+
+      const container = new ContainerBuilder()
+        .setAccentColor(0xc8553d)
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(
+            `## 🧧 籤詩\n諮詢方向：**${question}**`
+          )
+        )
+        .addSeparatorComponents(new SeparatorBuilder())
+        .addMediaGalleryComponents(
+          new MediaGalleryBuilder().addItems(
+            new MediaGalleryItemBuilder()
+              .setURL(`attachment://${fileName}`)
+              .setDescription(`籤詩 No.${serialNo}・${dateStr}`)
+          )
+        )
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(
+            `-# 🍀 抽自逼逼機器人廟口籤筒・No.${serialNo}`
+          )
+        );
 
       await interaction.editReply({
+        components: [container],
         files: [attachment],
+        flags: MessageFlags.IsComponentsV2,
       });
     } catch (error) {
       console.log(
         `[ERROR] An error occurred inside the straws ask:\n${error}`.red
       );
       if (interaction.deferred || interaction.replied) {
-        await interaction.editReply("哎呀！今天籤筒休息了 💤");
+        await interaction
+          .editReply({ content: "哎呀！今天籤筒休息了 💤", components: [] })
+          .catch(() => {});
       } else {
-        await interaction.reply({
-          content: "哎呀！今天籤筒休息了 💤",
-          ephemeral: true,
-        });
+        await interaction
+          .reply({ content: "哎呀！今天籤筒休息了 💤", ephemeral: true })
+          .catch(() => {});
       }
     }
   },
