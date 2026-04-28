@@ -3,17 +3,22 @@ require("colors");
 const {
   SlashCommandBuilder,
   EmbedBuilder,
+  PermissionFlagsBits,
 } = require("discord.js");
+
+const autocompleteBeverageStore = require("../../utils/autocompleteBeverageStore");
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("匯入飲料店菜單")
     .setDescription("快速匯入整個飲料店的菜單（支援大量品項）🥤")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addStringOption((option) =>
       option
         .setName("飲料店")
         .setDescription("飲料店名稱（例如：可不可紅茶）")
         .setRequired(true)
+        .setAutocomplete(true)
     )
     .addStringOption((option) =>
       option
@@ -27,9 +32,11 @@ module.exports = {
         .setDescription("是否刪除該店現有菜單後重新匯入（預設：否）")
     ),
 
+  autocomplete: autocompleteBeverageStore,
+
   run: async (client, interaction) => {
     const { options } = interaction;
-    const beverageStore = options.getString("飲料店");
+    const beverageStore = options.getString("飲料店")?.trim();
     const menuText = options.getString("菜單");
     const shouldOverwrite = options.getBoolean("覆蓋現有") || false;
 
@@ -41,6 +48,11 @@ module.exports = {
     });
 
     try {
+      if (!beverageStore) {
+        interaction.editReply("❌ 飲料店名稱不能為空白！");
+        return;
+      }
+
       // 解析菜單文字
       // 支援多種分隔符：換行、逗號、分號
       let items = [];
@@ -76,32 +88,45 @@ module.exports = {
         );
       }
 
-      // 批次匯入
-      let addedCount = 0;
-      let skippedCount = 0;
-      const skippedItems = [];
-
-      for (const itemName of items) {
-        // 檢查是否已存在
-        const existingItem = await collection.findOne({
-          name: itemName,
-          category: "beverage",
-          beverageStore: beverageStore,
-        });
-
-        if (existingItem) {
-          skippedCount++;
-          skippedItems.push(itemName);
-        } else {
-          await collection.insertOne({
-            name: itemName,
+      // 一次查出已存在的品項（覆蓋模式時剛清空，這查詢會返回空陣列）
+      const existingDocs = await collection
+        .find(
+          {
+            name: { $in: items },
             category: "beverage",
             beverageStore: beverageStore,
-            drawCount: 0,
+          },
+          { projection: { name: 1 } }
+        )
+        .toArray();
+      const existingNames = new Set(existingDocs.map((doc) => doc.name));
+
+      const skippedItems = [...existingNames];
+      const toInsert = items
+        .filter((name) => !existingNames.has(name))
+        .map((name) => ({
+          name,
+          category: "beverage",
+          beverageStore: beverageStore,
+          drawCount: 0,
+        }));
+
+      let addedCount = 0;
+      if (toInsert.length > 0) {
+        try {
+          const result = await collection.insertMany(toInsert, {
+            ordered: false,
           });
-          addedCount++;
+          addedCount = result.insertedCount ?? toInsert.length;
+        } catch (insertError) {
+          addedCount = insertError.result?.insertedCount ?? 0;
+          const failedNames = (insertError.writeErrors || [])
+            .map((e) => e.err?.op?.name)
+            .filter(Boolean);
+          skippedItems.push(...failedNames);
         }
       }
+      const skippedCount = skippedItems.length;
 
       // 構建詳細的回覆訊息
       const embed = new EmbedBuilder()

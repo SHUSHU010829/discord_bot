@@ -5,23 +5,13 @@ const {
 } = require("discord.js");
 
 const { commandEmojis, commandMessages } = require("../../config.json");
+const {
+  CATEGORY_LABEL,
+  CATEGORY_CHOICES,
+} = require("../../constants/foodCategories");
 
-// 類別映射
-const CATEGORY_MAP = {
-  早餐: "breakfast",
-  午餐: "lunch",
-  晚餐: "dinner",
-  宵夜: "snack",
-  飲料: "beverage",
-};
-
-const CATEGORY_DISPLAY = {
-  breakfast: "早餐",
-  lunch: "午餐",
-  dinner: "晚餐",
-  snack: "宵夜",
-  beverage: "飲料",
-};
+// 抽食物不含飲料
+const FOOD_CHOICES = CATEGORY_CHOICES.filter((c) => c.value !== "beverage");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -31,12 +21,7 @@ module.exports = {
       option
         .setName("類別")
         .setDescription("選擇食物類別（不選則隨機所有類別）")
-        .addChoices(
-          { name: "🌅 早餐", value: "breakfast" },
-          { name: "🌞 午餐", value: "lunch" },
-          { name: "🌙 晚餐", value: "dinner" },
-          { name: "🌃 宵夜", value: "snack" }
-        )
+        .addChoices(...FOOD_CHOICES)
     ),
 
   run: async (client, interaction) => {
@@ -73,7 +58,7 @@ module.exports = {
         let replyMessage = `逼逼機器人推薦你可以`;
 
         if (category) {
-          replyMessage += `${CATEGORY_DISPLAY[category]}吃... `;
+          replyMessage += `${CATEGORY_LABEL[category]}吃... `;
         } else {
           replyMessage += `吃... `;
         }
@@ -84,7 +69,7 @@ module.exports = {
       } else {
         let noFoodMsg = "目前沒有可供選擇的";
         if (category) {
-          noFoodMsg += `${CATEGORY_DISPLAY[category]}`;
+          noFoodMsg += `${CATEGORY_LABEL[category]}`;
         }
         noFoodMsg += "選項。";
         interaction.editReply(noFoodMsg);

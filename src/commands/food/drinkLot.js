@@ -5,6 +5,7 @@ const {
 } = require("discord.js");
 
 const { commandEmojis, commandMessages } = require("../../config.json");
+const autocompleteBeverageStore = require("../../utils/autocompleteBeverageStore");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -15,7 +16,10 @@ module.exports = {
         .setName("飲料店")
         .setDescription("選擇飲料店（不選則隨機所有飲料店）")
         .setRequired(false)
+        .setAutocomplete(true)
     ),
+
+  autocomplete: autocompleteBeverageStore,
 
   run: async (client, interaction) => {
     const collection = client.collection;
