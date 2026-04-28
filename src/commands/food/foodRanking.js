@@ -33,10 +33,7 @@ module.exports = {
     const category = interaction.options.getString("類別");
     const limit = interaction.options.getInteger("數量") || 10;
 
-    await interaction.reply({
-      content: "統計排行榜中... 📊",
-      fetchReply: true,
-    });
+    await interaction.deferReply();
 
     try {
       // 構建查詢條件

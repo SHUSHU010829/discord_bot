@@ -28,10 +28,7 @@ module.exports = {
     const collection = client.collection;
     const category = interaction.options.getString("類別");
 
-    await interaction.reply({
-      content: commandMessages.drawingLot,
-      fetchReply: true,
-    });
+    await interaction.deferReply();
 
     try {
       // 構建查詢條件 - 排除飲料

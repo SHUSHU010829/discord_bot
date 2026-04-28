@@ -1,7 +1,6 @@
 require("colors");
 
 const axios = require("axios");
-const fs = require("fs");
 
 const { SlashCommandBuilder } = require("discord.js");
 
@@ -12,10 +11,7 @@ module.exports = {
 
   run: async (client, interaction) => {
     try {
-      await interaction.reply({
-        content: "抓取氣象局資料中.. 🌤️",
-        fetchReply: true,
-      });
+      await interaction.deferReply();
       const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001?Authorization=${process.env.WEATHER_API_KEY}`;
       const response = await axios.get(apiUrl);
       const weatherData = response.data;

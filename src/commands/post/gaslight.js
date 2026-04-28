@@ -14,24 +14,21 @@ module.exports = {
   run: async (client, interaction) => {
     const collection = client.gaslightCollection;
 
-    const msg = await interaction.reply({
-      content: "生成中... 📝",
-      fetchReply: true,
-    });
+    await interaction.deferReply();
 
     try {
       const postList = await collection.find({}).toArray();
       if (postList.length > 0) {
-        const randomFood =
+        const randomPost =
           postList[Math.floor(Math.random() * postList.length)].post;
-        interaction.editReply(randomFood);
+        await interaction.editReply(randomPost);
       } else {
-        interaction.editReply("目前沒有情勒文庫存。");
+        await interaction.editReply("目前沒有情勒文庫存。");
       }
     } catch (error) {
-      interaction.editReply("🔧 獲取情勒文失敗，請呼叫舒舒！");
+      await interaction.editReply("🔧 獲取情勒文失敗，請呼叫舒舒！");
       console.log(
-        `[ERROR] An error occurred inside the draw lot:\n${error}`.red
+        `[ERROR] An error occurred inside the gaslight post:\n${error}`.red
       );
     }
   },
