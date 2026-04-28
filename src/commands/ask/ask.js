@@ -7,52 +7,43 @@ const changeTraditional = require("../../utils/changeTraditional.js");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("我想問")
-    .setDescription("跟機器人問問題吧！")
+    .setDescription("跟逼逼機器人問是非題（會回 Yes / No / Maybe）💬")
     .addStringOption((option) =>
       option
         .setName("問題")
-        .setDescription("輸入你想問的問題")
+        .setDescription("輸入想問的是非題（例：今天該加班嗎？）")
         .setRequired(true)
     ),
 
   run: async (client, interaction) => {
-    const { options } = interaction;
-    const question = options.getString("問題");
-    const answer = await getAnswer();
-    if (answer.code === 1) {
-      const final = await changeTraditional(answer.data.zh);
+    const question = interaction.options.getString("問題");
+
+    // 先 defer，避免外部 API 慢於 3 秒導致互動逾時
+    await interaction.deferReply();
+
+    try {
+      const answer = await getAnswer();
+
+      let title = "🤔 我不知道";
+      if (answer && answer.code === 1) {
+        const final = await changeTraditional(answer.data.zh);
+        if (final?.text) title = final.text;
+      }
 
       const embed = new EmbedBuilder()
-        .setTitle(`${final.text}`)
-        .setDescription(`📝 問題:${question}`)
+        .setTitle(title)
+        .setDescription(`📝 問題：${question}`)
         .setColor("Random")
         .setTimestamp();
 
-      try {
-        return interaction.reply({
-          embeds: [embed],
-        });
-      } catch (error) {
-        console.log(
-          `[ERROR] An error occurred inside the command ask:\n${error}`.red
-        );
-      }
-    } else {
-      const embed = new EmbedBuilder()
-        .setTitle(`🤔 我不知道`)
-        .setDescription(`📝 問題:${question}`)
-        .setColor("Random")
-        .setTimestamp();
-
-      try {
-        return interaction.reply({
-          embeds: [embed],
-        });
-      } catch (error) {
-        console.log(
-          `[ERROR] An error occurred inside the command ask:\n${error}`.red
-        );
-      }
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+      console.log(
+        `[ERROR] An error occurred inside the command ask:\n${error}`.red
+      );
+      await interaction
+        .editReply("🔧 詢問失敗，請稍後再試！")
+        .catch(() => {});
     }
   },
 };
