@@ -4,7 +4,7 @@ const { levelSystem } = require("../../config.json");
 const grantXp = require("../../features/leveling/grantXp");
 
 const reactionCooldown = new Map(); // key: `${reactorId}-${authorId}`, value: timestamp
-const COOLDOWN_MS = 60 * 1000;
+const COOLDOWN_MS = 30 * 1000;
 
 module.exports = async (client, reaction, user) => {
   try {

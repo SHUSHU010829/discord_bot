@@ -19,16 +19,16 @@ module.exports = {
   devOnly: true,
 
   data: new SlashCommandBuilder()
-    .setName("簽到測試")
+    .setName("dailytest")
     .setDescription("[DEV] 簽到卡預覽 / 重置今日紀錄")
     .setDMPermission(false)
     .addSubcommand((sub) =>
       sub
-        .setName("預覽")
+        .setName("preview")
         .setDescription("產生一張簽到卡（不寫 DB、不給 XP）")
         .addIntegerOption((opt) =>
           opt
-            .setName("連勝")
+            .setName("streak")
             .setDescription("模擬連勝天數（預設 1）")
             .setMinValue(1)
             .setMaxValue(365)
@@ -36,7 +36,7 @@ module.exports = {
         )
         .addIntegerOption((opt) =>
           opt
-            .setName("過往簽到數")
+            .setName("pastdays")
             .setDescription("模擬最近 30 天有幾天簽到過（預設 = 連勝天數）")
             .setMinValue(0)
             .setMaxValue(30)
@@ -45,7 +45,7 @@ module.exports = {
     )
     .addSubcommand((sub) =>
       sub
-        .setName("重置")
+        .setName("reset")
         .setDescription("刪掉今日簽到紀錄，讓你重新測試 /每日簽到（XP 不會退還）")
     )
     .toJSON(),
@@ -53,25 +53,25 @@ module.exports = {
   run: async (client, interaction) => {
     const sub = interaction.options.getSubcommand();
 
-    if (sub === "預覽") {
+    if (sub === "preview") {
       return runPreview(client, interaction);
     }
-    if (sub === "重置") {
+    if (sub === "reset") {
       return runReset(client, interaction);
     }
   },
 };
 
 async function runPreview(client, interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   try {
     const cfg = levelSystem.daily;
     const tz = cfg.resetTimezone || "Asia/Taipei";
     const today = DateTime.now().setZone(tz).toISODate();
 
-    const streak = interaction.options.getInteger("連勝") ?? 1;
-    const checkedDaysOpt = interaction.options.getInteger("過往簽到數");
+    const streak = interaction.options.getInteger("streak") ?? 1;
+    const checkedDaysOpt = interaction.options.getInteger("pastdays");
     const checkedDays = checkedDaysOpt ?? Math.min(streak, 30);
 
     let xp = cfg.baseXp;
@@ -139,13 +139,13 @@ async function runPreview(client, interaction) {
       flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
     });
   } catch (error) {
-    console.log(`[ERROR] /簽到測試 預覽:\n${error}\n${error.stack}`.red);
+    console.log(`[ERROR] /dailytest preview:\n${error}\n${error.stack}`.red);
     await interaction.editReply("🔧 預覽失敗，請看 console").catch(() => {});
   }
 }
 
 async function runReset(client, interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   try {
     if (!client.dailyCheckinCollection || !client.userLevelsCollection) {
@@ -200,7 +200,7 @@ async function runReset(client, interaction) {
         `現在可以重跑 \`/每日簽到\`。`
     );
   } catch (error) {
-    console.log(`[ERROR] /簽到測試 重置:\n${error}\n${error.stack}`.red);
+    console.log(`[ERROR] /dailytest reset:\n${error}\n${error.stack}`.red);
     await interaction.editReply("🔧 重置失敗，請看 console").catch(() => {});
   }
 }

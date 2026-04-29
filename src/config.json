@@ -167,7 +167,7 @@
     "message": {
       "minXp": 15,
       "maxXp": 25,
-      "cooldownSeconds": 60,
+      "cooldownSeconds": 30,
       "minCharacters": 3,
       "blacklistChannelIds": [],
       "whitelistChannelIds": []

@@ -1,5 +1,5 @@
 require("colors");
-const { SlashCommandBuilder } = require("discord.js");
+const { SlashCommandBuilder, MessageFlags } = require("discord.js");
 const { BADGES, BADGE_BY_ID } = require("../../features/leveling/badgeDefinitions");
 
 module.exports = {
@@ -62,7 +62,7 @@ module.exports = {
       if (!client.userLevelsCollection) {
         return interaction.reply({
           content: "🔧 等級系統尚未啟動",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
 
@@ -73,7 +73,7 @@ module.exports = {
         );
         return interaction.reply({
           content: "✅ 稱號已清除（等級卡會顯示 tier 預設稱號）",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
 
@@ -82,7 +82,7 @@ module.exports = {
       if (!badge) {
         return interaction.reply({
           content: "❌ 找不到該徽章",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
 
@@ -93,7 +93,7 @@ module.exports = {
       if (!doc?.badges?.includes(badgeId)) {
         return interaction.reply({
           content: `❌ 你還沒解鎖 ${badge.emoji} **${badge.name}**`,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
 
@@ -109,11 +109,11 @@ module.exports = {
 
       await interaction.reply({
         content: `✅ 稱號已設定為 **${badge.emoji} ${badge.name}**`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     } catch (error) {
       console.log(`[ERROR] /稱號 ${sub}:\n${error}\n${error.stack}`.red);
-      const reply = { content: "🔧 操作失敗，請呼叫舒舒！", ephemeral: true };
+      const reply = { content: "🔧 操作失敗，請呼叫舒舒！", flags: MessageFlags.Ephemeral };
       if (interaction.replied || interaction.deferred) {
         await interaction.editReply(reply).catch(() => {});
       } else {
