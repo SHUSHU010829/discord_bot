@@ -57,7 +57,6 @@ function renderRow(doc, globalIndex) {
 }
 
 function buildContainer({
-  guildName,
   pageDocs,
   currentPage,
   totalPages,
@@ -69,7 +68,7 @@ function buildContainer({
   const container = new ContainerBuilder()
     .setAccentColor(0xffd700)
     .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`# 🏆 ${guildName} 等級排行榜`)
+      new TextDisplayBuilder().setContent(`# 🏆 等級排行榜`)
     )
     .addSeparatorComponents(
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large)
@@ -181,7 +180,6 @@ module.exports = {
       const message = await interaction.editReply({
         components: [
           buildContainer({
-            guildName: interaction.guild.name,
             pageDocs,
             currentPage,
             totalPages,
@@ -201,13 +199,6 @@ module.exports = {
       });
 
       collector.on("collect", async (btn) => {
-        if (btn.user.id !== interaction.user.id) {
-          return btn.reply({
-            content: "這不是你的排行榜！",
-            ephemeral: true,
-          });
-        }
-
         switch (btn.customId) {
           case "first":
             currentPage = 0;
@@ -228,7 +219,6 @@ module.exports = {
         await btn.update({
           components: [
             buildContainer({
-              guildName: interaction.guild.name,
               pageDocs,
               currentPage,
               totalPages,
@@ -246,7 +236,6 @@ module.exports = {
           .editReply({
             components: [
               buildContainer({
-                guildName: interaction.guild.name,
                 pageDocs,
                 currentPage,
                 totalPages,
