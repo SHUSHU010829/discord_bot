@@ -2,7 +2,7 @@ require("colors");
 
 const cron = require("node-cron");
 
-const config = require("../../config.json");
+const config = require("../../config");
 const { runSteamDealsJob, ensureIndexes } = require("../../features/steamDeals");
 
 module.exports = async (client) => {

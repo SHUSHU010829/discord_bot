@@ -1,0 +1,68 @@
+{
+  "levelSystem": {
+    "enabled": true,
+    "message": {
+      "minXp": 15,
+      "maxXp": 25,
+      "cooldownSeconds": 30,
+      "minCharacters": 4,
+      "blacklistChannelIds": [],
+      "whitelistChannelIds": []
+    },
+    "voice": {
+      "xpPerMinute": 10,
+      "minPeopleInChannel": 2,
+      "ignoreMutedDeafened": true,
+      "ignoreAfkChannel": true,
+      "afkChannelIds": [],
+      "blacklistChannelIds": []
+    },
+    "daily": {
+      "baseXp": 100,
+      "streakBonusPerDay": 10,
+      "streakBonusCapDays": 30,
+      "streak7Multiplier": 1.5,
+      "streak30Multiplier": 2.0,
+      "resetTimezone": "Asia/Taipei",
+      "streakFreezeUnlockEvery": 30,
+      "maxStreakFreezeStock": 3
+    },
+    "reaction": {
+      "xpPerReactionReceived": 2,
+      "dailyCapPerUser": 50
+    },
+    "levelUpAnnouncement": {
+      "enabled": true,
+      "channelId": "",
+      "fallbackChannelId": "1192888968748994700",
+      "milestones": [5, 10, 20, 30, 50, 75, 100],
+      "useCard": true
+    },
+    "levelRoles": [],
+    "card": {
+      "defaultAccent": "default"
+    },
+    "twitchSubBonus": {
+      "enabled": true,
+      "appliesTo": ["message", "voice", "daily"],
+      "tiers": [
+        { "roleId": "1181162291568332891", "name": "Twitch Tier 1", "multiplier": 1.5 },
+        { "roleId": "1181162291568332892", "name": "Twitch Tier 2", "multiplier": 2.0 },
+        { "roleId": "1181162291568332893", "name": "Twitch Tier 3", "multiplier": 3.0 }
+      ]
+    }
+  },
+
+  "twitchSync": {
+    "enabled": true,
+    "guildId": "1174352637295067157",
+    "tierRoleIds": {
+      "tier1": "1181162291568332891",
+      "tier2": "1181162291568332892",
+      "tier3": "1181162291568332893"
+    },
+    "perSessionXpCap": 1000
+  },
+
+  "xpEvents": []
+}

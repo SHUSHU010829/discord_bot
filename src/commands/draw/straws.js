@@ -12,7 +12,7 @@ const {
 } = require("discord.js");
 const { DateTime } = require("luxon");
 
-const { morningMessage } = require("../../config.json");
+const { morningMessage } = require("../../config");
 const getPoem = require("../../utils/getPoem");
 const getStraw = require("../../utils/getStraw");
 const changeTraditional = require("../../utils/changeTraditional");

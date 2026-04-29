@@ -1,7 +1,7 @@
 require("colors");
 
 const { EmbedBuilder } = require("discord.js");
-const { developersId, serverId } = require("../../config.json");
+const { developersId, serverId } = require("../../config");
 const mConfig = require("../../messageConfig.json");
 const getLocalCommands = require("../../utils/getLocalCommands");
 

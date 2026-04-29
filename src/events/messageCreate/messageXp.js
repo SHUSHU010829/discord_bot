@@ -1,5 +1,5 @@
 require("colors");
-const { levelSystem } = require("../../config.json");
+const { levelSystem } = require("../../config");
 const { isMessageXpEligible, isMessageRepetitive } = require("../../utils/xpGuards");
 const { randomInt } = require("../../utils/levelMath");
 const grantXp = require("../../features/leveling/grantXp");

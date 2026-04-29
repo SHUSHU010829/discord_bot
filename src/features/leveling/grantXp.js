@@ -1,7 +1,7 @@
 require("colors");
 const { DateTime } = require("luxon");
 const { getLevelProgress } = require("../../utils/levelMath");
-const { levelSystem } = require("../../config.json");
+const { levelSystem } = require("../../config");
 const { getCurrentMultiplier } = require("../../utils/xpMultiplier");
 const { getTwitchSubBonus } = require("../../utils/twitchSubBonus");
 const syncLevelRoles = require("./levelRoles");

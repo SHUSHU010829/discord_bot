@@ -9,30 +9,11 @@ const {
   SeparatorSpacingSize,
   MessageFlags,
 } = require("discord.js");
-const config = require("../../config.json");
-const fs = require("fs");
-const { getDataFile } = require("../../utils/dataPaths");
-
-// 建議面板數據文件路徑
-const PANELS_FILE = getDataFile("suggestion-panels.json");
-
-// 確保數據文件存在（目錄已由 dataPaths 確保）
-function ensureDataFile() {
-  if (!fs.existsSync(PANELS_FILE)) {
-    fs.writeFileSync(PANELS_FILE, JSON.stringify({ panels: {}, pendingDeletions: {} }, null, 2));
-  }
-}
-
-function loadPanels() {
-  ensureDataFile();
-  const data = fs.readFileSync(PANELS_FILE, "utf8");
-  return JSON.parse(data);
-}
-
-function savePanels(data) {
-  ensureDataFile();
-  fs.writeFileSync(PANELS_FILE, JSON.stringify(data, null, 2));
-}
+const config = require("../../config");
+const {
+  loadPanels,
+  savePanels,
+} = require("../../utils/suggestionPanelsStore");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -142,7 +123,7 @@ module.exports = {
         flags: MessageFlags.IsComponentsV2,
       });
 
-      const panels = loadPanels();
+      const panels = await loadPanels(client);
       panels.panels[interaction.channel.id] = {
         messageId: message.id,
         channelId: interaction.channel.id,
@@ -154,7 +135,7 @@ module.exports = {
         createdAt: new Date().toISOString(),
         createdBy: interaction.user.id,
       };
-      savePanels(panels);
+      await savePanels(client, panels);
 
     } catch (error) {
       console.log(`[ERROR] 設置建議面板時出錯：\n${error}`.red);

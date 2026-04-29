@@ -1,5 +1,5 @@
 const { REST, Routes } = require("discord.js");
-const { serverId } = require("../config.json");
+const { serverId } = require("../config");
 
 require("colors");
 require("dotenv/config");

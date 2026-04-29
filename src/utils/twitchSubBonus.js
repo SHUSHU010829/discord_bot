@@ -1,4 +1,4 @@
-const { levelSystem } = require("../config.json");
+const { levelSystem } = require("../config");
 
 const getTwitchSubBonus = (member, source) => {
   const cfg = levelSystem?.twitchSubBonus;

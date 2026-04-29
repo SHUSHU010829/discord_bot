@@ -1,7 +1,7 @@
 require("colors");
 
 const { ActivityType } = require("discord.js");
-const { serverId } = require("../../config.json");
+const { serverId } = require("../../config");
 
 module.exports = (client) => {
   client.user.setActivity({

@@ -1,6 +1,6 @@
 require("colors");
 
-const { serverId } = require("../../config.json");
+const { serverId } = require("../../config");
 const commandComparing = require("../../utils/commandComparing");
 const getApplicationCommands = require("../../utils/getApplicationCommands");
 const getLocalCommands = require("../../utils/getLocalCommands");

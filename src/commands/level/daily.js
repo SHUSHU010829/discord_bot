@@ -11,7 +11,7 @@ const {
 } = require("discord.js");
 const { DateTime } = require("luxon");
 
-const { levelSystem } = require("../../config.json");
+const { levelSystem } = require("../../config");
 const grantXp = require("../../features/leveling/grantXp");
 const generateCheckinCard = require("../../utils/generateCheckinCard");
 

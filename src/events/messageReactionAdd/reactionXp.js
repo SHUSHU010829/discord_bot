@@ -1,6 +1,6 @@
 require("colors");
 const { DateTime } = require("luxon");
-const { levelSystem } = require("../../config.json");
+const { levelSystem } = require("../../config");
 const grantXp = require("../../features/leveling/grantXp");
 
 const reactionCooldown = new Map(); // key: `${reactorId}-${authorId}`, value: timestamp

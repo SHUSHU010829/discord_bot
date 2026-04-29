@@ -6,6 +6,9 @@ const { Resvg } = require("@resvg/resvg-js");
 const axios = require("axios");
 
 const { loadAdditionalAsset } = require("./satoriEmoji");
+const LruCache = require("./lruCache");
+
+const profileCardCache = new LruCache(256);
 
 const FONT_DIR = path.join(__dirname, "../../fonts");
 let fontsCache = null;
@@ -190,7 +193,34 @@ function buildMarkup(data) {
   `;
 }
 
+function buildCacheKey(data) {
+  const badges = Array.isArray(data.badges)
+    ? data.badges
+        .map((b) => (b && typeof b === "object" ? b.id || b.key || JSON.stringify(b) : b))
+        .join(",")
+    : "";
+  return [
+    data.userId || "",
+    data.guildId || "",
+    data.username || "",
+    data.avatarUrl || "",
+    data.totalXp ?? "",
+    data.streak ?? "",
+    data.streakFreezes ?? "",
+    data.totalMessages ?? "",
+    data.totalVoiceMinutes ?? "",
+    data.rank ?? "",
+    badges,
+    data.title || "",
+    data.cardAccent || "",
+  ].join("|");
+}
+
 async function generateProfileCard(data) {
+  const cacheKey = buildCacheKey(data);
+  const cached = profileCardCache.get(cacheKey);
+  if (cached) return cached;
+
   const fonts = await loadFonts();
   const avatarDataUri = await fetchAvatarDataUri(data.avatarUrl);
   const markup = buildMarkup({ ...data, avatarDataUri });
@@ -209,7 +239,9 @@ async function generateProfileCard(data) {
     .render()
     .asPng();
 
-  return Buffer.from(png);
+  const buf = Buffer.from(png);
+  profileCardCache.set(cacheKey, buf);
+  return buf;
 }
 
 module.exports = generateProfileCard;

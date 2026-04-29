@@ -1,6 +1,6 @@
 require("colors");
 const { AttachmentBuilder } = require("discord.js");
-const { levelSystem } = require("../../config.json");
+const { levelSystem } = require("../../config");
 const generateLevelUpCard = require("../../utils/generateLevelUpCard");
 
 let cardErrorCount = 0;

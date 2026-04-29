@@ -4,7 +4,7 @@ const {
   SlashCommandBuilder,
 } = require("discord.js");
 
-const { commandEmojis, commandMessages } = require("../../config.json");
+const { commandEmojis, commandMessages } = require("../../config");
 const autocompleteBeverageStore = require("../../utils/autocompleteBeverageStore");
 
 module.exports = {

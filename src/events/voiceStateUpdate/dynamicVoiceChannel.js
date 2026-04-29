@@ -1,7 +1,7 @@
 require("colors");
 
 const { ChannelType, PermissionFlagsBits } = require("discord.js");
-const { createVoiceChannelId, voiceChannel } = require("../../config.json");
+const { createVoiceChannelId, voiceChannel } = require("../../config");
 const dynamicChannels = require("../../utils/dynamicChannelStore");
 
 module.exports = async (client, oldState, newState) => {
@@ -99,7 +99,7 @@ module.exports = async (client, oldState, newState) => {
       oldState.channelId !== newState.channelId
     ) {
       // 使用 setTimeout 來確保 Discord 緩存已更新
-      setTimeout(async () => {
+      const t = setTimeout(async () => {
         try {
           // 重新 fetch 頻道以確保成員列表最新（cache 偶爾不準）
           const channel = await guild.channels
@@ -128,6 +128,7 @@ module.exports = async (client, oldState, newState) => {
           );
         }
       }, 1000); // 延遲 1 秒以確保緩存更新
+      t.unref?.();
     }
   } catch (error) {
     console.error(

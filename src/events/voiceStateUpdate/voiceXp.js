@@ -1,5 +1,5 @@
 require("colors");
-const { levelSystem } = require("../../config.json");
+const { levelSystem } = require("../../config");
 const voiceSessionStore = require("../../utils/voiceSessionStore");
 
 module.exports = async (client, oldState, newState) => {

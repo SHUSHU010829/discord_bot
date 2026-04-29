@@ -3,7 +3,7 @@ const cron = require("node-cron");
 const { DateTime } = require("luxon");
 const { AttachmentBuilder } = require("discord.js");
 
-const { weeklyReport } = require("../../config.json");
+const { weeklyReport } = require("../../config");
 const buildWeeklyReport = require("../../utils/buildWeeklyReport");
 const generateWeeklyReportCard = require("../../utils/generateWeeklyReportCard");
 

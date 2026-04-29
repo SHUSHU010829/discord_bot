@@ -1,5 +1,5 @@
 require("colors");
-const { levelSystem } = require("../../config.json");
+const { levelSystem } = require("../../config");
 
 /**
  * 拿某 guild 的等級 role 對應表。

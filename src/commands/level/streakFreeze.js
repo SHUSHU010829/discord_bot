@@ -1,7 +1,7 @@
 require("colors");
 const { SlashCommandBuilder, MessageFlags } = require("discord.js");
 
-const { levelSystem } = require("../../config.json");
+const { levelSystem } = require("../../config");
 
 module.exports = {
   data: new SlashCommandBuilder()

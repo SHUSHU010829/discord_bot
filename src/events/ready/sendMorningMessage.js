@@ -2,7 +2,7 @@ require("colors");
 
 const cron = require("node-cron");
 
-const { normalChannelId, morningMessage } = require("../../config.json");
+const { normalChannelId, morningMessage } = require("../../config");
 const buildMorningPayload = require("../../utils/buildMorningPayload");
 
 module.exports = (client) => {
