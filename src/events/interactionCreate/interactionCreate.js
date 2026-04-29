@@ -36,10 +36,11 @@ module.exports = async (client, interaction) => {
       return;
     }
 
-    // 處理身份組按鈕（customId 必須為 Discord snowflake，避免攔截其他按鈕如分頁）
-    if (!/^\d{17,20}$/.test(interaction.customId)) return;
+    // 處理身份組按鈕（必須以 role_btn_ 為前綴，避免攔截其他按鈕如分頁）
+    if (!interaction.customId.startsWith("role_btn_")) return;
 
-    const role = interaction.guild.roles.cache.get(interaction.customId);
+    const roleId = interaction.customId.slice("role_btn_".length);
+    const role = interaction.guild.roles.cache.get(roleId);
     if (!role) {
       return interaction.reply({
         content: "無法找到該身份組！",
