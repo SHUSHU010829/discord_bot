@@ -2,6 +2,8 @@ require("colors");
 const { DateTime } = require("luxon");
 const { getLevelProgress } = require("../../utils/levelMath");
 const { levelSystem } = require("../../config.json");
+const syncLevelRoles = require("./levelRoles");
+const announceLevelUp = require("./levelUpAnnouncer");
 
 module.exports = async (client, opts) => {
   if (!client.userLevelsCollection) return null;
@@ -84,6 +86,23 @@ module.exports = async (client, opts) => {
     console.log(
       `[LEVEL] ${opts.username} ${beforeLevel} → ${afterLevel} (+${opts.amount} from ${opts.source})`.cyan
     );
+
+    // 等級身分組同步（fire-and-forget，失敗不影響回傳）
+    if (opts.member) {
+      syncLevelRoles(client, opts.member, afterLevel).catch((e) =>
+        console.log(`[ERROR] syncLevelRoles: ${e}`.red)
+      );
+    }
+
+    // 升級公告（內部會判斷是否 milestone）
+    announceLevelUp(client, {
+      member: opts.member,
+      guildId: opts.guildId,
+      channel: opts.channel,
+      beforeLevel,
+      afterLevel,
+      after,
+    }).catch((e) => console.log(`[ERROR] announceLevelUp: ${e}`.red));
   }
 
   return { before: beforeLevel, after: afterLevel, doc: after };

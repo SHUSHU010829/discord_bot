@@ -6,6 +6,8 @@ const { Resvg } = require("@resvg/resvg-js");
 const { DateTime } = require("luxon");
 const axios = require("axios");
 
+const { loadAdditionalAsset } = require("./satoriEmoji");
+
 const FONT_DIR = path.join(__dirname, "../../fonts");
 let fontsCache = null;
 
@@ -186,6 +188,7 @@ async function generateCheckinCard(data) {
     width: 1080,
     height: 900,
     fonts,
+    loadAdditionalAsset,
   });
 
   const png = new Resvg(svg, {

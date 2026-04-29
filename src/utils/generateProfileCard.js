@@ -5,6 +5,8 @@ const { html } = require("satori-html");
 const { Resvg } = require("@resvg/resvg-js");
 const axios = require("axios");
 
+const { loadAdditionalAsset } = require("./satoriEmoji");
+
 const FONT_DIR = path.join(__dirname, "../../fonts");
 let fontsCache = null;
 
@@ -192,6 +194,7 @@ async function generateProfileCard(data) {
     width: 1080,
     height: 600,
     fonts,
+    loadAdditionalAsset,
   });
 
   const png = new Resvg(svg, {
