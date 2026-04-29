@@ -14,6 +14,7 @@ const {
 
 const { getLevelProgress } = require("../../utils/levelMath");
 const { getTier } = require("../../utils/levelTier");
+const { getTwitchSubBonus } = require("../../utils/twitchSubBonus");
 
 const PAGE_SIZE = 10;
 const PAGINATION_TIMEOUT = 5 * 60 * 1000;
@@ -48,12 +49,37 @@ function buildButtons(currentPage, totalPages) {
   );
 }
 
-function renderRow(doc, globalIndex) {
+function renderRow(doc, globalIndex, memberMap) {
   const prog = getLevelProgress(doc.totalXp);
   const tier = getTier(prog.level);
   const medals = ["🥇", "🥈", "🥉"];
   const medal = medals[globalIndex] || `**${globalIndex + 1}.**`;
-  return `${medal} <@${doc.userId}> ・ ${tier.emoji} **Lv.${prog.level}** ・ ${doc.totalXp.toLocaleString()} XP`;
+
+  const member = memberMap?.get(doc.userId);
+  const sub = member ? getTwitchSubBonus(member) : { multiplier: 1 };
+  const subBadge = sub.multiplier > 1 ? ` 💜x${sub.multiplier}` : "";
+
+  return `${medal} <@${doc.userId}> ・ ${tier.emoji} **Lv.${prog.level}** ・ ${doc.totalXp.toLocaleString()} XP${subBadge}`;
+}
+
+async function buildMemberMap(guild, docs) {
+  const map = new Map();
+  if (!guild) return map;
+  const missing = [];
+  for (const d of docs) {
+    const cached = guild.members.cache.get(d.userId);
+    if (cached) map.set(d.userId, cached);
+    else missing.push(d.userId);
+  }
+  if (missing.length > 0) {
+    try {
+      const fetched = await guild.members.fetch({ user: missing });
+      fetched.forEach((m) => map.set(m.id, m));
+    } catch {
+      /* 部分成員可能已離開伺服器，忽略 */
+    }
+  }
+  return map;
 }
 
 function buildContainer({
@@ -63,6 +89,8 @@ function buildContainer({
   total,
   myRank,
   myDoc,
+  memberMap,
+  myMember,
   withControls = true,
 }) {
   const container = new ContainerBuilder()
@@ -80,7 +108,7 @@ function buildContainer({
     );
   } else {
     const offset = currentPage * PAGE_SIZE;
-    const lines = pageDocs.map((d, i) => renderRow(d, offset + i));
+    const lines = pageDocs.map((d, i) => renderRow(d, offset + i, memberMap));
 
     // 第一頁前 3 名分區塊顯示
     if (currentPage === 0 && pageDocs.length > 3) {
@@ -104,11 +132,13 @@ function buildContainer({
   if (myRank && myDoc) {
     const myProg = getLevelProgress(myDoc.totalXp);
     const myTier = getTier(myProg.level);
+    const mySub = myMember ? getTwitchSubBonus(myMember) : { multiplier: 1 };
+    const mySubBadge = mySub.multiplier > 1 ? ` 💜x${mySub.multiplier}` : "";
     container
       .addSeparatorComponents(new SeparatorBuilder())
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          `**你的排名**：#${myRank} ・ ${myTier.emoji} Lv.${myProg.level} ・ ${myDoc.totalXp.toLocaleString()} XP`
+          `**你的排名**：#${myRank} ・ ${myTier.emoji} Lv.${myProg.level} ・ ${myDoc.totalXp.toLocaleString()} XP${mySubBadge}`
         )
       );
   }
@@ -176,6 +206,7 @@ module.exports = {
 
       let currentPage = 0;
       let pageDocs = await fetchPage(client, interaction.guildId, currentPage);
+      let memberMap = await buildMemberMap(interaction.guild, pageDocs);
 
       const message = await interaction.editReply({
         components: [
@@ -186,6 +217,8 @@ module.exports = {
             total,
             myRank,
             myDoc,
+            memberMap,
+            myMember: interaction.member,
           }),
         ],
         flags: MessageFlags.IsComponentsV2,
@@ -215,6 +248,7 @@ module.exports = {
         }
 
         pageDocs = await fetchPage(client, interaction.guildId, currentPage);
+        memberMap = await buildMemberMap(interaction.guild, pageDocs);
 
         await btn.update({
           components: [
@@ -225,6 +259,8 @@ module.exports = {
               total,
               myRank,
               myDoc,
+              memberMap,
+              myMember: interaction.member,
             }),
           ],
           flags: MessageFlags.IsComponentsV2,
@@ -242,6 +278,8 @@ module.exports = {
                 total,
                 myRank,
                 myDoc,
+                memberMap,
+                myMember: interaction.member,
                 withControls: false,
               }),
             ],
