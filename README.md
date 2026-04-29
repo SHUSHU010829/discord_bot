@@ -1,342 +1,385 @@
-# Discord Bot
+# 逼逼機器人 (Discord Bot)
 
-![Alt](https://repobeats.axiom.co/api/embed/07fb82330959889996315cafa478ae498f152b45.svg "Repobeats analytics image")
+![Repobeats](https://repobeats.axiom.co/api/embed/07fb82330959889996315cafa478ae498f152b45.svg "Repobeats analytics image")
+
+一隻為單一 Discord 社群量身打造的多功能機器人，整合社群治理（票務 / 投票 / 動態語音 / 身份組）、生活娛樂（早安卡、抽籤、食物/飲料管理、星座運勢）與外部資訊推播（Steam 特價、喜加一、加密貨幣、匯率、天氣）。
+
+---
 
 ## 目錄
 
-- [功能特色](#功能特色)
-  - [動態語音頻道](#動態語音頻道)
-  - [Ticket 與投票系統](#ticket-與投票系統)
-- [設定指南](#設定指南)
-  - [動態語音頻道設定](#動態語音頻道設定)
-  - [投票系統設定](#投票系統設定)
-- [API 資訊](#api-資訊)
-
-## 功能特色
-
-### 動態語音頻道
-
-支援自由創建臨時語音頻道功能。用戶只需加入特定的語音頻道,機器人就會自動創建一個新的語音頻道。
-
-**特性:**
-
-- **自動創建頻道**: 當用戶加入「點選新增頻道」時,機器人會自動創建一個新的語音頻道
-- **預設名稱**: 新頻道的預設名稱為「記得改名喔!」
-- **創建者權限**:
-  - 可以編輯頻道名稱
-  - 可以調整頻道人數上限
-  - 可以管理頻道設置
-- **所有成員權限**: 加入頻道的所有人都可以編輯頻道狀態
-- **自動清理**: 當頻道內沒有人時,該頻道會自動刪除
-
-### Ticket 與投票系統
-
-整合 Discord Ticket 系統與投票機制,讓成員可以透過 Ticket 申請新增或封存遊戲頻道,管理員審核後發起投票,系統會自動統計並通知結果。
-
-**核心流程:**
-
-```
-使用者開啟 Ticket → 提交遊戲申請 → 管理員審核 → 發起投票 →
-成員投票(權重計分) → 自動結算 → 通知結果 → 自動關閉 Ticket
-```
-
-**投票類型:**
-
-#### 新增頻道投票 (Create)
-
-- **🔥 我會玩** (權重 3 分) - 代表擁有遊戲且會活躍使用頻道
-- **👍 純支持** (權重 1 分) - 代表支持但不一定會玩
-- **😶 沒興趣** (不計分) - 單純表態
-
-**通過條件 (雙重鎖):**
-
-- 總分 ≥ 15 分
-- 核心玩家 ≥ 3 人
-
-#### 封存頻道投票 (Archive)
-
-- **✋ 我還在玩** - 反對封存
-- **📦 同意封存** - 同意封存
-
-**通過條件:**
-
-- 「我還在玩」的人數 < 2 人則封存通過
-
-## 設定指南
-
-### 動態語音頻道設定
-
-#### 1. 創建語音頻道
-
-在您的 Discord 伺服器中創建一個語音頻道,命名為「點選新增頻道」(或其他您喜歡的名稱)。
-
-#### 2. 獲取頻道 ID
-
-1. 在 Discord 中啟用開發者模式:
-   - 用戶設置 > 應用設置 > 進階 > 開發者模式 (開啟)
-2. 右鍵點擊您剛創建的語音頻道
-3. 點擊「複製頻道 ID」
-
-#### 3. 配置機器人
-
-打開 `src/config.json` 文件,將複製的頻道 ID 填入 `createVoiceChannelId` 欄位:
-
-```json
-{
-  "serverId": "您的伺服器ID",
-  "developersId": ["開發者ID"],
-  "normalChannelId": "一般頻道ID",
-  "createVoiceChannelId": "您複製的頻道ID"
-}
-```
-
-#### 4. 重啟機器人
-
-保存配置文件後,重啟機器人以載入新設置。
-
-#### 使用方法
-
-1. 用戶加入「點選新增頻道」
-2. 機器人自動創建新的語音頻道並將用戶移動到新頻道
-3. 用戶可以在新頻道中自由聊天
-4. 創建者可以修改頻道名稱和設置
-5. 所有成員都可以編輯頻道狀態
-6. 當所有人離開後,頻道會自動刪除
-
-#### 注意事項
-
-- 確保機器人擁有「管理頻道」和「移動成員」權限
-- 新創建的頻道會放在與「點選新增頻道」相同的分類下
-- 如果未設置 `createVoiceChannelId`,功能將不會啟動
-
-#### 故障排除
-
-**機器人沒有創建新頻道:**
-
-1. 檢查 `src/config.json` 中的 `createVoiceChannelId` 是否正確
-2. 確認機器人擁有足夠的權限
-3. 查看控制台日誌是否有錯誤訊息
-
-**無法修改頻道設置:**
-
-確保創建者在頻道中擁有「管理頻道」權限。這個權限會在頻道創建時自動授予。
-
-**頻道沒有自動刪除:**
-
-確保機器人正常運行且沒有重啟。頻道資訊存儲在記憶體中,重啟後會丟失。
-
-### 投票系統設定
-
-#### 1. 設定 config.json
-
-在 `src/config.json` 中設定投票頻道 ID:
-
-```json
-"voting": {
-  "votingChannelId": "YOUR_VOTING_CHANNEL_ID",
-  "voteDurationHours": 24,
-  "passThresholds": {
-    "totalScore": 15,
-    "minPlayers": 3
-  },
-  "archiveThresholds": {
-    "minActivePlayers": 2
-  },
-  "weights": {
-    "players": 3,
-    "supporters": 1
-  }
-}
-```
-
-**參數說明:**
-
-- `votingChannelId`: 投票頻道 ID
-- `voteDurationHours`: 投票持續時間 (小時)
-- `passThresholds.totalScore`: 總分門檻
-- `passThresholds.minPlayers`: 最低核心玩家數
-- `archiveThresholds.minActivePlayers`: 封存提案的最低活躍玩家數
-- `weights.players`: 核心玩家權重
-- `weights.supporters`: 支持者權重
-
-#### 2. 設定 Ticket 系統
-
-使用 `/setup-ticket` 指令在申請頻道設定 Ticket 面板。
-
-#### 使用流程
-
-**階段一: 使用者提交申請**
-
-1. 使用者點擊 Ticket 面板的「創建票務」按鈕
-2. 系統自動建立私人票務頻道 `ticket-username`
-3. 使用者在票務頻道中輸入想要申請的遊戲名稱
-
-**階段二: 管理員發起投票**
-
-管理員在票務頻道中使用指令:
-
-```
-/proposal start game:[遊戲名稱] type:[create/archive]
-```
-
-參數說明:
-
-- `game`: 遊戲名稱 (例如: Monster Hunter Wilds)
-- `type`: `create` (新增頻道) 或 `archive` (封存頻道)
-
-範例:
-
-```
-/proposal start game:Monster Hunter Wilds type:create
-```
-
-**階段三: 成員投票**
-
-系統會在投票頻道發布投票訊息,成員可以點擊按鈕進行投票。
-
-**階段四: 自動結算**
-
-投票時間到達後,系統會自動:
-
-1. 統計票數並判定結果
-2. 更新投票訊息 (顯示最終結果,移除按鈕)
-3. 通知票務頻道
-   - ✅ 通過: 顯示「恭喜!提案已通過」,列出核心玩家名單
-   - ❌ 未通過: 顯示「很遺憾,未達門檻」,5 分鐘後自動關閉 Ticket
-
-#### 投票邏輯範例
-
-**情境 1: 核心玩家充足**
-
-- 核心玩家: 5 人 (5 × 3 = 15 分)
-- 純支持: 0 人
-- **總分: 15 分**
-- **結果: ✅ 通過** (有足夠的活躍玩家)
-
-**情境 2: 純支持很多但核心玩家不足**
-
-- 核心玩家: 1 人 (1 × 3 = 3 分)
-- 純支持: 20 人 (20 × 1 = 20 分)
-- **總分: 23 分**
-- **結果: ❌ 未通過** (核心玩家 < 3,不滿足條件)
-
-**情境 3: 剛好達標**
-
-- 核心玩家: 3 人 (3 × 3 = 9 分)
-- 純支持: 6 人 (6 × 1 = 6 分)
-- **總分: 15 分**
-- **結果: ✅ 通過** (剛好滿足兩個條件)
-
-#### 常見問題
-
-**Q: 如何調整通過門檻?**
-
-A: 修改 `config.json` 中的 `voting.passThresholds`:
-
-```json
-"passThresholds": {
-  "totalScore": 15,    // 調整總分門檻
-  "minPlayers": 3      // 調整最低核心玩家數
-}
-```
-
-**Q: 如何調整投票時間?**
-
-A: 修改 `config.json` 中的 `voting.voteDurationHours` (單位: 小時)
-
-**Q: 如何調整權重?**
-
-A: 修改 `config.json` 中的 `voting.weights`:
-
-```json
-"weights": {
-  "players": 3,      // 核心玩家權重
-  "supporters": 1    // 支持者權重
-}
-```
-
-**Q: 使用者可以改票嗎?**
-
-A: 可以!使用者可以隨時點擊不同的按鈕來改變自己的投票,系統會自動處理互斥邏輯。
-
-**Q: 如果 Ticket 被手動關閉怎麼辦?**
-
-A: 投票仍會正常結算,但無法發送通知到 Ticket 頻道 (因為已被刪除)。投票結果仍會顯示在投票頻道中。
-
-#### 權限要求
-
-**Bot 權限:**
-
-- `ManageChannels`: 建立和刪除票務頻道
-- `SendMessages`: 發送訊息和 Embed
-- `ViewChannel`: 查看頻道
-
-**使用者權限:**
-
-- `/proposal start` 指令需要 `ManageChannels` 權限 (通常只有管理員)
-- 一般成員可以建立 Ticket 和參與投票
-
-## API 資訊
-
-- 加密貨幣: <https://min-api.cryptocompare.com/documentation>
-- 日曆: <https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/2025.json>
-- fixthreads: <https://github.com/milanmdev/fixthreads>
-
-## 技術架構
-
-### 資料庫結構
-
-系統使用 MongoDB 儲存投票資料:
-
-```javascript
-{
-  voteId: "unique_id",
-  ticketChannelId: "999888777",
-  proposerId: "user_id",
-  gameName: "Monster Hunter Wilds",
-  proposalType: "create",          // 或 "archive"
-  status: "VOTING",                // VOTING, PASSED, FAILED
-  messageId: "111222333",
-  channelId: "voting_channel_id",
-  guildId: "guild_id",
-  votes: {
-    players: ["user1", "user2"],   // 核心玩家
-    supporters: ["user3", "user4"], // 支持者
-    noInterest: ["user5"]          // 沒興趣
-  },
-  createdAt: Date,
-  expiresAt: Date
-}
-```
-
-### 自動結算機制
-
-- 使用 node-cron 每 5 分鐘檢查一次過期的投票
-- 自動計算分數並判定結果
-- 更新投票訊息狀態
-- 發送通知到原始 Ticket 頻道
-- 未通過的提案會在 5 分鐘後自動關閉 Ticket
-
-### 檔案結構
+- [設計目的](#設計目的)
+- [使用技術](#使用技術)
+- [專案結構](#專案結構)
+- [安裝與部署](#安裝與部署)
+- [核心功能與操作流程](#核心功能與操作流程)
+  - [動態語音頻道](#1-動態語音頻道)
+  - [Ticket 與遊戲頻道投票](#2-ticket-與遊戲頻道投票)
+  - [身份組自助領取](#3-身份組自助領取)
+  - [建議 / 投票面板](#4-建議--投票面板)
+  - [Steam 特價推播](#5-steam-特價推播)
+  - [喜加一（限時免費）推播](#6-喜加一限時免費推播)
+  - [每日早安卡 / 今日報告](#7-每日早安卡--今日報告)
+  - [食物與飲料系統](#8-食物與飲料系統)
+  - [加密貨幣 / 匯率 / 天氣](#9-加密貨幣--匯率--天氣)
+  - [抽籤、統計與其他指令](#10-抽籤統計與其他指令)
+  - [Twitter / Threads 連結修正](#11-twitter--threads-連結修正)
+- [維運腳本](#維運腳本)
+- [外部 API](#外部-api)
+- [維護建議](#維護建議)
+
+---
+
+## 設計目的
+
+- **集中化社群治理**：以「申請 → 審核 → 投票 → 自動結算」流程規範遊戲頻道的開設與封存，避免管理員主觀決策。
+- **降低管理員負擔**：動態語音頻道、Ticket、身份組、建議蒐集等流程全部交由 bot 自動化處理。
+- **內容主動觸達**：將 Steam 特價、限時免費遊戲、每日早安、星座運勢等資訊在固定時間推播到指定頻道，提升社群活躍度。
+- **單一伺服器最佳化**：所有設定集中在 `src/config.json`，搭配 `.env` 即可快速複製到其他伺服器使用。
+
+---
+
+## 使用技術
+
+| 類別 | 技術 |
+| --- | --- |
+| 執行環境 | Node.js 22.x |
+| Discord SDK | [discord.js](https://discord.js.org/) v14（Slash Command、Buttons、Modal、Embed） |
+| 資料庫 | MongoDB Atlas（透過官方 `mongodb` driver） |
+| 排程 | [`node-cron`](https://www.npmjs.com/package/node-cron) |
+| 圖片產生 | `satori` + `satori-html` + `@resvg/resvg-js`（早安卡、運勢卡） |
+| 時間處理 | `luxon`、`tyme4ts`（農民曆 / 節氣） |
+| 中文轉換 | `opencc-js`（簡繁轉換） |
+| HTTP | `axios` |
+| 部署 | Dockerfile（`node:22-slim`） |
+| 開發工具 | `nodemon`、`dotenv` |
+
+機器人在 `src/index.js` 啟動，建立 Discord Client 後委派給 `src/handlers/eventHandler.js` 動態載入 `src/events/**` 中所有事件處理器與 `src/commands/**` 中的 Slash Command。
+
+---
+
+## 專案結構
 
 ```
 src/
-├── commands/ticket/
-│   ├── setup-ticket.js      # 設定 Ticket 面板
-│   ├── close-ticket.js      # 關閉 Ticket
-│   └── proposal.js          # 發起投票提案
+├── index.js                # 進入點
+├── config.json             # 主要設定檔（頻道 ID、權重、推播排程…）
+├── messageConfig.json      # 訊息文案
+├── handlers/eventHandler.js
+├── commands/               # Slash Commands（按功能分子目錄）
+│   ├── ask/                # 詢問星座運勢、占卜
+│   ├── currency/           # 加密貨幣、匯率
+│   ├── draw/               # 抽籤、樂透、抽一個
+│   ├── food/               # 食物/飲料 CRUD、抽食物、抽飲料
+│   ├── general/            # /help、/today-report
+│   ├── misc/               # /ping
+│   ├── post/               # 整人小工具（瓦斯燈）
+│   ├── roles/              # /setup-roles
+│   ├── stats/              # /stats、/leaderboard
+│   ├── ticket/             # /setup-ticket、/proposal、/close-ticket、/setup-suggestion
+│   └── weather/            # /weather
 ├── events/
-│   ├── ready/
-│   │   ├── connectDb.js     # 資料庫連接
-│   │   └── voteScheduler.js # 投票自動結算
-│   └── interactionCreate/
-│       └── interactionCreate.js  # 按鈕互動處理
-└── config.json              # 配置文件
+│   ├── ready/              # bot 啟動時要做的事（載入 DB、註冊指令、起 cron…）
+│   ├── interactionCreate/  # 按鈕、Select Menu 互動
+│   ├── messageCreate/      # 訊息統計、Twitter/Threads 連結修正
+│   ├── voiceStateUpdate/   # 動態語音、語音時長統計
+│   ├── guildMemberAdd/Remove
+│   └── validations/        # Slash Command 前置驗證、Autocomplete
+├── features/
+│   ├── steamDeals/         # 小黑盒 RSS → Steam API → Embed → 推播
+│   └── freeGames/          # 喜加一抓取與發送
+├── utils/                  # 共用函式（卡片產生、農民曆、autocomplete…）
+├── data/                   # 持久化 JSON（身份組、建議、票務面板）
+├── constants/              # 食物分類等靜態常數
+├── scripts/                # 行事曆轉換、驗證
+└── tool/                   # 部署 / 刪除 Slash Command 用的維運腳本
 ```
+
+---
+
+## 安裝與部署
+
+### 1. 取得程式碼與安裝套件
+
+```bash
+git clone https://github.com/shushu010829/discord_bot.git
+cd discord_bot
+npm install
+```
+
+### 2. 建立 `.env`
+
+複製 `.env.example` 為 `.env` 並填入：
+
+| 變數 | 說明 |
+| --- | --- |
+| `BOT_TOKEN` | Discord Developer Portal 取得的 Bot Token |
+| `MONGO_PASSWORD` | MongoDB Atlas 密碼 |
+| `DISCORD_DEALS_CHANNEL_ID` | Steam 特價推播頻道（留空則用 `config.json`） |
+| `STEAM_DEALS_*` | 排程、暫停、Dry-run、首啟即跑 |
+| `DISCORD_FREE_GAMES_CHANNEL_ID`、`FREE_GAMES_*` | 喜加一推播控制 |
+
+### 3. 設定 `src/config.json`
+
+至少填入以下欄位（其他依需要）：
+
+- `serverId`、`developersId`
+- `normalChannelId`、`createVoiceChannelId`、`memberCountChannelId`
+- `ticket.categoryId`、`ticket.supportRoleId`
+- `voting.votingChannelId`
+- `roles[]`（提供身份組面板選項）
+
+### 4. 部署 Slash Command
+
+```bash
+node src/tool/deploy-commands.js   # 註冊指令
+node src/tool/get-commands.js      # 列出已註冊指令
+node src/tool/delete-commands.js   # 清除指令
+```
+
+### 5. 啟動
+
+```bash
+# 開發模式（nodemon 熱重載）
+npm run start:dev
+
+# 直接啟動
+node src/index.js
+```
+
+### 6. Docker 部署
+
+```bash
+docker build -t discord-bot .
+docker run -d --env-file .env --name bibi-bot discord-bot
+```
+
+---
+
+## 核心功能與操作流程
+
+### 1. 動態語音頻道
+
+**目的**：讓成員自由建立 / 銷毀臨時語音頻道，無需打擾管理員。
+
+**操作流程**：
+
+```
+使用者加入「點選新增頻道」
+   ↓ voiceStateUpdate 觸發
+bot 自動建立同分類下的新頻道（預設名稱「記得改名喔！」）
+   ↓
+將使用者移動進新頻道，並授予建立者「管理頻道」權限
+   ↓
+所有成員離開 → bot 自動刪除頻道
+```
+
+**設定**：將語音頻道 ID 填入 `config.json` 的 `createVoiceChannelId` 即可。
+
+> Bot 必須擁有 **管理頻道** 與 **移動成員** 權限。頻道狀態僅存在記憶體中，重啟會遺失。
+
+---
+
+### 2. Ticket 與遊戲頻道投票
+
+**目的**：把「想開新遊戲頻道 / 想封存舊頻道」的決策權交給社群投票。
+
+**完整流程**：
+
+```
+使用者點 Ticket 面板「創建票務」
+   ↓ 自動建立 ticket-{username} 私人頻道
+管理員在票務頻道輸入 /proposal start
+   ↓ bot 在投票頻道發布投票訊息
+成員按按鈕投票（可改票、有互斥邏輯）
+   ↓ node-cron 每 5 分鐘檢查過期投票
+自動結算 → 更新訊息 → 通知 Ticket
+   未通過：5 分鐘後自動關閉 Ticket
+```
+
+**指令**：
+
+| 指令 | 權限 | 說明 |
+| --- | --- | --- |
+| `/setup-ticket` | 管理員 | 在當前頻道部署 Ticket 面板 |
+| `/proposal start game:<名稱> type:<create\|archive>` | `ManageChannels` | 在 Ticket 頻道發起投票 |
+| `/close-ticket` | Ticket 開啟者 / 管理員 | 立即關閉 Ticket |
+
+**新增頻道 (create) 投票機制**：
+
+| 選項 | 權重 | 意義 |
+| --- | --- | --- |
+| 🔥 我會玩 | 3 | 擁有遊戲、會活躍使用 |
+| 👍 純支持 | 1 | 支持但不一定會玩 |
+| 😶 沒興趣 | 0 | 純表態 |
+
+**通過條件（雙重鎖）**：總分 ≥ `passThresholds.totalScore`（預設 15）**且** 核心玩家 ≥ `passThresholds.minPlayers`（預設 3）。
+
+**封存頻道 (archive) 投票**：
+
+- ✋ 我還在玩 / 📦 同意封存
+- 「我還在玩」< `archiveThresholds.minActivePlayers`（預設 2）即通過封存。
+
+**MongoDB 資料結構**：
+
+```javascript
+{
+  voteId, ticketChannelId, proposerId, gameName,
+  proposalType,                       // create | archive
+  status,                             // VOTING | PASSED | FAILED
+  messageId, channelId, guildId,
+  votes: { players: [], supporters: [], noInterest: [] },
+  createdAt, expiresAt
+}
+```
+
+---
+
+### 3. 身份組自助領取
+
+**目的**：讓成員自行勾選想接收通知的身份組，免人工指派。
+
+**流程**：
+
+1. 管理員在通知頻道執行 `/setup-roles`
+2. bot 依 `config.json` 的 `roles[]` 產生 Select Menu 面板
+3. 成員選擇後由 `events/interactionCreate/handleRoleSelect.js` 增/刪身份組
+4. 面板狀態會持久化到 `src/data/role-panels.json`，重啟後仍可運作
+
+---
+
+### 4. 建議 / 投票面板
+
+**指令**：`/setup-suggestion`
+
+提供讓成員提案、其他人投票（贊成 / 反對）的輕量級面板，資料存於 `src/data/suggestion-panels.json`，並由 `suggestionScheduler.js` 進行定期維護。
+
+---
+
+### 5. Steam 特價推播
+
+**目的**：自動把台灣區 Steam 史低 / 高折扣遊戲推送到指定頻道。
+
+**處理鏈**（`src/features/steamDeals/`）：
+
+```
+小黑盒 RSS (xiaoheihe.js)
+   ↓ 抓回特價清單
+Steam Store API (steam.js)
+   ↓ 補上台幣價格、是否史低
+filter.js
+   ↓ 過濾掉非台區、不符條件
+dedupe.js
+   ↓ 同一遊戲不重複推
+embed.js → 發送 Embed
+```
+
+**控制變數**（`.env` 覆寫 `config.json`）：
+
+- `STEAM_DEALS_ENABLED`：開關
+- `STEAM_DEALS_CRON`：排程（預設每 2 小時）
+- `STEAM_DEALS_DRY_RUN`：只 log 不發送
+- `STEAM_DEALS_RUN_ON_START`：啟動立即跑一次（驗證用）
+- `activeHours.startHour / endHour`：只在指定時段內推播
+
+---
+
+### 6. 喜加一（限時免費）推播
+
+**目的**：彙整 Epic / Steam / GOG 的限時免費遊戲。
+
+**設定**位於 `config.json` 的 `freeGames`，可單獨開關各平台與設定 RSS 來源；同樣支援 Dry-run、首啟即跑。
+
+排程預設 `30 */6 * * *`（與 Steam 特價錯開），實作於 `src/features/freeGames/` 與 `events/ready/freeGamesScheduler.js`。
+
+---
+
+### 7. 每日早安卡 / 今日報告
+
+- **早安卡**：`events/ready/sendMorningMessage.js` 依 `morningMessage.cronSchedule`（預設每天早上 8 點）發送，使用 `satori` 動態繪製含日期、星期、節氣、農民曆、詩詞、運勢的 PNG 卡片。
+- **`/today-report`**：成員可隨時手動取得今日資訊（日期、運勢、節日）。
+- **資料來源**：本地 `src/data/calender.json`（透過 `scripts/updateCalendar.js` 從 TaiwanCalendar 更新）、`utils/getLunarInfo.js`（農民曆）、`utils/getPoem.js`（詩詞）。
+
+---
+
+### 8. 食物與飲料系統
+
+為了解決「今天吃什麼？」的萬年難題：
+
+| 指令 | 用途 |
+| --- | --- |
+| `/increase-food` | 新增餐廳 / 食物 |
+| `/batch-add-food` | 批次匯入 |
+| `/delete-food` | 刪除 |
+| `/food-list` | 查看目前清單 |
+| `/food-ranking` | 依抽中次數排名 |
+| `/draw-lot` | 抽今天吃什麼 |
+| `/drink-lot` | 抽今天喝什麼 |
+| `/beverage-stores`、`/import-beverage-menu` | 飲料店與菜單管理 |
+
+資料存於 MongoDB；指令內含 Autocomplete（`utils/autocompleteFoodName.js`、`autocompleteBeverageStore.js`）。
+
+---
+
+### 9. 加密貨幣 / 匯率 / 天氣
+
+- `/cryptocurrency`：透過 [cryptocompare](https://min-api.cryptocompare.com/documentation) 查即時幣價。
+- `/exchange-rate`：查台幣對外幣匯率。
+- `/weather city:<城市>`、`/weather all`：查台灣縣市天氣。
+
+---
+
+### 10. 抽籤、統計與其他指令
+
+| 指令 | 說明 |
+| --- | --- |
+| `/choose-one` | 在多個選項中隨機抽一個 |
+| `/lotto` | 模擬樂透開獎 |
+| `/straws` | 抽籤（吉凶） |
+| `/ask` | 占卜 / 星座運勢 |
+| `/stats`、`/leaderboard` | 訊息與語音時長統計（由 `messageStats.js`、`voiceStats.js` 累積） |
+| `/gaslight`、`/increase-gaslight` | 整人小工具 |
+| `/help` | 查看指令說明 |
+| `/ping` | 測試延遲 |
+
+---
+
+### 11. Twitter / Threads 連結修正
+
+`events/messageCreate/threadsLinkHandler.js` 會自動偵測訊息中的 Twitter / Threads 連結，回覆可正確顯示嵌入內容的 fxtwitter / fixthreads 版本，方便手機瀏覽。
+
+---
+
+## 維運腳本
+
+```bash
+npm run update-calendar    # 從 TaiwanCalendar 抓最新行事曆
+npm run verify-calendar    # 驗證行事曆 JSON 完整性
+npm run convert-calendar   # 行事曆格式轉換
+
+node src/tool/deploy-commands.js   # 註冊 / 更新 Slash Command
+node src/tool/get-commands.js      # 列出已註冊指令
+node src/tool/delete-commands.js   # 清空所有指令（謹慎使用）
+```
+
+---
+
+## 外部 API
+
+| 用途 | URL |
+| --- | --- |
+| 加密貨幣 | <https://min-api.cryptocompare.com/documentation> |
+| 台灣行事曆 | <https://cdn.jsdelivr.net/gh/ruyut/TaiwanCalendar/data/2025.json> |
+| Steam 特價來源 | 小黑盒 RSS（`https://discord-news.zeabur.app/xiaoheihe/...`） |
+| Steam 商品資訊 | Steam Store API |
+| Threads 連結修正 | <https://github.com/milanmdev/fixthreads> |
+
+---
 
 ## 維護建議
 
-1. **定期備份資料庫**: 投票資料儲存在 MongoDB 中
-2. **監控 cron job**: 確保自動結算系統正常運作
-3. **調整門檻**: 根據伺服器大小調整通過門檻
-4. **收集反饋**: 定期詢問成員對投票系統的意見
+1. **定期備份 MongoDB**：投票、食物、訊息統計等資料皆存於此。
+2. **監控 cron**：投票結算、Steam 特價、喜加一、早安卡都仰賴 `node-cron`，bot 重啟後排程會重建。
+3. **依社群規模調整門檻**：`voting.passThresholds`、`voting.weights`、`activeHours` 都可在不重啟程式的情況下用 PR / 重新部署修改。
+4. **Slash Command 變更後執行 `deploy-commands`**：否則 Discord 端不會看到新指令。
+5. **動態語音頻道資料僅在記憶體**：若有計畫長時間維運，可考慮持久化到 MongoDB 以便在重啟時恢復。
