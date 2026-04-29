@@ -1,5 +1,5 @@
 require("dotenv/config");
-const { Client, GatewayIntentBits } = require("discord.js");
+const { Client, GatewayIntentBits, Partials } = require("discord.js");
 
 const eventHandlers = require("./handlers/eventHandler.js");
 
@@ -12,6 +12,7 @@ const client = new Client({
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildMessageReactions,
   ],
+  partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
 eventHandlers(client);
