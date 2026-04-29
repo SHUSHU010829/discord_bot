@@ -80,5 +80,15 @@ module.exports = async (client) => {
     console.log(
       `[ERROR] An error occurred inside the command registry:\n${error}`.red
     );
+    if (error?.rawError) {
+      console.log(
+        `[ERROR] Discord API rawError:\n${JSON.stringify(error.rawError, null, 2)}`.red
+      );
+    }
+    if (error?.requestBody) {
+      console.log(
+        `[ERROR] Request body json (truncated 4000):\n${JSON.stringify(error.requestBody.json).slice(0, 4000)}`.red
+      );
+    }
   }
 };
