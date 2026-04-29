@@ -44,6 +44,7 @@ module.exports = async (client) => {
     const userLevelsCollection = database.collection("UserLevels");
     const levelTransactionsCollection = database.collection("LevelTransactions");
     const dailyCheckinCollection = database.collection("DailyCheckin");
+    const levelRolesCollection = database.collection("LevelRoles");
 
     client.database = database;
     client.collection = collection;
@@ -58,6 +59,7 @@ module.exports = async (client) => {
     client.userLevelsCollection = userLevelsCollection;
     client.levelTransactionsCollection = levelTransactionsCollection;
     client.dailyCheckinCollection = dailyCheckinCollection;
+    client.levelRolesCollection = levelRolesCollection;
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
 
     // 自動修補沒有 category / drawCount 的舊資料（idempotent，沒事就不動）
@@ -132,6 +134,11 @@ module.exports = async (client) => {
       await dailyCheckinCollection.createIndex(
         { createdAt: 1 },
         { expireAfterSeconds: 90 * 24 * 60 * 60, name: "ttl_90d" }
+      );
+
+      await levelRolesCollection.createIndex(
+        { guildId: 1, level: 1 },
+        { unique: true, name: "uniq_guild_level" }
       );
     } catch (indexError) {
       console.log(
