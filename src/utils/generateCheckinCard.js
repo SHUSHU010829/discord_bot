@@ -77,34 +77,36 @@ function buildMarkup(data) {
 
   const cells = buildCalendar(today, timezone, checkinDates);
 
-  // 6 列 × 5 欄 = 30 格
+  // 5 列 × 6 欄 = 30 格（橫向排版避免吃高度）
   const calendarRows = [];
-  for (let r = 0; r < 6; r++) {
-    calendarRows.push(cells.slice(r * 5, r * 5 + 5));
+  for (let r = 0; r < 5; r++) {
+    calendarRows.push(cells.slice(r * 6, r * 6 + 6));
   }
 
+  const CELL = 64;
   const renderCell = (cell) => {
     if (cell.isToday) {
-      return `<div style="display:flex;width:80px;height:80px;background:${accent};color:${card};font-family:'NotoSansTC';font-weight:900;font-size:28px;justify-content:center;align-items:center;border:3px solid ${ink};">✓</div>`;
+      // 今天：紅色填滿 + 內外雙框，視覺最強
+      return `<div style="display:flex;width:${CELL}px;height:${CELL}px;background:${accent};border:4px solid ${ink};box-sizing:border-box;"></div>`;
     }
     if (cell.checked) {
-      return `<div style="display:flex;width:80px;height:80px;background:${teal};color:${card};font-family:'NotoSansTC';font-weight:900;font-size:24px;justify-content:center;align-items:center;">✓</div>`;
+      return `<div style="display:flex;width:${CELL}px;height:${CELL}px;background:${teal};box-sizing:border-box;"></div>`;
     }
-    return `<div style="display:flex;width:80px;height:80px;background:${subtle};border:1px solid ${muted};"></div>`;
+    return `<div style="display:flex;width:${CELL}px;height:${CELL}px;background:${subtle};border:1px solid ${muted};box-sizing:border-box;"></div>`;
   };
 
   const calendarHtml = calendarRows
     .map(
       (row) => `
-        <div style="display:flex;gap:10px;">
+        <div style="display:flex;gap:8px;">
           ${row.map(renderCell).join("")}
         </div>`
     )
     .join("");
 
   const avatarHtml = avatarDataUri
-    ? `<img src="${avatarDataUri}" width="80" height="80" style="object-fit:cover;border:3px solid ${ink};" />`
-    : `<div style="display:flex;width:80px;height:80px;background:${ink};color:${card};font-family:'NotoSansTC';font-weight:900;font-size:38px;justify-content:center;align-items:center;border:3px solid ${ink};">${(username || "?").charAt(0).toUpperCase()}</div>`;
+    ? `<img src="${avatarDataUri}" style="display:flex;width:88px;height:88px;object-fit:cover;border:3px solid ${ink};" />`
+    : `<div style="display:flex;width:88px;height:88px;background:${ink};color:${card};font-family:'NotoSansTC';font-weight:900;font-size:40px;justify-content:center;align-items:center;border:3px solid ${ink};">${(username || "?").charAt(0).toUpperCase()}</div>`;
 
   const bonusHtml =
     multiplier > 1
@@ -113,7 +115,7 @@ function buildMarkup(data) {
 
   return `
     <div style="display:flex;width:1080px;height:900px;background:${card};padding:24px;box-sizing:border-box;font-family:'NotoSansTC';">
-      <div style="display:flex;flex-direction:column;width:100%;height:100%;background:${card};border:3px solid ${ink};padding:36px 44px;box-sizing:border-box;">
+      <div style="display:flex;flex-direction:column;width:100%;height:100%;background:${card};border:3px solid ${ink};padding:32px 40px;box-sizing:border-box;">
 
         <!-- Header -->
         <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
@@ -131,36 +133,41 @@ function buildMarkup(data) {
         </div>
 
         <!-- Streak block -->
-        <div style="display:flex;flex-direction:column;align-items:center;width:100%;margin-top:24px;padding:32px 0;background:${ink};color:${card};">
-          <div style="display:flex;font-family:'SpaceMono';font-size:16px;letter-spacing:10px;color:${muted};">— STREAK —</div>
-          <div style="display:flex;align-items:baseline;margin-top:8px;">
-            <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:140px;color:${accent};line-height:1;">${streak}</div>
-            <div style="display:flex;margin-left:14px;font-family:'NotoSansTC';font-weight:500;font-size:36px;color:${card};">天</div>
+        <div style="display:flex;flex-direction:column;align-items:center;width:100%;margin-top:18px;padding:18px 0;background:${ink};color:${card};">
+          <div style="display:flex;font-family:'SpaceMono';font-size:14px;letter-spacing:10px;color:${muted};">— STREAK —</div>
+          <div style="display:flex;align-items:baseline;margin-top:4px;">
+            <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:96px;color:${accent};line-height:1;">${streak}</div>
+            <div style="display:flex;margin-left:14px;font-family:'NotoSansTC';font-weight:500;font-size:30px;color:${card};">天</div>
           </div>
           ${bonusHtml}
         </div>
 
         <!-- Calendar -->
-        <div style="display:flex;flex-direction:column;width:100%;margin-top:24px;align-items:center;">
-          <div style="display:flex;font-family:'SpaceMono';font-size:14px;letter-spacing:6px;color:${muted};">— LAST 30 DAYS —</div>
-          <div style="display:flex;flex-direction:column;margin-top:14px;gap:8px;">
+        <div style="display:flex;flex-direction:column;width:100%;margin-top:18px;align-items:center;">
+          <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:6px;color:${muted};">— LAST 30 DAYS —</div>
+          <div style="display:flex;flex-direction:column;margin-top:10px;gap:8px;">
             ${calendarHtml}
+          </div>
+          <div style="display:flex;margin-top:10px;gap:18px;font-family:'SpaceMono';font-size:11px;letter-spacing:2px;color:${muted};">
+            <div style="display:flex;align-items:center;"><div style="display:flex;width:14px;height:14px;background:${accent};margin-right:6px;"></div>TODAY</div>
+            <div style="display:flex;align-items:center;"><div style="display:flex;width:14px;height:14px;background:${teal};margin-right:6px;"></div>CHECKED</div>
+            <div style="display:flex;align-items:center;"><div style="display:flex;width:14px;height:14px;background:${subtle};border:1px solid ${muted};margin-right:6px;"></div>MISSED</div>
           </div>
         </div>
 
         <!-- Footer summary -->
-        <div style="display:flex;width:100%;margin-top:auto;padding-top:18px;border-top:1px dashed ${muted};justify-content:space-between;align-items:center;">
+        <div style="display:flex;width:100%;margin-top:auto;padding-top:14px;border-top:1px dashed ${muted};justify-content:space-between;align-items:center;">
           <div style="display:flex;flex-direction:column;">
             <div style="display:flex;font-family:'SpaceMono';font-size:12px;letter-spacing:3px;color:${muted};">XP EARNED</div>
-            <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:32px;color:${accent};">+${xpEarned}</div>
+            <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:30px;color:${accent};">+${xpEarned}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:center;">
             <div style="display:flex;font-family:'SpaceMono';font-size:12px;letter-spacing:3px;color:${muted};">TOTAL CHECK-INS</div>
-            <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:32px;color:${ink};">${totalCheckins}</div>
+            <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:30px;color:${ink};">${totalCheckins}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;">
             <div style="display:flex;font-family:'SpaceMono';font-size:12px;letter-spacing:3px;color:${muted};">CURRENT LEVEL</div>
-            <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:32px;color:${ink};">${afterLevel ?? "-"}</div>
+            <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:30px;color:${ink};">${afterLevel ?? "-"}</div>
           </div>
         </div>
 
