@@ -1,4 +1,4 @@
-const MIN_CHAR_DEFAULT = 3;
+const MIN_CHAR_DEFAULT = 4;
 
 // Discord 自訂表情符號：<:name:id> 或 <a:name:id>
 const DISCORD_CUSTOM_EMOJI_REGEX = /<a?:\w+:\d+>/g;

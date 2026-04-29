@@ -175,7 +175,7 @@
       "minXp": 15,
       "maxXp": 25,
       "cooldownSeconds": 30,
-      "minCharacters": 3,
+      "minCharacters": 4,
       "blacklistChannelIds": [],
       "whitelistChannelIds": []
     },
