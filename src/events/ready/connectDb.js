@@ -34,6 +34,9 @@ module.exports = async (client) => {
     // Role panels collection (遊戲身份組面板設定)
     const rolePanelsCollection = database.collection("RolePanels");
 
+    // Steam 特價推播去重
+    const steamDealsCollection = database.collection("SteamDealsPushed");
+
     client.database = database;
     client.collection = collection;
     client.gaslightCollection = gaslightCollection;
@@ -42,6 +45,7 @@ module.exports = async (client) => {
     client.channelActivityCollection = channelActivityCollection;
     client.votingProposalsCollection = votingProposalsCollection;
     client.rolePanelsCollection = rolePanelsCollection;
+    client.steamDealsCollection = steamDealsCollection;
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
 
     // 自動修補沒有 category / drawCount 的舊資料（idempotent，沒事就不動）

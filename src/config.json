@@ -63,6 +63,23 @@
 
   "roleMessageContent": "想要收到舒舒的開台通知！領取身份組吧！",
 
+  "steamDeals": {
+    "enabled": true,
+    "channelId": "",
+    "cronSchedule": "0 */2 * * *",
+    "timezone": "Asia/Taipei",
+    "fetchLimit": 30,
+    "steamRequestIntervalMs": 800,
+    "activeHours": {
+      "startHour": 9,
+      "endHour": 24
+    },
+    "filters": {
+      "alwaysPushIfLowest": true,
+      "skipIfNotInTw": true
+    }
+  },
+
   "commandEmojis": {
     "hiiiiii": "<:hiiiiii:1191449346777038858>"
   },
