@@ -23,7 +23,8 @@
   - [食物與飲料系統](#8-食物與飲料系統)
   - [加密貨幣 / 匯率 / 天氣](#9-加密貨幣--匯率--天氣)
   - [抽籤、統計與其他指令](#10-抽籤統計與其他指令)
-  - [Twitter / Threads 連結修正](#11-twitter--threads-連結修正)
+  - [等級系統與每日簽到](#11-等級系統與每日簽到)
+  - [Twitter / Threads 連結修正](#12-twitter--threads-連結修正)
 - [維運腳本](#維運腳本)
 - [外部 API](#外部-api)
 - [維護建議](#維護建議)
@@ -344,7 +345,96 @@ embed.js → 發送 Embed
 
 ---
 
-### 11. Twitter / Threads 連結修正
+### 11. 等級系統與每日簽到
+
+**目的**：以 XP / 等級 / 連勝 / 徽章 / 稱號的長線回饋強化社群黏著度，讓「每天回來看一眼」變成習慣。
+
+**XP 來源**：
+
+| 來源 | 規則 | 設定區塊 |
+| --- | --- | --- |
+| 訊息 | 每則 15–25 XP，30 秒冷卻、最少 4 字 | `levelSystem.message` |
+| 語音 | 每分鐘 10 XP，需頻道內 ≥ 2 人；自動忽略靜音 / 拒聽 / AFK | `levelSystem.voice` |
+| 簽到 | `/每日簽到`，基礎 100 XP + 連勝加成 | `levelSystem.daily` |
+| 反應 | 每被加 1 個反應 +2 XP，每人每日上限 50 XP | `levelSystem.reaction` |
+
+#### 每日簽到流程
+
+```
+使用者執行 /每日簽到
+   ↓ 檢查 dailyCheckinCollection 是否已有今天紀錄
+若昨天有簽 → streak +1
+若昨天沒簽但前天有，且持有保護卡 → 消耗 1 張保護卡，streak 不歸零
+其餘情況 → streak 歸零從 1 起算
+   ↓ 計算 XP：baseXp + min(streak, capDays) × bonusPerDay
+   ↓ 連勝倍率：≥7 天 ×1.5、≥30 天 ×2.0
+   ↓ 寫入 userLevelsCollection（streak、longestStreak、totalCheckins…）
+   ↓ 透過 grantXp 統一發 XP（會觸發升等公告與徽章解鎖）
+   ↓ 用 satori 產生 30 天月曆樣式的簽到卡並回覆
+```
+
+**重置時間**：以 `daily.resetTimezone`（預設 `Asia/Taipei`）的午夜為界，跨日才能再簽。
+
+#### 連勝保護卡 🛡️
+
+- 每連續簽到滿 `streakFreezeUnlockEvery`（預設 30）天 +1 張，庫存上限 `maxStreakFreezeStock`（預設 3）。
+- 漏簽 1 天會自動消耗 1 張、連勝不歸零；漏 2 天以上仍會歸零。
+- 用 `/連勝保護卡` 隨時查庫存與下一張的距離。
+
+#### 徽章與稱號
+
+- `src/features/leveling/badgeDefinitions.js` 定義了等級 / 連勝 / 訊息 / 語音 / 社交 / 特殊 6 大類徽章；連勝類包含 `streak_3 / 7 / 30 / 100`。
+- `grantXp` 每次發 XP 後呼叫 `badgeChecker` 重新評估，新解鎖的徽章會在升等公告與簽到回覆中標示。
+- `/稱號 設定` 可從已解鎖徽章中挑一個顯示在等級卡；`/稱號 清除` 還原為 tier 預設。
+
+#### Twitch 訂閱加成
+
+`levelSystem.twitchSubBonus` 讀取使用者當前的 Twitch Tier 身份組（在 `tiers[]` 對應 roleId），訊息 / 語音 / 簽到 XP 會套用對應倍率（預設 T1 ×1.5、T2 ×2.0、T3 ×3.0）。
+
+#### 指令
+
+| 指令 | 用途 |
+| --- | --- |
+| `/每日簽到` | 領今日 XP，產生簽到卡與月曆 |
+| `/連勝保護卡` | 查保護卡庫存、下次解鎖距離 |
+| `/等級卡 [用戶] [私密]` | 看自己或他人的等級卡（XP、進度條、稱號） |
+| `/等級排行榜` | 伺服器 Top 排行 |
+| `/徽章圖鑑` | 全徽章解鎖進度 |
+| `/稱號 設定 / 清除` | 切換等級卡稱號 |
+| `/等級卡主題` | 切換等級卡顏色主題 |
+| `/levelroles set / remove / list / apply` 🔒 | 管理員：設定等級對應身份組、批次同步 |
+
+#### MongoDB 資料結構
+
+```javascript
+// userLevelsCollection
+{
+  userId, guildId,
+  level, xp, totalXp,
+  totalMessages, totalVoiceMinutes, totalReactionsReceived,
+  streak, longestStreak, totalCheckins,
+  streakFreezes,                     // 保護卡庫存
+  lastDailyAt,                       // 最近簽到日期 (YYYY-MM-DD)
+  badges: [badgeId...],
+  title, cardTheme,
+  xpFromDaily, xpFromMessage, xpFromVoice, xpFromReaction,
+  createdAt, updatedAt
+}
+
+// dailyCheckinCollection（{userId, guildId, date} 唯一索引）
+{
+  userId, guildId, date,             // YYYY-MM-DD
+  streak, usedFreeze,
+  reward: { xp, bonus },
+  createdAt
+}
+```
+
+> 升等公告與卡片由 `events/ready/connectDb.js` 在連線時建立索引，並由 `features/leveling/levelUpAnnouncer.js` 推送到 `levelUpAnnouncement.channelId`。
+
+---
+
+### 12. Twitter / Threads 連結修正
 
 `events/messageCreate/threadsLinkHandler.js` 會自動偵測訊息中的 Twitter / Threads 連結，回覆可正確顯示嵌入內容的 fxtwitter / fixthreads 版本，方便手機瀏覽。
 
