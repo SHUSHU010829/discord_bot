@@ -1,31 +1,18 @@
 require("colors");
 const {
   SlashCommandBuilder,
+  AttachmentBuilder,
   ContainerBuilder,
   TextDisplayBuilder,
   SeparatorBuilder,
-  SeparatorSpacingSize,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
   MessageFlags,
 } = require("discord.js");
 
 const { getLevelProgress } = require("../../utils/levelMath");
 const { getTier } = require("../../utils/levelTier");
-
-const PROGRESS_BAR_LENGTH = 20;
-
-function renderProgressBar(progress) {
-  const filled = Math.round(progress * PROGRESS_BAR_LENGTH);
-  const empty = PROGRESS_BAR_LENGTH - filled;
-  return `\`${"█".repeat(filled)}${"░".repeat(empty)}\``;
-}
-
-function formatVoiceTime(minutes) {
-  if (!minutes || minutes <= 0) return "0 分";
-  if (minutes < 60) return `${minutes} 分`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m > 0 ? `${h} 小時 ${m} 分` : `${h} 小時`;
-}
+const generateProfileCard = require("../../utils/generateProfileCard");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -59,7 +46,7 @@ module.exports = {
 
       if (!doc) {
         return interaction.editReply(
-          `${target.username} 還沒有等級資料！多聊天才會開始累積喔 🌱`
+          `${target.username} 還沒有等級資料！多聊天/開語音才會開始累積喔 🌱`
         );
       }
 
@@ -71,63 +58,76 @@ module.exports = {
           guildId: interaction.guildId,
           totalXp: { $gt: doc.totalXp },
         })) + 1;
-
       const totalUsers = await client.userLevelsCollection.countDocuments({
         guildId: interaction.guildId,
       });
 
+      // 徽章定義（Phase 6 才會建表，這裡先用 doc.badges 字串作為備援，找不到 emoji 就掛 🏅）
+      let BADGES = [];
+      try {
+        BADGES =
+          require("../../features/leveling/badgeDefinitions").BADGES || [];
+      } catch (_e) {
+        BADGES = [];
+      }
+      const badgeDocs = (doc.badges || [])
+        .map((id) => {
+          const found = BADGES.find((b) => b.id === id);
+          if (found) return found;
+          return { id, name: id, emoji: "🏅" };
+        })
+        .slice(0, 5);
+
       const displayName = member?.displayName || target.username;
-      const titleLine = doc.title ? `${doc.title}` : `${tier.emoji} ${tier.label}`;
+      const titleLine = doc.title ? doc.title : `${tier.emoji} ${tier.label}`;
+
+      const buf = await generateProfileCard({
+        username: displayName,
+        avatarUrl: target.displayAvatarURL({ extension: "png", size: 256 }),
+        level: progress.level,
+        currentLevelXp: progress.currentLevelXp,
+        xpToNextLevel: progress.xpToNextLevel,
+        progress: progress.progress,
+        totalXp: doc.totalXp,
+        rank,
+        totalUsers,
+        tier,
+        title: titleLine,
+        streak: doc.streak || 0,
+        totalMessages: doc.totalMessages || 0,
+        totalVoiceMinutes: doc.totalVoiceMinutes || 0,
+        badges: badgeDocs,
+      });
+
+      const fileName = `profile-${target.id}.png`;
+      const attachment = new AttachmentBuilder(buf, { name: fileName });
 
       const accentInt = parseInt(tier.color.slice(1), 16);
-
       const container = new ContainerBuilder()
         .setAccentColor(accentInt)
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(
-            `## ${tier.emoji} ${displayName} 的等級卡\n-# ${titleLine}`
-          )
-        )
-        .addSeparatorComponents(
-          new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large)
-        )
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(
-            [
-              `**Lv.${progress.level}** ・ ${tier.emoji} ${tier.label}`,
-              `${renderProgressBar(progress.progress)} ${Math.floor(progress.progress * 100)}%`,
-              `\`${progress.currentLevelXp.toLocaleString()} / ${progress.xpToNextLevel.toLocaleString()}\` XP（離下一等）`,
-            ].join("\n")
+            `## ${tier.emoji} ${displayName} 的等級卡\n-# Lv.${progress.level} ・ ${tier.label} ・ #${rank} / ${totalUsers}`
           )
         )
         .addSeparatorComponents(new SeparatorBuilder())
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(
-            [
-              `🏆 **總 XP**：${doc.totalXp.toLocaleString()}`,
-              `📊 **排名**：#${rank} / ${totalUsers}`,
-              `💬 **訊息數**：${(doc.totalMessages || 0).toLocaleString()}`,
-              `🎤 **語音時長**：${formatVoiceTime(doc.totalVoiceMinutes || 0)}`,
-              `🔥 **連續簽到**：${doc.streak || 0} 天 ・ 歷史最長 ${doc.longestStreak || 0} 天`,
-              `🏅 **徽章數**：${(doc.badges || []).length}`,
-            ].join("\n")
-          )
-        )
-        .addSeparatorComponents(new SeparatorBuilder())
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(
-            `-# 訊息 ${(doc.xpFromMessage || 0).toLocaleString()} XP ・ 語音 ${(doc.xpFromVoice || 0).toLocaleString()} XP ・ 簽到 ${(doc.xpFromDaily || 0).toLocaleString()} XP`
+        .addMediaGalleryComponents(
+          new MediaGalleryBuilder().addItems(
+            new MediaGalleryItemBuilder()
+              .setURL(`attachment://${fileName}`)
+              .setDescription(`Lv.${progress.level} · ${tier.label}`)
           )
         );
 
       await interaction.editReply({
         components: [container],
+        files: [attachment],
         flags: MessageFlags.IsComponentsV2,
       });
     } catch (error) {
-      console.log(`[ERROR] /profile:\n${error}`.red);
+      console.log(`[ERROR] /等級卡:\n${error}\n${error.stack}`.red);
       await interaction
-        .editReply("🔧 等級卡載入失敗，請呼叫舒舒！")
+        .editReply("🔧 等級卡產生失敗，請呼叫舒舒！")
         .catch(() => {});
     }
   },
