@@ -117,7 +117,7 @@ function buildMarkup(data) {
 
   return `
     <div style="display:flex;width:1080px;height:900px;background:${card};padding:24px;box-sizing:border-box;font-family:'NotoSansTC';">
-      <div style="display:flex;flex-direction:column;width:100%;height:100%;background:${card};border:3px solid ${ink};padding:32px 40px;box-sizing:border-box;">
+      <div style="display:flex;flex-direction:column;width:100%;height:100%;background:${card};border:3px solid ${ink};padding:30px 56px;box-sizing:border-box;">
 
         <!-- Header -->
         <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
@@ -135,17 +135,17 @@ function buildMarkup(data) {
         </div>
 
         <!-- Streak block -->
-        <div style="display:flex;flex-direction:column;align-items:center;width:100%;margin-top:18px;padding:18px 0;background:${ink};color:${card};">
+        <div style="display:flex;flex-direction:column;align-items:center;width:100%;margin-top:14px;padding:12px 0 14px 0;background:${ink};color:${card};">
           <div style="display:flex;font-family:'SpaceMono';font-size:14px;letter-spacing:10px;color:${muted};">— STREAK —</div>
-          <div style="display:flex;align-items:baseline;margin-top:4px;">
-            <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:96px;color:${accent};line-height:1;">${streak}</div>
-            <div style="display:flex;margin-left:14px;font-family:'NotoSansTC';font-weight:500;font-size:30px;color:${card};">天</div>
+          <div style="display:flex;align-items:baseline;margin-top:2px;">
+            <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:88px;color:${accent};line-height:1;">${streak}</div>
+            <div style="display:flex;margin-left:14px;font-family:'NotoSansTC';font-weight:500;font-size:28px;color:${card};">天</div>
           </div>
           ${bonusHtml}
         </div>
 
         <!-- Calendar -->
-        <div style="display:flex;flex-direction:column;width:100%;margin-top:18px;align-items:center;">
+        <div style="display:flex;flex-direction:column;width:100%;margin-top:14px;align-items:center;">
           <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:6px;color:${muted};">— LAST 30 DAYS —</div>
           <div style="display:flex;flex-direction:column;margin-top:10px;gap:8px;">
             ${calendarHtml}

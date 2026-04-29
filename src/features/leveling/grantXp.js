@@ -4,6 +4,7 @@ const { getLevelProgress } = require("../../utils/levelMath");
 const { levelSystem } = require("../../config.json");
 const syncLevelRoles = require("./levelRoles");
 const announceLevelUp = require("./levelUpAnnouncer");
+const checkBadges = require("./badgeChecker");
 
 module.exports = async (client, opts) => {
   if (!client.userLevelsCollection) return null;
@@ -42,7 +43,8 @@ module.exports = async (client, opts) => {
   };
   if (opts.incrementMessages) inc.totalMessages = 1;
   if (opts.incrementVoiceMinutes) inc.totalVoiceMinutes = opts.incrementVoiceMinutes;
-  if (opts.source === "reaction") inc.totalReactionsReceived = opts.amount;
+  if (opts.incrementReactionsReceived)
+    inc.totalReactionsReceived = opts.incrementReactionsReceived;
 
   const setOnInsert = {
     userId: opts.userId,
@@ -104,6 +106,11 @@ module.exports = async (client, opts) => {
       after,
     }).catch((e) => console.log(`[ERROR] announceLevelUp: ${e}`.red));
   }
+
+  // 徽章檢查（不論升級與否；訊息累積、語音累積、簽到 streak 都可能觸發解鎖）
+  checkBadges(client, after, { channel: opts.channel }).catch((e) =>
+    console.log(`[ERROR] checkBadges: ${e}`.red)
+  );
 
   return { before: beforeLevel, after: afterLevel, doc: after };
 };
