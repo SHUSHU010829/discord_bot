@@ -148,7 +148,7 @@ function buildMarkup(data) {
           <div style="display:flex;flex-direction:column;margin-top:10px;gap:8px;">
             ${calendarHtml}
           </div>
-          <div style="display:flex;margin-top:10px;gap:18px;font-family:'SpaceMono';font-size:11px;letter-spacing:2px;color:${muted};">
+          <div style="display:flex;margin-top:14px;margin-bottom:14px;gap:18px;font-family:'SpaceMono';font-size:11px;letter-spacing:2px;color:${muted};">
             <div style="display:flex;align-items:center;"><div style="display:flex;width:14px;height:14px;background:${accent};margin-right:6px;"></div>TODAY</div>
             <div style="display:flex;align-items:center;"><div style="display:flex;width:14px;height:14px;background:${teal};margin-right:6px;"></div>CHECKED</div>
             <div style="display:flex;align-items:center;"><div style="display:flex;width:14px;height:14px;background:${subtle};border:1px solid ${muted};margin-right:6px;"></div>MISSED</div>
@@ -156,7 +156,7 @@ function buildMarkup(data) {
         </div>
 
         <!-- Footer summary -->
-        <div style="display:flex;width:100%;margin-top:auto;padding-top:14px;border-top:1px dashed ${muted};justify-content:space-between;align-items:center;">
+        <div style="display:flex;width:100%;margin-top:auto;padding-top:24px;border-top:1px dashed ${muted};justify-content:space-between;align-items:center;">
           <div style="display:flex;flex-direction:column;">
             <div style="display:flex;font-family:'SpaceMono';font-size:12px;letter-spacing:3px;color:${muted};">XP EARNED</div>
             <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:30px;color:${accent};">+${xpEarned}</div>
