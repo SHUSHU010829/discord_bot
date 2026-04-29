@@ -162,6 +162,48 @@
     }
   },
 
+  "levelSystem": {
+    "enabled": true,
+    "message": {
+      "minXp": 15,
+      "maxXp": 25,
+      "cooldownSeconds": 60,
+      "minCharacters": 3,
+      "blacklistChannelIds": [],
+      "whitelistChannelIds": []
+    },
+    "voice": {
+      "xpPerMinute": 10,
+      "minPeopleInChannel": 2,
+      "ignoreMutedDeafened": true,
+      "ignoreAfkChannel": true,
+      "afkChannelIds": [],
+      "blacklistChannelIds": []
+    },
+    "daily": {
+      "baseXp": 100,
+      "streakBonusPerDay": 10,
+      "streakBonusCapDays": 30,
+      "streak7Multiplier": 1.5,
+      "streak30Multiplier": 2.0,
+      "resetTimezone": "Asia/Taipei"
+    },
+    "reaction": {
+      "xpPerReactionReceived": 2,
+      "dailyCapPerUser": 50
+    },
+    "levelUpAnnouncement": {
+      "enabled": true,
+      "channelId": "",
+      "milestones": [5, 10, 20, 30, 50, 75, 100],
+      "useCard": true
+    },
+    "levelRoles": [],
+    "card": {
+      "defaultAccent": "default"
+    }
+  },
+
   "commandEmojis": {
     "hiiiiii": "<:hiiiiii:1191449346777038858>"
   },

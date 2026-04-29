@@ -40,6 +40,11 @@ module.exports = async (client) => {
     // 喜加一 (限免) 推播去重
     const freeGamesCollection = database.collection("FreeGamesPushed");
 
+    // 等級系統 collections
+    const userLevelsCollection = database.collection("UserLevels");
+    const levelTransactionsCollection = database.collection("LevelTransactions");
+    const dailyCheckinCollection = database.collection("DailyCheckin");
+
     client.database = database;
     client.collection = collection;
     client.gaslightCollection = gaslightCollection;
@@ -50,6 +55,9 @@ module.exports = async (client) => {
     client.rolePanelsCollection = rolePanelsCollection;
     client.steamDealsCollection = steamDealsCollection;
     client.freeGamesCollection = freeGamesCollection;
+    client.userLevelsCollection = userLevelsCollection;
+    client.levelTransactionsCollection = levelTransactionsCollection;
+    client.dailyCheckinCollection = dailyCheckinCollection;
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
 
     // 自動修補沒有 category / drawCount 的舊資料（idempotent，沒事就不動）
@@ -86,6 +94,48 @@ module.exports = async (client) => {
     } catch (indexError) {
       console.log(
         `[WARNING] Failed to create FoodList index (可能有重複資料需要先清理):\n${indexError.message}`.yellow
+      );
+    }
+
+    // 等級系統索引
+    try {
+      await userLevelsCollection.createIndex(
+        { userId: 1, guildId: 1 },
+        { unique: true, name: "uniq_user_guild" }
+      );
+      await userLevelsCollection.createIndex(
+        { guildId: 1, totalXp: -1 },
+        { name: "guild_xp_desc" }
+      );
+      await userLevelsCollection.createIndex(
+        { guildId: 1, level: -1, totalXp: -1 },
+        { name: "guild_level_desc" }
+      );
+
+      await levelTransactionsCollection.createIndex(
+        { userId: 1, guildId: 1, createdAt: -1 },
+        { name: "user_guild_time" }
+      );
+      await levelTransactionsCollection.createIndex(
+        { guildId: 1, date: 1 },
+        { name: "guild_date" }
+      );
+      await levelTransactionsCollection.createIndex(
+        { createdAt: 1 },
+        { expireAfterSeconds: 90 * 24 * 60 * 60, name: "ttl_90d" }
+      );
+
+      await dailyCheckinCollection.createIndex(
+        { userId: 1, guildId: 1, date: 1 },
+        { unique: true, name: "uniq_user_guild_date" }
+      );
+      await dailyCheckinCollection.createIndex(
+        { createdAt: 1 },
+        { expireAfterSeconds: 90 * 24 * 60 * 60, name: "ttl_90d" }
+      );
+    } catch (indexError) {
+      console.log(
+        `[WARNING] Failed to create LevelSystem indexes:\n${indexError.message}`.yellow
       );
     }
 
