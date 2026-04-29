@@ -1,6 +1,19 @@
+const fs = require("fs");
 const { DateTime } = require("luxon");
+const { getDataFile } = require("./dataPaths");
 
-const calenderData = require("../data/calender.json");
+const CALENDAR_FILE = getDataFile("calender.json");
+
+function loadCalenderData() {
+  try {
+    if (fs.existsSync(CALENDAR_FILE)) {
+      return JSON.parse(fs.readFileSync(CALENDAR_FILE, "utf8"));
+    }
+  } catch (error) {
+    console.log(`[ERROR] 讀取 calender.json 時出錯：${error}`);
+  }
+  return null;
+}
 
 /**
  * 找出當日之後第一個帶有 description 的日子，以及還有幾天。
@@ -12,6 +25,7 @@ const calenderData = require("../data/calender.json");
 function findNextSpecialDay(now, timezone) {
   const searchDate = now.toFormat("yyyyMMdd");
 
+  const calenderData = loadCalenderData();
   if (!calenderData) {
     return { nextSpecialDay: null, daysUntilSpecialDay: null };
   }

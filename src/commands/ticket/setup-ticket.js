@@ -8,17 +8,13 @@ const {
 } = require("discord.js");
 const config = require("../../config.json");
 const fs = require("fs");
-const path = require("path");
+const { getDataFile } = require("../../utils/dataPaths");
 
 // 票務面板數據文件路徑
-const PANELS_FILE = path.join(__dirname, "../../data/ticket-panels.json");
+const PANELS_FILE = getDataFile("ticket-panels.json");
 
-// 確保數據目錄和文件存在
+// 確保數據文件存在（目錄已由 dataPaths 確保）
 function ensureDataFile() {
-  const dataDir = path.dirname(PANELS_FILE);
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
   if (!fs.existsSync(PANELS_FILE)) {
     fs.writeFileSync(PANELS_FILE, JSON.stringify({ panels: {} }, null, 2));
   }

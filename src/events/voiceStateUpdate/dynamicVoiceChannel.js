@@ -2,9 +2,7 @@ require("colors");
 
 const { ChannelType, PermissionFlagsBits } = require("discord.js");
 const { createVoiceChannelId, voiceChannel } = require("../../config.json");
-
-// 存儲動態創建的頻道 ID 和創建者 ID
-const dynamicChannels = new Map();
+const dynamicChannels = require("../../utils/dynamicChannelStore");
 
 module.exports = async (client, oldState, newState) => {
   try {
@@ -58,6 +56,8 @@ module.exports = async (client, oldState, newState) => {
       // 記錄創建者
       dynamicChannels.set(newChannel.id, {
         ownerId: member.id,
+        guildId: guild.id,
+        parentId: parentId || null,
         createdAt: Date.now(),
       });
 
@@ -98,30 +98,36 @@ module.exports = async (client, oldState, newState) => {
       dynamicChannels.has(oldState.channelId) &&
       oldState.channelId !== newState.channelId
     ) {
-      const oldChannel = guild.channels.cache.get(oldState.channelId);
-      if (oldChannel) {
-        // 使用 setTimeout 來確保 Discord 緩存已更新
-        setTimeout(async () => {
-          try {
-            // 重新獲取頻道以確保成員列表是最新的
-            const channel = guild.channels.cache.get(oldState.channelId);
-            if (channel && channel.members.size === 0) {
-              const channelName = channel.name;
-              await channel.delete(voiceChannel.deleteReason);
-              dynamicChannels.delete(oldState.channelId);
+      // 使用 setTimeout 來確保 Discord 緩存已更新
+      setTimeout(async () => {
+        try {
+          // 重新 fetch 頻道以確保成員列表最新（cache 偶爾不準）
+          const channel = await guild.channels
+            .fetch(oldState.channelId)
+            .catch(() => null);
 
-              console.log(
-                `[VOICE] Deleted empty dynamic voice channel: ${channelName}`
-                  .yellow
-              );
-            }
-          } catch (error) {
-            console.error(
-              `[ERROR] Failed to delete dynamic voice channel: ${error}`.red
+          if (!channel) {
+            // 已被別人或 Discord 刪掉，清掉紀錄即可
+            dynamicChannels.remove(oldState.channelId);
+            return;
+          }
+
+          if (channel.members.size === 0) {
+            const channelName = channel.name;
+            await channel.delete(voiceChannel.deleteReason);
+            dynamicChannels.remove(oldState.channelId);
+
+            console.log(
+              `[VOICE] Deleted empty dynamic voice channel: ${channelName}`
+                .yellow
             );
           }
-        }, 1000); // 延遲 1 秒以確保緩存更新
-      }
+        } catch (error) {
+          console.error(
+            `[ERROR] Failed to delete dynamic voice channel: ${error}`.red
+          );
+        }
+      }, 1000); // 延遲 1 秒以確保緩存更新
     }
   } catch (error) {
     console.error(

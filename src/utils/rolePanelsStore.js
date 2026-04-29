@@ -3,9 +3,10 @@
 // 部署的種子；在 Zeabur 上對檔案的寫入不會在重啟後保留）。
 const fs = require("fs");
 const path = require("path");
+const { getDataFile } = require("./dataPaths");
 require("colors");
 
-const PANELS_FILE = path.join(__dirname, "../data/role-panels.json");
+const PANELS_FILE = getDataFile("role-panels.json");
 const DOC_ID = "rolePanels";
 
 function loadFromFile() {
