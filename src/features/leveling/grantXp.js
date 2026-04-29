@@ -3,6 +3,7 @@ const { DateTime } = require("luxon");
 const { getLevelProgress } = require("../../utils/levelMath");
 const { levelSystem } = require("../../config.json");
 const { getCurrentMultiplier } = require("../../utils/xpMultiplier");
+const { getTwitchSubBonus } = require("../../utils/twitchSubBonus");
 const syncLevelRoles = require("./levelRoles");
 const announceLevelUp = require("./levelUpAnnouncer");
 const checkBadges = require("./badgeChecker");
@@ -15,12 +16,17 @@ module.exports = async (client, opts) => {
   const today = DateTime.now().setZone(tz).toISODate();
 
   // XP 倍率事件（admin/手動 grant 不套用）
-  const eventInfo = ["admin"].includes(opts.source)
+  const isAdminSource = ["admin"].includes(opts.source);
+  const eventInfo = isAdminSource
     ? { multiplier: 1, names: [] }
     : getCurrentMultiplier(opts.source, DateTime.now().setZone(tz));
+  const twitchInfo = isAdminSource
+    ? { multiplier: 1, name: null }
+    : getTwitchSubBonus(opts.member, opts.source);
   const baseAmount = opts.amount;
-  if (eventInfo.multiplier > 1) {
-    opts.amount = Math.floor(opts.amount * eventInfo.multiplier);
+  const totalMultiplier = eventInfo.multiplier * twitchInfo.multiplier;
+  if (totalMultiplier > 1) {
+    opts.amount = Math.floor(opts.amount * totalMultiplier);
   }
 
   if (client.levelTransactionsCollection) {
@@ -137,6 +143,9 @@ module.exports = async (client, opts) => {
     baseAmount,
     grantedAmount: opts.amount,
     eventNames: eventInfo.names,
-    multiplier: eventInfo.multiplier,
+    multiplier: totalMultiplier,
+    eventMultiplier: eventInfo.multiplier,
+    twitchSubName: twitchInfo.name,
+    twitchSubMultiplier: twitchInfo.multiplier,
   };
 };

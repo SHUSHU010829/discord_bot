@@ -15,6 +15,7 @@ const { getTier } = require("../../utils/levelTier");
 const generateProfileCard = require("../../utils/generateProfileCard");
 const { BADGES } = require("../../features/leveling/badgeDefinitions");
 const { resolveAccent } = require("../../utils/cardThemes");
+const { getTwitchSubBonus } = require("../../utils/twitchSubBonus");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -109,12 +110,18 @@ module.exports = {
       const fileName = `profile-${target.id}.png`;
       const attachment = new AttachmentBuilder(buf, { name: fileName });
 
+      const twitchSub = getTwitchSubBonus(member);
+      const subLine =
+        twitchSub.multiplier > 1
+          ? ` ・ 💜 ${twitchSub.name}（XP x${twitchSub.multiplier}）`
+          : "";
+
       const accentInt = parseInt(cardAccent.slice(1), 16);
       const container = new ContainerBuilder()
         .setAccentColor(accentInt)
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(
-            `## ${tier.emoji} ${displayName} 的等級卡\n-# Lv.${progress.level} ・ ${tier.label} ・ #${rank} / ${totalUsers}`
+            `## ${tier.emoji} ${displayName} 的等級卡\n-# Lv.${progress.level} ・ ${tier.label} ・ #${rank} / ${totalUsers}${subLine}`
           )
         )
         .addSeparatorComponents(new SeparatorBuilder())

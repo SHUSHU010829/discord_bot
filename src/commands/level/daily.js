@@ -237,12 +237,16 @@ module.exports = {
       const eventNames = grantResult?.eventNames || [];
       const eventLine =
         eventNames.length > 0
-          ? `\n-# ⚡ XP 倍率事件：${eventNames.join("、")}（x${grantResult.multiplier}）`
+          ? `\n-# ⚡ XP 倍率事件：${eventNames.join("、")}（x${grantResult.eventMultiplier}）`
+          : "";
+      const twitchLine =
+        grantResult?.twitchSubMultiplier > 1
+          ? `\n-# 💜 ${grantResult.twitchSubName} 加成：x${grantResult.twitchSubMultiplier}`
           : "";
 
       container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          `-# 連續 7 天 +50% ・ 連續 30 天 x2 ・ 🛡️ 庫存 ${freezesAfter}/${maxStock}${eventLine}`
+          `-# 連續 7 天 +50% ・ 連續 30 天 x2 ・ 🛡️ 庫存 ${freezesAfter}/${maxStock}${eventLine}${twitchLine}`
         )
       );
 

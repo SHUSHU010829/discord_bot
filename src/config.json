@@ -211,6 +211,15 @@
     "levelRoles": [],
     "card": {
       "defaultAccent": "default"
+    },
+    "twitchSubBonus": {
+      "enabled": true,
+      "appliesTo": ["message", "voice", "daily"],
+      "tiers": [
+        { "roleId": "1181162291568332891", "name": "Twitch Tier 1", "multiplier": 1.5 },
+        { "roleId": "1181162291568332892", "name": "Twitch Tier 2", "multiplier": 2.0 },
+        { "roleId": "1181162291568332893", "name": "Twitch Tier 3", "multiplier": 3.0 }
+      ]
     }
   },
 
