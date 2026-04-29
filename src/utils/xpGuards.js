@@ -1,5 +1,8 @@
 const MIN_CHAR_DEFAULT = 3;
 
+// Discord 自訂表情符號：<:name:id> 或 <a:name:id>
+const DISCORD_CUSTOM_EMOJI_REGEX = /<a?:\w+:\d+>/g;
+
 const isMessageXpEligible = (message, config) => {
   if (message.author.bot) return false;
   if (!message.guild) return false;
@@ -9,7 +12,9 @@ const isMessageXpEligible = (message, config) => {
   const minChars = config.minCharacters ?? MIN_CHAR_DEFAULT;
   if (content.length < minChars) return false;
 
-  const stripped = content.replace(/[\p{Emoji}\s\p{P}]/gu, "");
+  const stripped = content
+    .replace(DISCORD_CUSTOM_EMOJI_REGEX, "")
+    .replace(/[\p{Emoji}\s\p{P}]/gu, "");
   if (stripped.length < minChars) return false;
 
   if (/^[!?/.][\w]*$/.test(content) && content.length < 6) return false;
