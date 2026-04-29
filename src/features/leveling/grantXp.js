@@ -2,6 +2,7 @@ require("colors");
 const { DateTime } = require("luxon");
 const { getLevelProgress } = require("../../utils/levelMath");
 const { levelSystem } = require("../../config.json");
+const { getCurrentMultiplier } = require("../../utils/xpMultiplier");
 const syncLevelRoles = require("./levelRoles");
 const announceLevelUp = require("./levelUpAnnouncer");
 const checkBadges = require("./badgeChecker");
@@ -12,6 +13,15 @@ module.exports = async (client, opts) => {
 
   const tz = levelSystem?.daily?.resetTimezone || "Asia/Taipei";
   const today = DateTime.now().setZone(tz).toISODate();
+
+  // XP 倍率事件（admin/手動 grant 不套用）
+  const eventInfo = ["admin"].includes(opts.source)
+    ? { multiplier: 1, names: [] }
+    : getCurrentMultiplier(opts.source, DateTime.now().setZone(tz));
+  const baseAmount = opts.amount;
+  if (eventInfo.multiplier > 1) {
+    opts.amount = Math.floor(opts.amount * eventInfo.multiplier);
+  }
 
   if (client.levelTransactionsCollection) {
     client.levelTransactionsCollection
@@ -28,13 +38,6 @@ module.exports = async (client, opts) => {
         console.log(`[ERROR] insert level transaction: ${e}`.red)
       );
   }
-
-  const before = await client.userLevelsCollection.findOne({
-    userId: opts.userId,
-    guildId: opts.guildId,
-  });
-
-  const beforeLevel = before ? getLevelProgress(before.totalXp).level : 0;
 
   const counterField = opts.counterField || `xpFrom_${opts.source}`;
   const inc = {
@@ -73,6 +76,10 @@ module.exports = async (client, opts) => {
   const after = result.value || result;
   if (!after) return null;
 
+  // 用 findOneAndUpdate 之後反推 beforeXp，避免 findOne→update 之間的 race
+  const beforeXp = Math.max(0, (after.totalXp || 0) - opts.amount);
+  const beforeLevel = getLevelProgress(beforeXp).level;
+
   const afterProgress = getLevelProgress(after.totalXp);
   const afterLevel = afterProgress.level;
 
@@ -82,6 +89,20 @@ module.exports = async (client, opts) => {
       { $set: { level: afterLevel } }
     );
     after.level = afterLevel;
+  }
+
+  // 徽章檢查（先寫 DB，拿到本次新解鎖的徽章，由呼叫端決定要不要顯示）
+  let newlyUnlocked = [];
+  try {
+    newlyUnlocked = await checkBadges(client, after);
+    if (newlyUnlocked.length > 0) {
+      after.badges = [
+        ...(after.badges || []),
+        ...newlyUnlocked.map((b) => b.id),
+      ];
+    }
+  } catch (e) {
+    console.log(`[ERROR] checkBadges: ${e}`.red);
   }
 
   if (afterLevel > beforeLevel) {
@@ -96,7 +117,7 @@ module.exports = async (client, opts) => {
       );
     }
 
-    // 升級公告（內部會判斷是否 milestone）
+    // 升級公告（內部會判斷是否 milestone），同時把當下解鎖的徽章帶下去
     announceLevelUp(client, {
       member: opts.member,
       guildId: opts.guildId,
@@ -104,13 +125,18 @@ module.exports = async (client, opts) => {
       beforeLevel,
       afterLevel,
       after,
+      newBadges: newlyUnlocked,
     }).catch((e) => console.log(`[ERROR] announceLevelUp: ${e}`.red));
   }
 
-  // 徽章檢查（不論升級與否；訊息累積、語音累積、簽到 streak 都可能觸發解鎖）
-  checkBadges(client, after, { channel: opts.channel }).catch((e) =>
-    console.log(`[ERROR] checkBadges: ${e}`.red)
-  );
-
-  return { before: beforeLevel, after: afterLevel, doc: after };
+  return {
+    before: beforeLevel,
+    after: afterLevel,
+    doc: after,
+    newBadges: newlyUnlocked,
+    baseAmount,
+    grantedAmount: opts.amount,
+    eventNames: eventInfo.names,
+    multiplier: eventInfo.multiplier,
+  };
 };

@@ -3,30 +3,66 @@ const cron = require("node-cron");
 const { levelSystem } = require("../../config.json");
 const { isVoiceXpEligible } = require("../../utils/xpGuards");
 const grantXp = require("../../features/leveling/grantXp");
+const voiceSessionStore = require("../../utils/voiceSessionStore");
 
-module.exports = (client) => {
+module.exports = async (client) => {
   if (!levelSystem?.enabled) return;
   if (!client.voiceXpSessions) client.voiceXpSessions = new Map();
 
   const cfg = levelSystem.voice;
 
-  // 啟動時把目前已經在語音中的人補上 session（重啟後不會誤跳但 session 一開始是空的）
+  // 1) 把 DB 裡已存在的 session 載回 in-memory cache（重啟前的紀錄）
   try {
+    const dbSessions = await voiceSessionStore.findAll(client);
+    for (const s of dbSessions) {
+      const key = voiceSessionStore.key(s.userId, s.guildId);
+      client.voiceXpSessions.set(key, {
+        userId: s.userId,
+        guildId: s.guildId,
+        channelId: s.channelId,
+        joinedAt: s.joinedAt || Date.now(),
+        username: s.username,
+      });
+    }
+    if (dbSessions.length > 0) {
+      console.log(`[SYSTEM] voiceXpTicker 從 DB 還原 ${dbSessions.length} 筆 session`.gray);
+    }
+  } catch (e) {
+    console.log(`[WARNING] voiceXpTicker 從 DB 還原失敗: ${e}`.yellow);
+  }
+
+  // 2) sweep 目前語音中的人（保留已有 session 的 joinedAt，新進來的才寫 now）
+  try {
+    const seen = new Set();
     for (const [, guild] of client.guilds.cache) {
       for (const [, channel] of guild.channels.cache) {
         if (!channel.isVoiceBased?.()) continue;
         for (const [, member] of channel.members) {
           if (member.user.bot) continue;
-          const key = `${member.id}-${guild.id}`;
-          if (!client.voiceXpSessions.has(key)) {
-            client.voiceXpSessions.set(key, {
-              userId: member.id,
-              guildId: guild.id,
-              channelId: channel.id,
-              joinedAt: Date.now(),
-              username: member.user.username,
-            });
-          }
+          const key = voiceSessionStore.key(member.id, guild.id);
+          seen.add(key);
+          const existing = client.voiceXpSessions.get(key);
+          const joinedAt = existing?.joinedAt || Date.now();
+          const session = {
+            userId: member.id,
+            guildId: guild.id,
+            channelId: channel.id,
+            joinedAt,
+            username: member.user.username,
+          };
+          client.voiceXpSessions.set(key, session);
+          voiceSessionStore.upsert(client, session).catch(() => {});
+        }
+      }
+    }
+
+    // 不在線上但 DB / cache 還有紀錄的人 → 已離開但 voiceStateUpdate 沒抓到，清掉
+    for (const key of [...client.voiceXpSessions.keys()]) {
+      if (!seen.has(key)) {
+        const s = client.voiceXpSessions.get(key);
+        client.voiceXpSessions.delete(key);
+        if (s) {
+          voiceSessionStore.remove(client, s.userId, s.guildId).catch(() => {});
         }
       }
     }
@@ -40,8 +76,16 @@ module.exports = (client) => {
       if (!client.userLevelsCollection) return;
       if (client.voiceXpSessions.size === 0) return;
 
-      for (const [key, session] of client.voiceXpSessions) {
+      for (const [key, sessionCached] of client.voiceXpSessions) {
         try {
+          // cache miss 時 fallback DB
+          let session = sessionCached;
+          if (!session) {
+            const [userId, guildId] = key.split("-");
+            session = await voiceSessionStore.get(client, userId, guildId);
+            if (!session) continue;
+          }
+
           const guild = client.guilds.cache.get(session.guildId);
           if (!guild) continue;
           const member =
@@ -49,7 +93,6 @@ module.exports = (client) => {
             (await guild.members.fetch(session.userId).catch(() => null));
           if (!member) continue;
 
-          // 用最新狀態的頻道而不是 session 紀錄的（萬一切換頻道 voiceXp.js 已經更新）
           const currentChannelId =
             member.voice.channelId || session.channelId;
           const channel = guild.channels.cache.get(currentChannelId);
@@ -82,4 +125,12 @@ module.exports = (client) => {
   );
 
   console.log(`[SYSTEM] 語音 XP ticker 啟動`.green);
+
+  // 提醒：levelSystem.enabled 為 true 但沒設任何升級公告 channel 時 warn 一次
+  const ann = levelSystem.levelUpAnnouncement;
+  if (ann?.enabled && !ann.channelId && !ann.fallbackChannelId) {
+    console.log(
+      `[WARNING] levelUpAnnouncement 沒有設 channelId / fallbackChannelId，語音/反應升級時會找不到公告頻道`.yellow
+    );
+  }
 };

@@ -20,7 +20,7 @@ module.exports = {
 
   data: new SlashCommandBuilder()
     .setName("dailytest")
-    .setDescription("[DEV] 簽到卡預覽 / 重置今日紀錄")
+    .setDescription("[DEV ONLY] 簽到卡預覽 / 重置今日紀錄")
     .setDMPermission(false)
     .addSubcommand((sub) =>
       sub
@@ -197,7 +197,8 @@ async function runReset(client, interaction) {
         `streak ${userDoc?.streak ?? 0} → ${newStreak}\n` +
         `totalCheckins ${userDoc?.totalCheckins ?? 0} → ${newTotalCheckins}\n` +
         `XP **不會**退還（${todayDoc.reward?.xp ?? 0} XP 仍記在帳上）。\n` +
-        `現在可以重跑 \`/每日簽到\`。`
+        `現在可以重跑 \`/每日簽到\`。\n\n` +
+        `⚠️ 注意：這只是 dev 工具，streak 邏輯經過此操作後不再 100% 準確（例如重簽會用「假昨天」累計）。請勿在正式環境用這個補簽。`
     );
   } catch (error) {
     console.log(`[ERROR] /dailytest reset:\n${error}\n${error.stack}`.red);

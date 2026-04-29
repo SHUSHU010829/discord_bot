@@ -3,11 +3,14 @@ const { BADGES } = require("./badgeDefinitions");
 
 /**
  * 檢查 user doc 是否符合某些徽章解鎖條件，atomic 加入 doc.badges。
- * 解鎖時若 opts.channel 存在會公告（不存在則靜默累積，下次 /徽章圖鑑 會看到）。
+ * 回傳 newlyUnlocked 陣列（badge 物件），由呼叫端決定是否要公告。
+ *
+ * opts.announce  — 若為 true 且 opts.channel 存在，會直接送公告（向後相容）
+ * opts.channel   — 公告目標頻道（僅 announce=true 時使用）
  */
 module.exports = async (client, userDoc, opts = {}) => {
-  if (!userDoc) return;
-  if (!client.userLevelsCollection) return;
+  if (!userDoc) return [];
+  if (!client.userLevelsCollection) return [];
 
   const owned = new Set(userDoc.badges || []);
   const newlyUnlocked = [];
@@ -23,7 +26,7 @@ module.exports = async (client, userDoc, opts = {}) => {
     }
   }
 
-  if (newlyUnlocked.length === 0) return;
+  if (newlyUnlocked.length === 0) return [];
 
   await client.userLevelsCollection.updateOne(
     { _id: userDoc._id },
@@ -34,7 +37,7 @@ module.exports = async (client, userDoc, opts = {}) => {
     `[BADGE] ${userDoc.username} 解鎖 ${newlyUnlocked.length} 個徽章: ${newlyUnlocked.map((b) => b.id).join(", ")}`.cyan
   );
 
-  if (opts.channel) {
+  if (opts.announce && opts.channel) {
     const lines = newlyUnlocked
       .map((b) => `${b.emoji} **${b.name}** — ${b.description}`)
       .join("\n");
@@ -44,4 +47,6 @@ module.exports = async (client, userDoc, opts = {}) => {
       })
       .catch(() => {});
   }
+
+  return newlyUnlocked;
 };

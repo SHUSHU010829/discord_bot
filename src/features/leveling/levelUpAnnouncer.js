@@ -3,6 +3,15 @@ const { AttachmentBuilder } = require("discord.js");
 const { levelSystem } = require("../../config.json");
 const generateLevelUpCard = require("../../utils/generateLevelUpCard");
 
+let cardErrorCount = 0;
+
+function classifyCardError(err) {
+  const msg = err?.message || String(err);
+  if (/font|woff|ENOENT.*\.woff/i.test(msg)) return "font";
+  if (/satori|resvg|render|svg/i.test(msg)) return "render";
+  return "other";
+}
+
 /**
  * 升級公告策略：
  *   1. 不是 milestone（5/10/20...）→ 完全不公告，避免洗版
@@ -14,7 +23,7 @@ module.exports = async (client, opts) => {
   const cfg = levelSystem?.levelUpAnnouncement;
   if (!cfg?.enabled) return;
 
-  const { afterLevel, beforeLevel, member, after, channel } = opts;
+  const { afterLevel, beforeLevel, member, after, channel, newBadges } = opts;
   const milestones = cfg.milestones || [];
   const isMilestone = milestones.includes(afterLevel);
   if (!isMilestone) return;
@@ -26,7 +35,15 @@ module.exports = async (client, opts) => {
   if (!targetChannel && channel) {
     targetChannel = channel;
   }
+  if (!targetChannel && cfg.fallbackChannelId) {
+    targetChannel = client.channels.cache.get(cfg.fallbackChannelId);
+  }
   if (!targetChannel) return;
+
+  const badgeSuffix =
+    Array.isArray(newBadges) && newBadges.length > 0
+      ? `\n🎉 解鎖新徽章：${newBadges.map((b) => `${b.emoji} **${b.name}**`).join("、")}`
+      : "";
 
   try {
     const username = member?.displayName || after.username || "Someone";
@@ -48,19 +65,31 @@ module.exports = async (client, opts) => {
           name: `levelup-${afterLevel}.png`,
         });
         await targetChannel.send({
-          content: `🎉 ${mention} 升到 **Lv.${afterLevel}** 啦！`,
+          content: `🎉 ${mention} 升到 **Lv.${afterLevel}** 啦！${badgeSuffix}`,
           files: [attachment],
         });
         return;
       } catch (cardError) {
-        console.log(
-          `[WARNING] level up card render failed, fallback to text: ${cardError.message}`.yellow
-        );
+        cardErrorCount += 1;
+        const kind = classifyCardError(cardError);
+        if (kind === "font") {
+          console.error(
+            `[ERROR] level up card font load failed (count=${cardErrorCount}): ${cardError.message}`.red
+          );
+        } else if (kind === "render") {
+          console.error(
+            `[ERROR] level up card satori/resvg render failed (count=${cardErrorCount}): ${cardError.message}\n${cardError.stack || ""}`.red
+          );
+        } else {
+          console.log(
+            `[WARNING] level up card render failed, fallback to text: ${cardError.message}`.yellow
+          );
+        }
       }
     }
 
     await targetChannel.send(
-      `🎉 ${mention} 從 Lv.${beforeLevel} 升到 **Lv.${afterLevel}** 啦！`
+      `🎉 ${mention} 從 Lv.${beforeLevel} 升到 **Lv.${afterLevel}** 啦！${badgeSuffix}`
     );
   } catch (e) {
     console.log(`[ERROR] levelUpAnnouncer send: ${e}`.red);

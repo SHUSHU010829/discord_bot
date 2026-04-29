@@ -71,6 +71,7 @@ function loadCommandIndex() {
         const mod = require(path.join(dirPath, file));
         if (!mod || !mod.data || !mod.data.name) continue;
         if (mod.deleted) continue;
+        if (mod.devOnly) continue;
         if (mod.data.name === "help") continue;
 
         commands.push({

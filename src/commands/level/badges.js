@@ -43,9 +43,28 @@ module.exports = {
 
         const lines = catBadges.map((b) => {
           const has = owned.has(b.id);
-          const icon = has ? b.emoji : "🔒";
-          const name = has ? `**${b.name}**` : b.name;
-          return `${icon} ${name} — ${b.description}`;
+          if (has) {
+            return `${b.emoji} **${b.name}** — ${b.description}`;
+          }
+          let progressStr = "";
+          let nameDecoration = b.name;
+          if (typeof b.progress === "function") {
+            try {
+              const { current, target } = b.progress(doc || {}) || {};
+              if (typeof current === "number" && typeof target === "number" && target > 0) {
+                const pct = Math.min(100, Math.floor((current / target) * 100));
+                const close = pct >= 80;
+                progressStr = `  (${current.toLocaleString()}/${target.toLocaleString()} · ${pct}%)`;
+                if (close) {
+                  progressStr = ` ⚡${progressStr}`;
+                  nameDecoration = `**${b.name}**`;
+                }
+              }
+            } catch {
+              /* ignore */
+            }
+          }
+          return `🔒 ${nameDecoration} — ${b.description}${progressStr}`;
         });
 
         container

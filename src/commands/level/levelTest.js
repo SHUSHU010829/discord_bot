@@ -19,7 +19,7 @@ module.exports = {
 
   data: new SlashCommandBuilder()
     .setName("leveltest")
-    .setDescription("[DEV] 等級系統測試工具")
+    .setDescription("[DEV ONLY] 等級系統測試工具")
     .setDMPermission(false)
     .addSubcommand((sub) =>
       sub
