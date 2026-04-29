@@ -17,7 +17,7 @@ module.exports = {
     .setDMPermission(false),
 
   run: async (client, interaction) => {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       const doc = await client.userLevelsCollection?.findOne({

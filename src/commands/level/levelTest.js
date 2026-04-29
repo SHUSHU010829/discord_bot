@@ -18,16 +18,16 @@ module.exports = {
   devOnly: true,
 
   data: new SlashCommandBuilder()
-    .setName("等級測試")
+    .setName("leveltest")
     .setDescription("[DEV] 等級系統測試工具")
     .setDMPermission(false)
     .addSubcommand((sub) =>
       sub
-        .setName("給xp")
+        .setName("givexp")
         .setDescription("給自己或他人加 XP（會觸發升級流程）")
         .addIntegerOption((opt) =>
           opt
-            .setName("數量")
+            .setName("amount")
             .setDescription("要加的 XP")
             .setMinValue(1)
             .setMaxValue(100000)
@@ -35,18 +35,18 @@ module.exports = {
         )
         .addUserOption((opt) =>
           opt
-            .setName("用戶")
+            .setName("user")
             .setDescription("不填預設給自己")
             .setRequired(false)
         )
     )
     .addSubcommand((sub) =>
       sub
-        .setName("升級卡")
+        .setName("levelupcard")
         .setDescription("純預覽升級卡（不寫 DB、不公告）")
         .addIntegerOption((opt) =>
           opt
-            .setName("升級前")
+            .setName("from")
             .setDescription("升級前等級")
             .setMinValue(0)
             .setMaxValue(998)
@@ -54,7 +54,7 @@ module.exports = {
         )
         .addIntegerOption((opt) =>
           opt
-            .setName("升級後")
+            .setName("to")
             .setDescription("升級後等級")
             .setMinValue(1)
             .setMaxValue(999)
@@ -63,11 +63,11 @@ module.exports = {
     )
     .addSubcommand((sub) =>
       sub
-        .setName("重置等級")
+        .setName("reset")
         .setDescription("把自己或他人的 XP / 等級歸零（保留簽到、徽章）")
         .addUserOption((opt) =>
           opt
-            .setName("用戶")
+            .setName("user")
             .setDescription("不填預設重置自己")
             .setRequired(false)
         )
@@ -76,17 +76,17 @@ module.exports = {
 
   run: async (client, interaction) => {
     const sub = interaction.options.getSubcommand();
-    if (sub === "給xp") return grantXpCmd(client, interaction);
-    if (sub === "升級卡") return previewCard(client, interaction);
-    if (sub === "重置等級") return resetLevel(client, interaction);
+    if (sub === "givexp") return grantXpCmd(client, interaction);
+    if (sub === "levelupcard") return previewCard(client, interaction);
+    if (sub === "reset") return resetLevel(client, interaction);
   },
 };
 
 async function grantXpCmd(client, interaction) {
   await interaction.deferReply();
   try {
-    const target = interaction.options.getUser("用戶") || interaction.user;
-    const amount = interaction.options.getInteger("數量");
+    const target = interaction.options.getUser("user") || interaction.user;
+    const amount = interaction.options.getInteger("amount");
     const member = await interaction.guild.members
       .fetch(target.id)
       .catch(() => null);
@@ -112,16 +112,16 @@ async function grantXpCmd(client, interaction) {
         `Lv.${result.before} → **Lv.${result.after}**`
     );
   } catch (error) {
-    console.log(`[ERROR] /等級測試 給xp:\n${error}\n${error.stack}`.red);
+    console.log(`[ERROR] /leveltest givexp:\n${error}\n${error.stack}`.red);
     await interaction.editReply("🔧 給 XP 失敗，看 console").catch(() => {});
   }
 }
 
 async function previewCard(client, interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   try {
-    const beforeLevel = interaction.options.getInteger("升級前");
-    const afterLevel = interaction.options.getInteger("升級後");
+    const beforeLevel = interaction.options.getInteger("from");
+    const afterLevel = interaction.options.getInteger("to");
 
     if (afterLevel <= beforeLevel) {
       return interaction.editReply("升級後等級必須大於升級前");
@@ -164,15 +164,15 @@ async function previewCard(client, interaction) {
       flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
     });
   } catch (error) {
-    console.log(`[ERROR] /等級測試 升級卡:\n${error}\n${error.stack}`.red);
+    console.log(`[ERROR] /leveltest levelupcard:\n${error}\n${error.stack}`.red);
     await interaction.editReply("🔧 預覽失敗，看 console").catch(() => {});
   }
 }
 
 async function resetLevel(client, interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   try {
-    const target = interaction.options.getUser("用戶") || interaction.user;
+    const target = interaction.options.getUser("user") || interaction.user;
 
     const before = await client.userLevelsCollection.findOne({
       userId: target.id,
@@ -207,7 +207,7 @@ async function resetLevel(client, interaction) {
         `（簽到、徽章、稱號、streak 不動）`
     );
   } catch (error) {
-    console.log(`[ERROR] /等級測試 重置等級:\n${error}\n${error.stack}`.red);
+    console.log(`[ERROR] /leveltest reset:\n${error}\n${error.stack}`.red);
     await interaction.editReply("🔧 重置失敗，看 console").catch(() => {});
   }
 }
