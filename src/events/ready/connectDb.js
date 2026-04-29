@@ -37,6 +37,9 @@ module.exports = async (client) => {
     // Steam 特價推播去重
     const steamDealsCollection = database.collection("SteamDealsPushed");
 
+    // 喜加一 (限免) 推播去重
+    const freeGamesCollection = database.collection("FreeGamesPushed");
+
     client.database = database;
     client.collection = collection;
     client.gaslightCollection = gaslightCollection;
@@ -46,6 +49,7 @@ module.exports = async (client) => {
     client.votingProposalsCollection = votingProposalsCollection;
     client.rolePanelsCollection = rolePanelsCollection;
     client.steamDealsCollection = steamDealsCollection;
+    client.freeGamesCollection = freeGamesCollection;
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
 
     // 自動修補沒有 category / drawCount 的舊資料（idempotent，沒事就不動）
