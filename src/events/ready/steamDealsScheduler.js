@@ -46,23 +46,30 @@ module.exports = async (client) => {
       .cyan
   );
 
-  cron.schedule(
-    cronSchedule,
-    async () => {
-      try {
-        await runSteamDealsJob({
-          client,
-          channelId,
-          config: cfg,
-          dryRun: process.env.STEAM_DEALS_DRY_RUN === "true",
-        });
-      } catch (error) {
-        console.log(
-          `[ERROR] Steam特價推播 job 例外:\n${error.stack || error.message}`
-            .red
-        );
-      }
-    },
-    { scheduled: true, timezone }
-  );
+  const runOnce = async (label) => {
+    console.log(`[INFO] Steam特價推播 ${label} 觸發`.cyan);
+    try {
+      await runSteamDealsJob({
+        client,
+        channelId,
+        config: cfg,
+        dryRun: process.env.STEAM_DEALS_DRY_RUN === "true",
+      });
+    } catch (error) {
+      console.log(
+        `[ERROR] Steam特價推播 job 例外:\n${error.stack || error.message}`
+          .red
+      );
+    }
+  };
+
+  if (process.env.STEAM_DEALS_RUN_ON_START === "true") {
+    // 故意不 await,讓 ready 流程繼續跑
+    runOnce("啟動時");
+  }
+
+  cron.schedule(cronSchedule, () => runOnce("cron"), {
+    scheduled: true,
+    timezone,
+  });
 };
