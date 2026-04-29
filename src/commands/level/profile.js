@@ -29,7 +29,7 @@ function formatVoiceTime(minutes) {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("profile")
+    .setName("等級卡")
     .setDescription("查看你或他人的等級卡 🏅")
     .setDMPermission(false)
     .addUserOption((option) =>
