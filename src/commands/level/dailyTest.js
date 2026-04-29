@@ -47,7 +47,8 @@ module.exports = {
       sub
         .setName("重置")
         .setDescription("刪掉今日簽到紀錄，讓你重新測試 /每日簽到（XP 不會退還）")
-    ),
+    )
+    .toJSON(),
 
   run: async (client, interaction) => {
     const sub = interaction.options.getSubcommand();
