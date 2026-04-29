@@ -1,5 +1,4 @@
 const fs = require("fs");
-const path = require("path");
 const {
   ChannelType,
   PermissionFlagsBits,
@@ -9,9 +8,10 @@ const {
   ButtonStyle,
 } = require("discord.js");
 const config = require("../../config.json");
+const { getDataFile } = require("../../utils/dataPaths");
 require("colors");
 
-const PANELS_FILE = path.join(__dirname, "../../data/suggestion-panels.json");
+const PANELS_FILE = getDataFile("suggestion-panels.json");
 
 function loadPanels() {
   try {
