@@ -17,6 +17,13 @@
     }
   },
 
+  "weeklyReport": {
+    "enabled": false,
+    "channelId": "",
+    "cronSchedule": "0 21 * * 0",
+    "timezone": "Asia/Taipei"
+  },
+
   "voiceChannel": {
     "defaultChannelName": "記得改名喔！",
     "deleteReason": "動態語音頻道已空，自動刪除"
@@ -186,7 +193,9 @@
       "streakBonusCapDays": 30,
       "streak7Multiplier": 1.5,
       "streak30Multiplier": 2.0,
-      "resetTimezone": "Asia/Taipei"
+      "resetTimezone": "Asia/Taipei",
+      "streakFreezeUnlockEvery": 30,
+      "maxStreakFreezeStock": 3
     },
     "reaction": {
       "xpPerReactionReceived": 2,
@@ -195,6 +204,7 @@
     "levelUpAnnouncement": {
       "enabled": true,
       "channelId": "",
+      "fallbackChannelId": "",
       "milestones": [5, 10, 20, 30, 50, 75, 100],
       "useCard": true
     },
@@ -203,6 +213,8 @@
       "defaultAccent": "default"
     }
   },
+
+  "xpEvents": [],
 
   "commandEmojis": {
     "hiiiiii": "<:hiiiiii:1191449346777038858>"

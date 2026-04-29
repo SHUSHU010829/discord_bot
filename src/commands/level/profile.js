@@ -13,6 +13,8 @@ const {
 const { getLevelProgress } = require("../../utils/levelMath");
 const { getTier } = require("../../utils/levelTier");
 const generateProfileCard = require("../../utils/generateProfileCard");
+const { BADGES } = require("../../features/leveling/badgeDefinitions");
+const { resolveAccent } = require("../../utils/cardThemes");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -24,10 +26,19 @@ module.exports = {
         .setName("用戶")
         .setDescription("不填預設查自己")
         .setRequired(false)
+    )
+    .addBooleanOption((option) =>
+      option
+        .setName("私密")
+        .setDescription("只有你看得到（預設 False）")
+        .setRequired(false)
     ),
 
   run: async (client, interaction) => {
-    await interaction.deferReply();
+    const ephemeral = interaction.options.getBoolean("私密") ?? false;
+    await interaction.deferReply({
+      flags: ephemeral ? MessageFlags.Ephemeral : 0,
+    });
 
     try {
       if (!client.userLevelsCollection) {
@@ -62,14 +73,6 @@ module.exports = {
         guildId: interaction.guildId,
       });
 
-      // 徽章定義（Phase 6 才會建表，這裡先用 doc.badges 字串作為備援，找不到 emoji 就掛 🏅）
-      let BADGES = [];
-      try {
-        BADGES =
-          require("../../features/leveling/badgeDefinitions").BADGES || [];
-      } catch (_e) {
-        BADGES = [];
-      }
       const badgeDocs = (doc.badges || [])
         .map((id) => {
           const found = BADGES.find((b) => b.id === id);
@@ -80,6 +83,8 @@ module.exports = {
 
       const displayName = member?.displayName || target.username;
       const titleLine = doc.title ? doc.title : `${tier.emoji} ${tier.label}`;
+
+      const cardAccent = resolveAccent(doc.cardAccent, tier.color);
 
       const buf = await generateProfileCard({
         username: displayName,
@@ -94,15 +99,17 @@ module.exports = {
         tier,
         title: titleLine,
         streak: doc.streak || 0,
+        streakFreezes: doc.streakFreezes || 0,
         totalMessages: doc.totalMessages || 0,
         totalVoiceMinutes: doc.totalVoiceMinutes || 0,
         badges: badgeDocs,
+        cardAccent,
       });
 
       const fileName = `profile-${target.id}.png`;
       const attachment = new AttachmentBuilder(buf, { name: fileName });
 
-      const accentInt = parseInt(tier.color.slice(1), 16);
+      const accentInt = parseInt(cardAccent.slice(1), 16);
       const container = new ContainerBuilder()
         .setAccentColor(accentInt)
         .addTextDisplayComponents(
@@ -122,7 +129,9 @@ module.exports = {
       await interaction.editReply({
         components: [container],
         files: [attachment],
-        flags: MessageFlags.IsComponentsV2,
+        flags:
+          MessageFlags.IsComponentsV2 |
+          (ephemeral ? MessageFlags.Ephemeral : 0),
       });
     } catch (error) {
       console.log(`[ERROR] /等級卡:\n${error}\n${error.stack}`.red);

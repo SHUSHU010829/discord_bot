@@ -6,6 +6,26 @@ const grantXp = require("../../features/leveling/grantXp");
 const reactionCooldown = new Map(); // key: `${reactorId}-${authorId}`, value: timestamp
 const COOLDOWN_MS = 30 * 1000;
 
+const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+setInterval(() => {
+  try {
+    const threshold = COOLDOWN_MS * 2;
+    const now = Date.now();
+    let pruned = 0;
+    for (const [k, v] of reactionCooldown) {
+      if (now - v > threshold) {
+        reactionCooldown.delete(k);
+        pruned += 1;
+      }
+    }
+    if (pruned > 0) {
+      console.log(`[LEVEL] reactionCooldown pruned ${pruned} entries (size=${reactionCooldown.size})`.gray);
+    }
+  } catch (e) {
+    console.log(`[ERROR] reactionCooldown prune: ${e}`.red);
+  }
+}, PRUNE_INTERVAL_MS).unref();
+
 module.exports = async (client, reaction, user) => {
   try {
     if (!levelSystem?.enabled) return;

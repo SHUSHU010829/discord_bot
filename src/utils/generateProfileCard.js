@@ -45,8 +45,8 @@ function formatVoiceTime(minutes) {
   if (minutes < 60) return `${minutes}m`;
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  if (h < 100) return m > 0 ? `${h}h ${m}m` : `${h}h`;
-  return `${h}h`;
+  if (h < 1000) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  return `${h.toLocaleString()}h`;
 }
 
 function buildMarkup(data) {
@@ -66,9 +66,10 @@ function buildMarkup(data) {
     totalMessages,
     totalVoiceMinutes,
     badges,
+    cardAccent,
   } = data;
 
-  const accent = tier.color;
+  const accent = cardAccent || tier.color;
   const ink = "#2A2420";
   const card = "#F4ECD8";
   const muted = "#A89270";
@@ -104,6 +105,11 @@ function buildMarkup(data) {
     { label: "MESSAGES", value: totalMessages.toLocaleString(), unit: "" },
     { label: "VOICE", value: formatVoiceTime(totalVoiceMinutes), unit: "" },
     { label: "STREAK", value: String(streak), unit: "天" },
+    {
+      label: "FREEZE",
+      value: String(data.streakFreezes ?? 0),
+      unit: "🛡️",
+    },
     { label: "TOTAL XP", value: totalXp.toLocaleString(), unit: "" },
   ];
 

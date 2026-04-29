@@ -1,5 +1,6 @@
 require("colors");
 const { levelSystem } = require("../../config.json");
+const voiceSessionStore = require("../../utils/voiceSessionStore");
 
 module.exports = async (client, oldState, newState) => {
   try {
@@ -10,18 +11,24 @@ module.exports = async (client, oldState, newState) => {
     if (!member || member.user.bot) return;
 
     const guildId = (newState.guild || oldState.guild).id;
-    const key = `${member.id}-${guildId}`;
+    const key = voiceSessionStore.key(member.id, guildId);
 
     if (newState.channelId) {
-      client.voiceXpSessions.set(key, {
+      // 已有 in-memory session（切換頻道）就保留 joinedAt，否則記錄當下
+      const existing = client.voiceXpSessions.get(key);
+      const joinedAt = existing?.joinedAt || Date.now();
+      const session = {
         userId: member.id,
         guildId,
         channelId: newState.channelId,
-        joinedAt: Date.now(),
+        joinedAt,
         username: member.user.username,
-      });
+      };
+      client.voiceXpSessions.set(key, session);
+      voiceSessionStore.upsert(client, session).catch(() => {});
     } else {
       client.voiceXpSessions.delete(key);
+      voiceSessionStore.remove(client, member.id, guildId).catch(() => {});
     }
   } catch (error) {
     console.log(`[ERROR] voiceXp state update:\n${error}`.red);

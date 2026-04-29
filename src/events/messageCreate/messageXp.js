@@ -6,6 +6,27 @@ const grantXp = require("../../features/leveling/grantXp");
 
 const messageCooldown = new Map();
 
+const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+setInterval(() => {
+  try {
+    const cooldownMs = (levelSystem?.message?.cooldownSeconds || 30) * 1000;
+    const threshold = cooldownMs * 2;
+    const now = Date.now();
+    let pruned = 0;
+    for (const [k, v] of messageCooldown) {
+      if (now - v > threshold) {
+        messageCooldown.delete(k);
+        pruned += 1;
+      }
+    }
+    if (pruned > 0) {
+      console.log(`[LEVEL] messageCooldown pruned ${pruned} entries (size=${messageCooldown.size})`.gray);
+    }
+  } catch (e) {
+    console.log(`[ERROR] messageCooldown prune: ${e}`.red);
+  }
+}, PRUNE_INTERVAL_MS).unref();
+
 module.exports = async (client, message) => {
   try {
     if (!levelSystem?.enabled) return;

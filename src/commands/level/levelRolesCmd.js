@@ -4,6 +4,7 @@ const {
   PermissionFlagsBits,
   MessageFlags,
 } = require("discord.js");
+const pLimit = require("p-limit");
 
 const syncLevelRoles = require("../../features/leveling/levelRoles");
 const { getLevelProgress } = require("../../utils/levelMath");
@@ -171,6 +172,26 @@ async function runApply(client, interaction) {
       return interaction.editReply("🔧 等級系統尚未啟動");
     }
 
+    // 先驗證所有 mapping role 的位階都在 bot 之下
+    const mappingDocs = await client.levelRolesCollection
+      .find({ guildId: interaction.guildId })
+      .sort({ level: 1 })
+      .toArray();
+    const me = interaction.guild.members.me;
+    const tooHigh = [];
+    for (const m of mappingDocs) {
+      const role = interaction.guild.roles.cache.get(m.roleId);
+      if (!role) continue;
+      if (me.roles.highest.comparePositionTo(role) <= 0) {
+        tooHigh.push(`${role} (Lv.${m.level})`);
+      }
+    }
+    if (tooHigh.length > 0) {
+      return interaction.editReply(
+        `⚠️ 以下 role 高於 bot，請先調整位階：${tooHigh.join("、")}`
+      );
+    }
+
     const docs = await client.userLevelsCollection
       .find({ guildId: interaction.guildId })
       .toArray();
@@ -179,24 +200,48 @@ async function runApply(client, interaction) {
       return interaction.editReply("沒有任何用戶等級資料，跳過");
     }
 
+    const total = docs.length;
     let synced = 0;
     let skipped = 0;
-    for (const doc of docs) {
-      const member = await interaction.guild.members
-        .fetch(doc.userId)
-        .catch(() => null);
-      if (!member) {
-        skipped += 1;
-        continue;
-      }
-      const level = doc.level ?? getLevelProgress(doc.totalXp).level;
-      try {
-        await syncLevelRoles(client, member, level);
-        synced += 1;
-      } catch (_e) {
-        skipped += 1;
-      }
-    }
+    let processed = 0;
+    let lastProgressEdit = 0;
+
+    await interaction.editReply(`🔄 同步中... 0/${total}`);
+
+    const limit = pLimit(5);
+    await Promise.all(
+      docs.map((doc) =>
+        limit(async () => {
+          const member = await interaction.guild.members
+            .fetch(doc.userId)
+            .catch(() => null);
+          if (!member) {
+            skipped += 1;
+          } else {
+            const level = doc.level ?? getLevelProgress(doc.totalXp).level;
+            try {
+              await syncLevelRoles(client, member, level);
+              synced += 1;
+            } catch (_e) {
+              skipped += 1;
+            }
+          }
+          processed += 1;
+
+          // 節流：每 10 人或處理完才 update（避免 rate limit）
+          const now = Date.now();
+          if (
+            (processed % 10 === 0 || processed === total) &&
+            now - lastProgressEdit > 1500
+          ) {
+            lastProgressEdit = now;
+            interaction
+              .editReply(`🔄 同步中... ${processed}/${total}`)
+              .catch(() => {});
+          }
+        })
+      )
+    );
 
     await interaction.editReply(
       `✅ 同步完成\n` +
