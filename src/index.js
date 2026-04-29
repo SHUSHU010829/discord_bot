@@ -2,6 +2,7 @@ require("dotenv/config");
 const { Client, GatewayIntentBits, Partials } = require("discord.js");
 
 const eventHandlers = require("./handlers/eventHandler.js");
+const startHttpServer = require("./httpServer");
 
 const client = new Client({
   intents: [
@@ -16,5 +17,6 @@ const client = new Client({
 });
 
 eventHandlers(client);
+startHttpServer(client);
 
 client.login(process.env.BOT_TOKEN);

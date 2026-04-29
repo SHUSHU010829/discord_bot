@@ -22,6 +22,7 @@
     "colors": "^1.4.0",
     "discord.js": "^14.18.0",
     "dotenv": "^16.4.3",
+    "express": "^4.21.2",
     "luxon": "^3.4.4",
     "mongodb": "^6.3.0",
     "node-cron": "^3.0.3",

@@ -47,6 +47,9 @@ module.exports = async (client) => {
     const levelRolesCollection = database.collection("LevelRoles");
     const voiceSessionsCollection = database.collection("VoiceSessions");
 
+    // Twitch chat 同步去重
+    const twitchScoreFlushesCollection = database.collection("TwitchScoreFlushes");
+
     client.database = database;
     client.collection = collection;
     client.gaslightCollection = gaslightCollection;
@@ -62,6 +65,7 @@ module.exports = async (client) => {
     client.dailyCheckinCollection = dailyCheckinCollection;
     client.levelRolesCollection = levelRolesCollection;
     client.voiceSessionsCollection = voiceSessionsCollection;
+    client.twitchScoreFlushesCollection = twitchScoreFlushesCollection;
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
 
     // 自動修補沒有 category / drawCount 的舊資料（idempotent，沒事就不動）
@@ -146,6 +150,11 @@ module.exports = async (client) => {
       await voiceSessionsCollection.createIndex(
         { userId: 1, guildId: 1 },
         { unique: true, name: "uniq_voice_user_guild" }
+      );
+
+      await twitchScoreFlushesCollection.createIndex(
+        { sessionId: 1 },
+        { unique: true, name: "uniq_twitch_session" }
       );
     } catch (indexError) {
       console.log(
