@@ -7,6 +7,9 @@ const { DateTime } = require("luxon");
 const axios = require("axios");
 
 const { loadAdditionalAsset } = require("./satoriEmoji");
+const LruCache = require("./lruCache");
+
+const checkinCardCache = new LruCache(256);
 
 const FONT_DIR = path.join(__dirname, "../../fonts");
 let fontsCache = null;
@@ -178,7 +181,27 @@ function buildMarkup(data) {
   `;
 }
 
+function buildCacheKey(data) {
+  const dates = data.checkinDates
+    ? [...data.checkinDates].sort().join(",")
+    : "";
+  return [
+    data.userId || data.username || "",
+    data.today || "",
+    data.streak ?? "",
+    data.totalCheckins ?? "",
+    data.xpEarned ?? "",
+    data.multiplier ?? "",
+    data.afterLevel ?? "",
+    dates,
+  ].join("|");
+}
+
 async function generateCheckinCard(data) {
+  const cacheKey = buildCacheKey(data);
+  const cached = checkinCardCache.get(cacheKey);
+  if (cached) return cached;
+
   const fonts = await loadFonts();
   const avatarDataUri = await fetchAvatarDataUri(data.avatarUrl);
   const markup = buildMarkup({ ...data, avatarDataUri });
@@ -197,7 +220,9 @@ async function generateCheckinCard(data) {
     .render()
     .asPng();
 
-  return Buffer.from(png);
+  const buf = Buffer.from(png);
+  checkinCardCache.set(cacheKey, buf);
+  return buf;
 }
 
 module.exports = generateCheckinCard;

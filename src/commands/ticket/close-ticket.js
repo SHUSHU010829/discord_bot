@@ -3,7 +3,7 @@ const {
   PermissionFlagsBits,
   EmbedBuilder,
 } = require("discord.js");
-const config = require("../../config.json");
+const config = require("../../config");
 
 module.exports = {
   data: new SlashCommandBuilder()

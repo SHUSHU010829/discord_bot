@@ -1,4 +1,3 @@
-const fs = require("fs");
 const {
   ChannelType,
   PermissionFlagsBits,
@@ -7,23 +6,9 @@ const {
   ButtonBuilder,
   ButtonStyle,
 } = require("discord.js");
-const config = require("../../config.json");
-const { getDataFile } = require("../../utils/dataPaths");
+const config = require("../../config");
+const { loadPanels } = require("../../utils/suggestionPanelsStore");
 require("colors");
-
-const PANELS_FILE = getDataFile("suggestion-panels.json");
-
-function loadPanels() {
-  try {
-    if (fs.existsSync(PANELS_FILE)) {
-      const data = fs.readFileSync(PANELS_FILE, "utf8");
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.log(`[ERROR] 讀取建議面板數據時出錯：${error}`.red);
-  }
-  return { panels: {}, pendingDeletions: {} };
-}
 
 module.exports = async (client, interaction) => {
   // 只處理 StringSelectMenu 互動
@@ -71,7 +56,7 @@ module.exports = async (client, interaction) => {
     }
 
     // 獲取此頻道的面板配置（如果存在）
-    const panels = loadPanels();
+    const panels = await loadPanels(client);
     const panelConfig = panels.panels[interaction.channel.id];
 
     // 使用頻道特定配置或預設配置

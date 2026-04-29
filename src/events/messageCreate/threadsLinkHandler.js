@@ -229,6 +229,39 @@ function extractThreadsUrl(content) {
   return match ? match[0] : null;
 }
 
+// Circuit breaker：避免被 Meta 擋掉時還繼續打 request
+// 5 分鐘內連續 3 次失敗 → 暫停 30 分鐘
+const CB_FAIL_WINDOW_MS = 5 * 60 * 1000;
+const CB_FAIL_THRESHOLD = 3;
+const CB_PAUSE_MS = 30 * 60 * 1000;
+const circuit = {
+  failures: [], // timestamps
+  pausedUntil: 0,
+};
+
+function circuitOpen() {
+  return Date.now() < circuit.pausedUntil;
+}
+
+function recordFailure() {
+  const now = Date.now();
+  circuit.failures = circuit.failures.filter(
+    (t) => now - t <= CB_FAIL_WINDOW_MS,
+  );
+  circuit.failures.push(now);
+  if (circuit.failures.length >= CB_FAIL_THRESHOLD) {
+    circuit.pausedUntil = now + CB_PAUSE_MS;
+    circuit.failures = [];
+    console.log(
+      `[Threads] 連續 ${CB_FAIL_THRESHOLD} 次抓取失敗，暫停 ${CB_PAUSE_MS / 60000} 分鐘`,
+    );
+  }
+}
+
+function recordSuccess() {
+  circuit.failures = [];
+}
+
 // 格式化數字（1000 -> 1K）
 function formatNumber(num) {
   if (!num || num < 1000) return String(num || 0);
@@ -243,9 +276,15 @@ module.exports = async (client, message) => {
   const threadsUrl = extractThreadsUrl(message.content);
   if (!threadsUrl) return;
 
+  if (circuitOpen()) return;
+
   try {
     const data = await fetchThreadsData(threadsUrl);
-    if (!data) return;
+    if (!data) {
+      recordFailure();
+      return;
+    }
+    recordSuccess();
 
     // 建立主 embed
     const mainEmbed = new EmbedBuilder()

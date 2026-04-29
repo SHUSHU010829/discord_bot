@@ -10,7 +10,7 @@ const {
   MessageFlags,
 } = require("discord.js");
 
-const { morningMessage } = require("../../config.json");
+const { morningMessage } = require("../../config");
 const buildMorningPayload = require("../../utils/buildMorningPayload");
 
 module.exports = {

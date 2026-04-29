@@ -34,6 +34,9 @@ module.exports = async (client) => {
     // Role panels collection (遊戲身份組面板設定)
     const rolePanelsCollection = database.collection("RolePanels");
 
+    // Suggestion panels collection (建議系統面板設定 + 排程刪除)
+    const suggestionPanelsCollection = database.collection("SuggestionPanels");
+
     // Steam 特價推播去重
     const steamDealsCollection = database.collection("SteamDealsPushed");
 
@@ -58,6 +61,7 @@ module.exports = async (client) => {
     client.channelActivityCollection = channelActivityCollection;
     client.votingProposalsCollection = votingProposalsCollection;
     client.rolePanelsCollection = rolePanelsCollection;
+    client.suggestionPanelsCollection = suggestionPanelsCollection;
     client.steamDealsCollection = steamDealsCollection;
     client.freeGamesCollection = freeGamesCollection;
     client.userLevelsCollection = userLevelsCollection;

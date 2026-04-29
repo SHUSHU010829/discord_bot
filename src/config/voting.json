@@ -1,0 +1,76 @@
+{
+  "votingChannelId": "1445987524291072152",
+  "defaultDurationHours": 48,
+  "templates": {
+    "game_create": {
+      "name": "遊戲頻道新增",
+      "emoji": "🎮",
+      "description": "為了確保新頻道能維持活躍，我們需要統計「實際玩家」數量。\n請根據您的實際情況點擊下方按鈕：",
+      "buttons": [
+        { "id": "high_interest", "label": "我會玩", "emoji": "🔥", "style": "Success", "weight": 3 },
+        { "id": "support", "label": "純支持", "emoji": "👍", "style": "Secondary", "weight": 1 },
+        { "id": "no_interest", "label": "沒興趣", "emoji": "😶", "style": "Danger", "weight": 0 }
+      ],
+      "passCondition": {
+        "type": "weighted",
+        "minTotalScore": 15,
+        "minHighInterest": 3
+      }
+    },
+    "game_archive": {
+      "name": "遊戲頻道封存",
+      "emoji": "📦",
+      "description": "如果您仍在遊玩此遊戲，請點擊下方按鈕反對封存。\n如果沒有足夠的活躍玩家，此頻道將被封存。",
+      "buttons": [
+        { "id": "still_active", "label": "我還在玩", "emoji": "✋", "style": "Primary", "weight": 1 },
+        { "id": "agree_archive", "label": "同意封存", "emoji": "📦", "style": "Secondary", "weight": 0 }
+      ],
+      "passCondition": {
+        "type": "reverse",
+        "maxStillActive": 1
+      }
+    },
+    "event": {
+      "name": "活動提案",
+      "emoji": "🎉",
+      "description": "請根據您的參與意願點擊下方按鈕：",
+      "buttons": [
+        { "id": "will_join", "label": "我會參加", "emoji": "🎉", "style": "Success", "weight": 3 },
+        { "id": "interested", "label": "有興趣", "emoji": "👀", "style": "Secondary", "weight": 1 },
+        { "id": "not_interested", "label": "沒興趣", "emoji": "🚫", "style": "Danger", "weight": 0 }
+      ],
+      "passCondition": {
+        "type": "weighted",
+        "minTotalScore": 20,
+        "minHighInterest": 5
+      }
+    },
+    "rule_change": {
+      "name": "規則修改",
+      "emoji": "📜",
+      "description": "請投票表決此規則修改提案：",
+      "buttons": [
+        { "id": "approve", "label": "贊成", "emoji": "✅", "style": "Success", "weight": 1 },
+        { "id": "reject", "label": "反對", "emoji": "❌", "style": "Danger", "weight": 1 }
+      ],
+      "passCondition": {
+        "type": "majority",
+        "minTotalVotes": 10,
+        "requireApproveMore": true
+      }
+    },
+    "general": {
+      "name": "一般提案",
+      "emoji": "💡",
+      "description": "請對此提案進行投票：",
+      "buttons": [
+        { "id": "support", "label": "支持", "emoji": "👍", "style": "Success", "weight": 1 },
+        { "id": "oppose", "label": "反對", "emoji": "👎", "style": "Secondary", "weight": 0 }
+      ],
+      "passCondition": {
+        "type": "simple",
+        "minSupport": 10
+      }
+    }
+  }
+}

@@ -6,7 +6,7 @@
 require("colors");
 
 const { ChannelType } = require("discord.js");
-const { createVoiceChannelId, voiceChannel } = require("../../config.json");
+const { createVoiceChannelId, voiceChannel } = require("../../config");
 const dynamicChannels = require("../../utils/dynamicChannelStore");
 
 module.exports = async (client) => {

@@ -1,7 +1,7 @@
 require("colors");
 const { randomInt } = require("../utils/levelMath");
 const grantXp = require("../features/leveling/grantXp");
-const { twitchSync, levelSystem } = require("../config.json");
+const { twitchSync, levelSystem } = require("../config");
 
 function rollSessionXp(messageCount) {
   const min = levelSystem?.message?.minXp ?? 15;

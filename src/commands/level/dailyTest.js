@@ -11,7 +11,7 @@ const {
 } = require("discord.js");
 const { DateTime } = require("luxon");
 
-const { levelSystem } = require("../../config.json");
+const { levelSystem } = require("../../config");
 const generateCheckinCard = require("../../utils/generateCheckinCard");
 const { getLevelProgress } = require("../../utils/levelMath");
 
@@ -155,7 +155,6 @@ async function runReset(client, interaction) {
     const cfg = levelSystem.daily;
     const tz = cfg.resetTimezone || "Asia/Taipei";
     const today = DateTime.now().setZone(tz).toISODate();
-    const yesterday = DateTime.now().setZone(tz).minus({ days: 1 }).toISODate();
 
     const userId = interaction.user.id;
     const guildId = interaction.guildId;
@@ -177,14 +176,36 @@ async function runReset(client, interaction) {
       userId,
       guildId,
     });
-    const newStreak = Math.max(0, (userDoc?.streak || 0) - 1);
+
+    // 從歷史紀錄反推真正的 streak：找最近一筆 < today 的紀錄，從那天往回連續計數
+    const recentDocs = await client.dailyCheckinCollection
+      .find({ userId, guildId, date: { $lt: today } })
+      .project({ date: 1 })
+      .sort({ date: -1 })
+      .limit(60)
+      .toArray();
+
+    const dateSet = new Set(recentDocs.map((d) => d.date));
+
+    let newStreak = 0;
+    let newLastDailyAt = null;
+
+    if (recentDocs.length > 0) {
+      newLastDailyAt = recentDocs[0].date;
+      let cursor = DateTime.fromISO(newLastDailyAt, { zone: tz });
+      while (dateSet.has(cursor.toISODate())) {
+        newStreak += 1;
+        cursor = cursor.minus({ days: 1 });
+      }
+    }
+
     const newTotalCheckins = Math.max(0, (userDoc?.totalCheckins || 0) - 1);
 
     await client.userLevelsCollection.updateOne(
       { userId, guildId },
       {
         $set: {
-          lastDailyAt: newStreak > 0 ? yesterday : null,
+          lastDailyAt: newLastDailyAt,
           streak: newStreak,
           totalCheckins: newTotalCheckins,
           updatedAt: new Date(),
@@ -194,11 +215,11 @@ async function runReset(client, interaction) {
 
     await interaction.editReply(
       `🔄 已重置今日簽到紀錄。\n` +
-        `streak ${userDoc?.streak ?? 0} → ${newStreak}\n` +
+        `streak ${userDoc?.streak ?? 0} → ${newStreak}（從歷史紀錄反推）\n` +
+        `lastDailyAt → ${newLastDailyAt ?? "null"}\n` +
         `totalCheckins ${userDoc?.totalCheckins ?? 0} → ${newTotalCheckins}\n` +
         `XP **不會**退還（${todayDoc.reward?.xp ?? 0} XP 仍記在帳上）。\n` +
-        `現在可以重跑 \`/每日簽到\`。\n\n` +
-        `⚠️ 注意：這只是 dev 工具，streak 邏輯經過此操作後不再 100% 準確（例如重簽會用「假昨天」累計）。請勿在正式環境用這個補簽。`
+        `現在可以重跑 \`/每日簽到\`。`
     );
   } catch (error) {
     console.log(`[ERROR] /dailytest reset:\n${error}\n${error.stack}`.red);

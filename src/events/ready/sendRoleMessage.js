@@ -1,7 +1,7 @@
 require("colors");
 
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
-const { roleMessageChannelId, roles, roleMessageContent } = require("../../config.json");
+const { roleMessageChannelId, roles, roleMessageContent } = require("../../config");
 
 module.exports = async (client) => {
   try {

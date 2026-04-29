@@ -1,7 +1,7 @@
 const { DateTime } = require("luxon");
 const cron = require("node-cron");
 
-const { xpEvents } = require("../config.json");
+const { xpEvents } = require("../config");
 
 /**
  * cron 欄位支援：

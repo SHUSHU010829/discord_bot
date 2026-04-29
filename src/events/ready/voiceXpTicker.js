@@ -1,6 +1,6 @@
 require("colors");
 const cron = require("node-cron");
-const { levelSystem } = require("../../config.json");
+const { levelSystem } = require("../../config");
 const { isVoiceXpEligible } = require("../../utils/xpGuards");
 const grantXp = require("../../features/leveling/grantXp");
 const voiceSessionStore = require("../../utils/voiceSessionStore");
@@ -76,21 +76,36 @@ module.exports = async (client) => {
       if (!client.userLevelsCollection) return;
       if (client.voiceXpSessions.size === 0) return;
 
+      // 先按 guild 分組，每個 guild 一次 fetch 全部 user，避免每個 session 各 round-trip 一次
+      const sessionsByGuild = new Map();
       for (const [key, sessionCached] of client.voiceXpSessions) {
-        try {
-          // cache miss 時 fallback DB
-          let session = sessionCached;
-          if (!session) {
-            const [userId, guildId] = key.split("-");
-            session = await voiceSessionStore.get(client, userId, guildId);
-            if (!session) continue;
-          }
+        let session = sessionCached;
+        if (!session) {
+          const [userId, guildId] = key.split("-");
+          session = await voiceSessionStore.get(client, userId, guildId);
+          if (!session) continue;
+        }
+        if (!sessionsByGuild.has(session.guildId)) {
+          sessionsByGuild.set(session.guildId, []);
+        }
+        sessionsByGuild.get(session.guildId).push({ key, session });
+      }
 
+      for (const [guildId, guildSessions] of sessionsByGuild) {
+        const guild = client.guilds.cache.get(guildId);
+        if (!guild) continue;
+        const userIds = guildSessions.map((s) => s.session.userId);
+        await guild.members
+          .fetch({ user: userIds })
+          .catch(() => null);
+      }
+
+      for (const [, guildSessions] of sessionsByGuild) {
+        for (const { key, session } of guildSessions) {
+        try {
           const guild = client.guilds.cache.get(session.guildId);
           if (!guild) continue;
-          const member =
-            guild.members.cache.get(session.userId) ||
-            (await guild.members.fetch(session.userId).catch(() => null));
+          const member = guild.members.cache.get(session.userId);
           if (!member) continue;
 
           const currentChannelId =
@@ -115,6 +130,7 @@ module.exports = async (client) => {
           });
         } catch (error) {
           console.log(`[ERROR] voiceXp tick (${key}):\n${error}`.red);
+        }
         }
       }
     },

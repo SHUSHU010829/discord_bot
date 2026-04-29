@@ -7,6 +7,9 @@ const axios = require("axios");
 
 const { getTier } = require("./levelTier");
 const { loadAdditionalAsset } = require("./satoriEmoji");
+const LruCache = require("./lruCache");
+
+const levelUpCardCache = new LruCache(256);
 
 const FONT_DIR = path.join(__dirname, "../../fonts");
 let fontsCache = null;
@@ -81,7 +84,20 @@ function buildMarkup({ username, avatarDataUri, beforeLevel, afterLevel, totalXp
   `;
 }
 
+function buildCacheKey(data) {
+  return [
+    data.userId || data.username || "",
+    data.fromLevel ?? "",
+    data.toLevel ?? "",
+    data.cardAccent || "",
+  ].join("|");
+}
+
 async function generateLevelUpCard(data) {
+  const cacheKey = buildCacheKey(data);
+  const cached = levelUpCardCache.get(cacheKey);
+  if (cached) return cached;
+
   const fonts = await loadFonts();
   const avatarDataUri = await fetchAvatarDataUri(data.avatarUrl);
   const markup = buildMarkup({ ...data, avatarDataUri });
@@ -100,7 +116,9 @@ async function generateLevelUpCard(data) {
     .render()
     .asPng();
 
-  return Buffer.from(png);
+  const buf = Buffer.from(png);
+  levelUpCardCache.set(cacheKey, buf);
+  return buf;
 }
 
 module.exports = generateLevelUpCard;
