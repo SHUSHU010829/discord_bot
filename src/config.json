@@ -80,6 +80,27 @@
     }
   },
 
+  "freeGames": {
+    "enabled": true,
+    "channelId": "",
+    "cronSchedule": "30 */6 * * *",
+    "timezone": "Asia/Taipei",
+    "activeHours": {
+      "startHour": 9,
+      "endHour": 24
+    },
+    "platforms": {
+      "epic": true,
+      "steam": true,
+      "gog": false
+    },
+    "feeds": {
+      "epic": "https://discord-news.zeabur.app/xiaoheihe/add2cart/epic",
+      "steam": "https://discord-news.zeabur.app/xiaoheihe/add2cart/steam",
+      "gog": "https://discord-news.zeabur.app/xiaoheihe/add2cart/gog"
+    }
+  },
+
   "commandEmojis": {
     "hiiiiii": "<:hiiiiii:1191449346777038858>"
   },
