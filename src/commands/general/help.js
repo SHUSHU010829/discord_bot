@@ -384,9 +384,13 @@ function buildCommandContainer(cmd) {
   return container;
 }
 
+function normalizeQuery(query) {
+  return (query || "").trim().replace(/^\//, "").toLowerCase();
+}
+
 function findCommand(query) {
   const { commands } = loadCommandIndex();
-  const normalized = query.trim().replace(/^\//, "").toLowerCase();
+  const normalized = normalizeQuery(query);
   if (!normalized) return null;
 
   return (
@@ -394,6 +398,33 @@ function findCommand(query) {
     commands.find((c) => c.name.toLowerCase().includes(normalized)) ||
     null
   );
+}
+
+// 找不到指令時：依名稱與描述比對打分排序，比 charAt(0) 過濾準確很多
+function suggestCommands(query, limit = 5) {
+  const { commands } = loadCommandIndex();
+  const normalized = normalizeQuery(query);
+  if (!normalized) return [];
+
+  const scored = [];
+  for (const cmd of commands) {
+    const name = cmd.name.toLowerCase();
+    const desc = (cmd.description || "").toLowerCase();
+    let score = 0;
+    if (name === normalized) score += 100;
+    else if (name.startsWith(normalized)) score += 60;
+    else if (name.includes(normalized)) score += 40;
+    if (desc.includes(normalized)) score += 15;
+    // 字元重疊度（短查詢時當作 fallback）
+    if (score === 0) {
+      const overlap = [...new Set(normalized)].filter((ch) => name.includes(ch)).length;
+      if (overlap > 0) score = overlap;
+    }
+    if (score > 0) scored.push({ cmd, score });
+  }
+
+  scored.sort((a, b) => b.score - a.score || a.cmd.name.length - b.cmd.name.length);
+  return scored.slice(0, limit).map((s) => s.cmd);
 }
 
 const REPLY_FLAGS = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
@@ -416,15 +447,13 @@ module.exports = {
       if (targetName) {
         const cmd = findCommand(targetName);
         if (!cmd) {
-          const { commands } = loadCommandIndex();
-          const hint = commands
-            .filter((c) =>
-              c.name
-                .toLowerCase()
-                .includes(targetName.trim().toLowerCase().charAt(0) || ""),
-            )
-            .slice(0, 5)
-            .map((c) => `\`/${c.name}\``)
+          const suggestions = suggestCommands(targetName);
+          const hint = suggestions
+            .map((c) => {
+              const meta = CATEGORY_META[c.category];
+              const emoji = meta?.emoji ? `${meta.emoji} ` : "";
+              return `${emoji}\`/${c.name}\``;
+            })
             .join("、");
           return interaction.reply({
             content:
