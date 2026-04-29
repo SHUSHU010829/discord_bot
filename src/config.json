@@ -223,6 +223,17 @@
     }
   },
 
+  "twitchSync": {
+    "enabled": true,
+    "guildId": "1174352637295067157",
+    "tierRoleIds": {
+      "tier1": "1181162291568332891",
+      "tier2": "1181162291568332892",
+      "tier3": "1181162291568332893"
+    },
+    "perSessionXpCap": 1000
+  },
+
   "xpEvents": [],
 
   "commandEmojis": {
