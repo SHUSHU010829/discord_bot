@@ -53,6 +53,9 @@ module.exports = async (client) => {
     // Twitch chat 同步去重
     const twitchScoreFlushesCollection = database.collection("TwitchScoreFlushes");
 
+    // Twitch 開台通知狀態 (login → 上次通知過的 streamId)
+    const twitchLiveStateCollection = database.collection("TwitchLiveState");
+
     client.database = database;
     client.collection = collection;
     client.gaslightCollection = gaslightCollection;
@@ -70,6 +73,7 @@ module.exports = async (client) => {
     client.levelRolesCollection = levelRolesCollection;
     client.voiceSessionsCollection = voiceSessionsCollection;
     client.twitchScoreFlushesCollection = twitchScoreFlushesCollection;
+    client.twitchLiveStateCollection = twitchLiveStateCollection;
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
 
     // 自動修補沒有 category / drawCount 的舊資料（idempotent，沒事就不動）

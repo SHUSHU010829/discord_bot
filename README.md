@@ -295,6 +295,27 @@ embed.js → 發送 Embed
 
 ---
 
+### 6.5 Twitch 開台通知
+
+**目的**：當指定的 Twitch 主播開台時，自動在 Discord 頻道推播一張 Twitch 紫色 embed（顯示主播名 / 標題 / 遊戲 / 觀眾數 / 縮圖 + Watch Stream 按鈕）。
+
+**設定**位於 `src/config/twitch.json`：
+- `channelId`：要推到的 Discord 頻道 ID（預設 `1181142765002833980`）
+- `streamers`：要追蹤的 Twitch login 陣列（預設 `["shushu010829"]`）
+- `cronSchedule`：輪詢頻率（預設 `*/1 * * * *`，每分鐘檢查一次）
+- `messageContent`：通知文案模板，可用 `{streamer}` 取代主播名
+- `mentionRoleId` / `mentionEveryone`：要不要 ping 身份組或全體
+
+**環境變數**（見 `.env.example`）：
+- `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET`：必填，於 [Twitch Dev Console](https://dev.twitch.tv/console/apps) 註冊 App 取得
+- `DISCORD_TWITCH_CHANNEL_ID`、`TWITCH_STREAMERS`、`TWITCH_LIVE_CRON`、`TWITCH_LIVE_ENABLED`、`TWITCH_LIVE_DRY_RUN`、`TWITCH_LIVE_RUN_ON_START`
+
+**去重**：`TwitchLiveState` collection 以 login 為 key，記錄上一次已通知的 streamId，同一場直播只會通知一次；下播後再開新一場才會再推一次。沒有 MongoDB 時會 fallback 到 in-memory，bot 重啟後會重新通知（屬預期行為）。
+
+實作位於 `src/features/twitch/`（`api.js` 走 Helix App Access Token、`embed.js` 組訊息、`dedupe.js` 處理重複、`index.js` 串成一個 job）與 `events/ready/twitchLiveScheduler.js`。
+
+---
+
 ### 7. 每日早安卡 / 今日報告
 
 - **早安卡**：`events/ready/sendMorningMessage.js` 依 `morningMessage.cronSchedule`（預設每天早上 8 點）發送，使用 `satori` 動態繪製含日期、星期、節氣、農民曆、詩詞、運勢的 PNG 卡片。

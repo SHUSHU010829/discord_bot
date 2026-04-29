@@ -1,0 +1,12 @@
+{
+  "twitch": {
+    "enabled": true,
+    "channelId": "1181142765002833980",
+    "streamers": ["shushu010829"],
+    "cronSchedule": "*/1 * * * *",
+    "timezone": "Asia/Taipei",
+    "mentionRoleId": "",
+    "mentionEveryone": false,
+    "messageContent": "{streamer} 開實況啦！！快去找 {streamer} 玩 ヽ(✿ﾟ▽ﾟ)ノ"
+  }
+}
