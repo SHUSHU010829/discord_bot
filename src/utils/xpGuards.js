@@ -2,6 +2,8 @@ const MIN_CHAR_DEFAULT = 4;
 
 // Discord 自訂表情符號：<:name:id> 或 <a:name:id>
 const DISCORD_CUSTOM_EMOJI_REGEX = /<a?:\w+:\d+>/g;
+// URL：含 scheme（http/https/ftp 等）或裸網域（example.com/path）
+const URL_REGEX = /(?:https?:\/\/|ftp:\/\/|www\.)\S+|[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/\S*)?/gi;
 
 const isMessageXpEligible = (message, config) => {
   if (message.author.bot) return false;
@@ -13,6 +15,7 @@ const isMessageXpEligible = (message, config) => {
   if (content.length < minChars) return false;
 
   const stripped = content
+    .replace(URL_REGEX, "")
     .replace(DISCORD_CUSTOM_EMOJI_REGEX, "")
     .replace(/[\p{Emoji}\s\p{P}]/gu, "");
   if (stripped.length < minChars) return false;
