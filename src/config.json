@@ -204,7 +204,7 @@
     "levelUpAnnouncement": {
       "enabled": true,
       "channelId": "",
-      "fallbackChannelId": "",
+      "fallbackChannelId": "1192888968748994700",
       "milestones": [5, 10, 20, 30, 50, 75, 100],
       "useCard": true
     },

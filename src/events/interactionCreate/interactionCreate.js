@@ -36,7 +36,9 @@ module.exports = async (client, interaction) => {
       return;
     }
 
-    // 處理身份組按鈕
+    // 處理身份組按鈕（customId 必須為 Discord snowflake，避免攔截其他按鈕如分頁）
+    if (!/^\d{17,20}$/.test(interaction.customId)) return;
+
     const role = interaction.guild.roles.cache.get(interaction.customId);
     if (!role) {
       return interaction.reply({
