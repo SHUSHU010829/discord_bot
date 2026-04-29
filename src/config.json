@@ -18,8 +18,8 @@
   },
 
   "weeklyReport": {
-    "enabled": false,
-    "channelId": "",
+    "enabled": true,
+    "channelId": "1174352640210124877",
     "cronSchedule": "0 21 * * 0",
     "timezone": "Asia/Taipei"
   },
