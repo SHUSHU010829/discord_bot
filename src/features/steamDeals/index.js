@@ -45,12 +45,13 @@ const runSteamDealsJob = async ({ client, channelId, config, dryRun = false }) =
     }
   }
 
+  const feedUrl = process.env.XIAOHEIHE_FEED_URL || config.feedUrl;
   let games;
   try {
-    games = await fetchDiscountList({ limit: config.fetchLimit || 30 });
+    games = await fetchDiscountList({ feedUrl });
     stats.fetched = games.length;
   } catch (error) {
-    console.log(`[ERROR] 小黑盒 API 失敗：${error.message}`.red);
+    console.log(`[ERROR] 小黑盒 RSS 拉取失敗：${error.message}`.red);
     return stats;
   }
 

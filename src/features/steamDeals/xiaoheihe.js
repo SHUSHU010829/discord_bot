@@ -1,130 +1,113 @@
 require("colors");
 const axios = require("axios");
-const { createHash } = require("node:crypto");
+const { DateTime } = require("luxon");
 
-// Signing logic ported from RSSHub (lib/routes/xiaoheihe/util.ts),
-// originally from https://github.com/huandu/heybox-url
-const dict = "JKMNPQRTX1234OABCDFG56789H";
+const DEFAULT_FEED_URL =
+  "https://discord-news.zeabur.app/xiaoheihe/discount/pc";
 
-const md5 = (str) => {
-  const h = createHash("md5");
-  h.update(str);
-  return h.digest();
+// 解 CDATA / 還原 HTML entity (RSS 通常包 CDATA 但保險處理)
+const decodeXml = (str) => {
+  if (!str) return "";
+  const cdata = str.match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/);
+  const inner = cdata ? cdata[1] : str;
+  return inner
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
 };
 
-const convertByte = (v) => (v & 0x80 ? 0xff & ((v << 1) ^ 0x1b) : v << 1);
-const c3 = (v) => convertByte(v) ^ v;
-const c2 = (v) => c3(convertByte(v));
-const c1 = (v) => c2(c3(convertByte(v)));
-const c0 = (v) => c1(v) ^ c2(v) ^ c3(v);
-
-const checksum = (data) =>
-  [
-    c0(data[0]) ^ c1(data[1]) ^ c2(data[2]) ^ c3(data[3]),
-    c3(data[0]) ^ c0(data[1]) ^ c1(data[2]) ^ c2(data[3]),
-    c2(data[0]) ^ c3(data[1]) ^ c0(data[2]) ^ c1(data[3]),
-    c1(data[0]) ^ c2(data[1]) ^ c3(data[2]) ^ c0(data[3]),
-  ].reduce((prev, value) => prev + value) % 100;
-
-const sign = (url, timestamp = 0, nonce = "") => {
-  timestamp ||= Math.trunc(Date.now() / 1000);
-  nonce ||= md5(Math.random().toString()).toString("hex").toUpperCase();
-
-  const { pathname } = new URL(url);
-  const ts = timestamp + 1;
-  const u = "/" + pathname.split("/").filter(Boolean).join("/") + "/";
-
-  let key = "";
-  const nonceHash = md5((nonce + dict).replace(/\D/g, ""))
-    .toString("hex")
-    .toLowerCase();
-  const rnd = md5(ts + u + nonceHash)
-    .toString("hex")
-    .replace(/\D/g, "")
-    .slice(0, 9)
-    .padEnd(9, "0");
-
-  for (let c = +rnd, i = 0; i < 5; i++) {
-    const idx = c % dict.length;
-    c = Math.trunc(c / dict.length);
-    key += dict[idx];
-  }
-
-  const suffix = checksum(
-    [...key].slice(-4).map((ch) => ch.codePointAt(0))
-  )
-    .toString()
-    .padStart(2, "0");
-
-  const query = `hkey=${key}${suffix}&_time=${timestamp}&nonce=${nonce}`;
-  const urlObj = new URL(url);
-  urlObj.search += urlObj.search ? "&" + query : query;
-  return urlObj.toString();
+const pickTag = (block, tag) => {
+  const m = block.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`));
+  return m ? decodeXml(m[1].trim()) : "";
 };
 
-const BASE_QUERY = {
-  filter_head: "pc",
-  offset: "0",
-  limit: "30",
-  os_type: "web",
-  app: "heybox",
-  client_type: "mobile",
-  version: "999.0.3",
-  x_client_type: "web",
-  x_os_type: "Mac",
-  x_app: "heybox",
-  heybox_id: "-1",
-  include_filter: "-1",
+const extractAppId = (link) => {
+  const m = link.match(/\/app\/(\d+)/);
+  return m ? Number(m[1]) : null;
+};
+
+// description 內包含 "评分: 9.6<br/>",抽出來
+const extractScore = (description) => {
+  const m = description.match(/评分[:：]\s*([\d.]+)/);
+  return m ? Number(m[1]) : null;
+};
+
+// description 內含 [史低] / [新史低] 文字
+const detectLowest = (description) => ({
+  isLowest: /\[(?:史低|新史低|超史低)\]/.test(description),
+  newLowest: /\[新史低\]/.test(description),
+});
+
+// 抽 "截止时间: YYYY-MM-DD" 並轉為 unix seconds
+const extractEndTime = (description) => {
+  const m = description.match(/截止时间[:：]\s*(\d{4}-\d{2}-\d{2})/);
+  if (!m) return null;
+  const dt = DateTime.fromISO(m[1], { zone: "Asia/Taipei" }).endOf("day");
+  return dt.isValid ? Math.trunc(dt.toSeconds()) : null;
+};
+
+// title 是 "中文/English" 形式,只取中文段
+const extractName = (title) => {
+  if (!title) return null;
+  return title.split("/")[0].trim() || null;
 };
 
 /**
- * Fetch the PC discount list from xiaoheihe.
- * Returns an array of raw game records (not yet filtered).
+ * 從自家 RSSHub feed 抓小黑盒折扣清單,parse 成內部統一格式。
  *
- * Each item is expected to contain at minimum:
- *   - steam_appid (string|number)
- *   - is_lowest (0|1)
- *   - new_lowest (0|1)
- *   - score (number, 小黑盒評分, may be missing)
- *   - end_time (timestamp seconds, may be missing)
+ * 回傳:
+ *   [{ appid, isLowest, newLowest, score, endTime, rawName }, ...]
  */
 const fetchDiscountList = async ({
-  limit = 30,
+  feedUrl = DEFAULT_FEED_URL,
   fetcher = axios.get,
 } = {}) => {
-  const baseUrl = "https://api.xiaoheihe.cn/game/get_game_list_v3/";
-  const query = new URLSearchParams({ ...BASE_QUERY, limit: String(limit) });
-  const signedUrl = sign(`${baseUrl}?${query.toString()}`);
-
-  const response = await fetcher(signedUrl, {
+  const response = await fetcher(feedUrl, {
     timeout: 15000,
+    responseType: "text",
+    transformResponse: [(data) => data],
     headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      Accept: "application/rss+xml, application/xml;q=0.9, */*;q=0.8",
     },
   });
 
-  const games = response?.data?.result?.games;
-  if (!Array.isArray(games)) {
+  const xml = typeof response.data === "string" ? response.data : "";
+  if (!xml) {
+    throw new Error(`[xiaoheihe-rss] empty body from ${feedUrl}`);
+  }
+
+  const itemBlocks = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
+  if (itemBlocks.length === 0) {
     throw new Error(
-      `[xiaoheihe] Unexpected response shape: status=${response?.data?.status} msg=${response?.data?.msg}`
+      `[xiaoheihe-rss] no <item> found in feed (URL: ${feedUrl})`
     );
   }
 
-  return games
-    .map((g) => {
-      const appid = g.steam_appid ?? g.appid;
+  const games = itemBlocks
+    .map((block) => {
+      const title = pickTag(block, "title");
+      const link = pickTag(block, "link");
+      const description = pickTag(block, "description");
+
+      const appid = extractAppId(link);
       if (!appid) return null;
+
+      const { isLowest, newLowest } = detectLowest(description);
+
       return {
-        appid: Number(appid),
-        isLowest: Number(g.is_lowest || 0) === 1,
-        newLowest: Number(g.new_lowest || 0) === 1,
-        score: typeof g.score === "number" ? g.score : null,
-        endTime: typeof g.end_time === "number" ? g.end_time : null,
-        rawName: g.name || null,
+        appid,
+        isLowest,
+        newLowest,
+        score: extractScore(description),
+        endTime: extractEndTime(description),
+        rawName: extractName(title),
       };
     })
     .filter(Boolean);
+
+  return games;
 };
 
-module.exports = { sign, fetchDiscountList };
+module.exports = { fetchDiscountList };
