@@ -74,13 +74,20 @@ module.exports = {
         guildId: interaction.guildId,
       });
 
-      const badgeDocs = (doc.badges || [])
-        .map((id) => {
-          const found = BADGES.find((b) => b.id === id);
-          if (found) return found;
-          return { id, name: id, emoji: "🏅" };
-        })
-        .slice(0, 5);
+      const owned = new Set(doc.badges || []);
+      const customDisplay = Array.isArray(doc.displayBadges)
+        ? doc.displayBadges.filter((id) => owned.has(id))
+        : null;
+      const badgeIds = (customDisplay && customDisplay.length > 0
+        ? customDisplay
+        : doc.badges || []
+      ).slice(0, 5);
+
+      const badgeDocs = badgeIds.map((id) => {
+        const found = BADGES.find((b) => b.id === id);
+        if (found) return found;
+        return { id, name: id, emoji: "🏅" };
+      });
 
       const displayName = member?.displayName || target.username;
       const titleLine = doc.title ? doc.title : `${tier.emoji} ${tier.label}`;
