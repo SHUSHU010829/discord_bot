@@ -1,6 +1,10 @@
 require("colors");
 const { SlashCommandBuilder, MessageFlags } = require("discord.js");
 const { BADGES, BADGE_BY_ID } = require("../../features/leveling/badgeDefinitions");
+const { getLevelProgress } = require("../../utils/levelMath");
+const { getTier } = require("../../utils/levelTier");
+
+const TIER_TITLE_VALUE = "__tier_default__";
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -10,17 +14,14 @@ module.exports = {
     .addSubcommand((sub) =>
       sub
         .setName("設定")
-        .setDescription("從已解鎖徽章中選一個當稱號")
+        .setDescription("從已解鎖徽章或目前等級 tier 中選一個當稱號")
         .addStringOption((opt) =>
           opt
             .setName("徽章")
-            .setDescription("選擇徽章")
+            .setDescription("選擇徽章，或使用目前等級 tier")
             .setRequired(true)
             .setAutocomplete(true)
         )
-    )
-    .addSubcommand((sub) =>
-      sub.setName("清除").setDescription("清掉目前的稱號（恢復成 tier 預設）")
     )
     .toJSON(),
 
@@ -35,16 +36,32 @@ module.exports = {
       });
       const owned = new Set(doc?.badges || []);
 
+      const tier = getTier(getLevelProgress(doc?.totalXp || 0).level);
+      const tierOption = {
+        name: `${tier.emoji} 等級稱號 ・ ${tier.label}`,
+        value: TIER_TITLE_VALUE,
+      };
+
       const query = (focused.value || "").toLowerCase();
-      const opts = BADGES.filter((b) => owned.has(b.id))
+      const tierMatchesQuery =
+        !query ||
+        tier.label.toLowerCase().includes(query) ||
+        tier.key.toLowerCase().includes(query) ||
+        "等級".includes(query) ||
+        "tier".includes(query);
+
+      const badgeOpts = BADGES.filter((b) => owned.has(b.id))
         .filter(
           (b) =>
             !query ||
             b.name.toLowerCase().includes(query) ||
             b.id.toLowerCase().includes(query)
         )
-        .slice(0, 25)
         .map((b) => ({ name: `${b.emoji} ${b.name}`, value: b.id }));
+
+      const opts = (tierMatchesQuery ? [tierOption] : [])
+        .concat(badgeOpts)
+        .slice(0, 25);
 
       await interaction.respond(opts);
     } catch (error) {
@@ -66,18 +83,25 @@ module.exports = {
         });
       }
 
-      if (sub === "清除") {
+      const badgeId = interaction.options.getString("徽章");
+
+      if (badgeId === TIER_TITLE_VALUE) {
+        const doc = await client.userLevelsCollection.findOne({
+          userId: interaction.user.id,
+          guildId: interaction.guildId,
+        });
+        const tier = getTier(getLevelProgress(doc?.totalXp || 0).level);
         await client.userLevelsCollection.updateOne(
           { userId: interaction.user.id, guildId: interaction.guildId },
-          { $set: { title: null, updatedAt: new Date() } }
+          { $set: { title: null, updatedAt: new Date() } },
+          { upsert: true }
         );
         return interaction.reply({
-          content: "✅ 稱號已清除（等級卡會顯示 tier 預設稱號）",
+          content: `✅ 稱號已設定為等級 tier **${tier.emoji} ${tier.label}**`,
           flags: MessageFlags.Ephemeral,
         });
       }
 
-      const badgeId = interaction.options.getString("徽章");
       const badge = BADGE_BY_ID.get(badgeId);
       if (!badge) {
         return interaction.reply({
