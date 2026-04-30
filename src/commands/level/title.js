@@ -23,9 +23,6 @@ module.exports = {
             .setAutocomplete(true)
         )
     )
-    .addSubcommand((sub) =>
-      sub.setName("清除").setDescription("清掉目前的稱號（恢復成 tier 預設）")
-    )
     .toJSON(),
 
   autocomplete: async (client, interaction) => {
@@ -82,17 +79,6 @@ module.exports = {
       if (!client.userLevelsCollection) {
         return interaction.reply({
           content: "🔧 等級系統尚未啟動",
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      if (sub === "清除") {
-        await client.userLevelsCollection.updateOne(
-          { userId: interaction.user.id, guildId: interaction.guildId },
-          { $set: { title: null, updatedAt: new Date() } }
-        );
-        return interaction.reply({
-          content: "✅ 稱號已清除（等級卡會顯示 tier 預設稱號）",
           flags: MessageFlags.Ephemeral,
         });
       }
