@@ -20,8 +20,11 @@ module.exports = async (client, oldState, newState) => {
     const member = newState.member || oldState.member;
     const guild = newState.guild || oldState.guild;
 
-    // 當用戶加入"點選新增頻道"時
-    if (newState.channelId === CREATE_CHANNEL_ID && !oldState.channelId) {
+    // 當用戶加入"點選新增頻道"時（含從其他語音房切過來的情況）
+    if (
+      newState.channelId === CREATE_CHANNEL_ID &&
+      oldState.channelId !== CREATE_CHANNEL_ID
+    ) {
       console.log(
         `[VOICE] ${member.user.tag} joined the create channel, creating new voice channel...`
           .cyan
