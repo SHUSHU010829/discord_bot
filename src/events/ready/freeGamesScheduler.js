@@ -65,8 +65,7 @@ module.exports = async (client) => {
       .join(",")})`.cyan
   );
 
-  const runOnce = async (label) => {
-    console.log(`[INFO] 喜加一推播 ${label} 觸發`.cyan);
+  const runOnce = async () => {
     for (const p of platforms) {
       try {
         await runFreeGamesJob({
@@ -87,10 +86,10 @@ module.exports = async (client) => {
   };
 
   if (process.env.FREE_GAMES_RUN_ON_START === "true") {
-    runOnce("啟動時");
+    runOnce();
   }
 
-  cron.schedule(cronSchedule, () => runOnce("cron"), {
+  cron.schedule(cronSchedule, () => runOnce(), {
     scheduled: true,
     timezone,
   });

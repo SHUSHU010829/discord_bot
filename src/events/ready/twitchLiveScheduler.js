@@ -61,8 +61,7 @@ module.exports = async (client) => {
       .cyan
   );
 
-  const runOnce = async (label) => {
-    console.log(`[INFO] Twitch 開台通知 ${label} 觸發`.cyan);
+  const runOnce = async () => {
     try {
       await runTwitchLiveJob({
         client,
@@ -78,10 +77,10 @@ module.exports = async (client) => {
   };
 
   if (process.env.TWITCH_LIVE_RUN_ON_START === "true") {
-    runOnce("啟動時");
+    runOnce();
   }
 
-  cron.schedule(cronSchedule, () => runOnce("cron"), {
+  cron.schedule(cronSchedule, () => runOnce(), {
     scheduled: true,
     timezone,
   });
