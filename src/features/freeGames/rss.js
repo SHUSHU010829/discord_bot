@@ -11,78 +11,98 @@ const decodeXml = (str) => {
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
+    .replace(/&#39;/g, "'")
+    .replace(/&#039;/g, "'");
 };
 
-const pickTag = (block, tag) => {
-  const m = block.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`));
+const pickTagText = (block, tag) => {
+  const m = block.match(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`));
   return m ? decodeXml(m[1].trim()) : "";
 };
 
-// link 對 Steam 是 store URL,對 Epic/GOG 是 xiaoheihe share API,兩者都帶 appid 數字
+const pickAttr = (block, tag, attr) => {
+  const m = block.match(
+    new RegExp(`<${tag}\\b[^>]*\\b${attr}="([^"]+)"`, "i")
+  );
+  return m ? decodeXml(m[1]) : "";
+};
+
+// Steam URL: https://store.steampowered.com/app/220/
+// Epic URL: https://store.epicgames.com/p/<slug> (no numeric id)
 const extractAppId = (link) => {
-  const m = link.match(/(?:\/app\/|appid=)(\d+)/);
+  if (!link) return null;
+  const m = link.match(/\/app\/(\d+)/);
   return m ? Number(m[1]) : null;
 };
 
-// title: "[DLC]中文/English" 或 "中文/English"
+// LootScraper Atom title 格式:"<Source> (<Type>[, <Duration>]) - <Game Title>"
+// e.g. "Steam (Game) - Half-Life 2"
+//      "Epic Games (Game, Always Free) - Foo"
+//      "Steam (Loot) - Foo: bar bonus pack"
 const parseTitle = (title) => {
-  if (!title) return { name: null, isDlc: false };
-  const isDlc = title.startsWith("[DLC]");
-  const stripped = isDlc ? title.slice(5) : title;
-  const name = stripped.split("/")[0].trim() || null;
-  return { name, isDlc };
+  if (!title) return { name: null, isDlc: false, duration: null };
+  const m = title.match(/^[^(]+\(([^)]*)\)\s*-\s*(.+)$/);
+  if (!m) return { name: title.trim(), isDlc: false, duration: null };
+  const tagPart = m[1];
+  const name = m[2].trim();
+  const tags = tagPart.split(",").map((t) => t.trim());
+  const isDlc = tags.some((t) => /loot/i.test(t));
+  // 第二個 tag (若有) 是 duration,例如 "Always Free" / "Temporary" / "Permanent after Claim"
+  const duration = tags[1] || null;
+  return { name, isDlc, duration };
 };
 
-const extractImage = (description) => {
-  const m = description.match(/<img\s+src="([^"]+)"/i);
+// content xhtml 內含 <img src="..."/> 與 <li><b>Offer valid to:</b> yyyy-MM-dd HH:mm</li>
+const extractImage = (content) => {
+  const m = content.match(/<img\s+[^>]*src="([^"]+)"/i);
   return m ? m[1] : null;
 };
 
-const extractField = (description, label) => {
-  // 例如 label="评分",description 含 "评分: 9.6<br/>"
-  const re = new RegExp(`${label}[:：]\\s*([^<\\n]+?)<`);
-  const m = description.match(re);
-  return m ? m[1].trim() : null;
+// 從 content 抓 <li><b>Label:</b> value</li> 形式
+const extractLi = (content, label) => {
+  const re = new RegExp(
+    `<b>${label.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}:</b>\\s*([\\s\\S]*?)</li>`,
+    "i"
+  );
+  const m = content.match(re);
+  return m ? m[1].replace(/<[^>]+>/g, "").trim() : null;
 };
 
-const extractScore = (description) => {
-  const v = extractField(description, "评分");
-  return v ? Number(v) : null;
+// LootScraper 把 valid_to 用 ISO toFormat("yyyy-MM-dd HH:mm") 輸出,落地時區資訊不見了。
+// 經驗值:server 跑 UTC,所以這裡也當 UTC 解。
+const parseEndTime = (content) => {
+  const text = extractLi(content, "Offer valid to");
+  if (!text) return null;
+  const dt = DateTime.fromFormat(text, "yyyy-MM-dd HH:mm", { zone: "utc" });
+  return dt.isValid ? Math.trunc(dt.toSeconds()) : null;
 };
 
-const extractOriginalPrice = (description) => extractField(description, "原价");
-
-const extractChineseSupport = (description) => {
-  const v = extractField(description, "支持中文");
-  if (!v) return null;
-  return v.includes("是");
-};
-
-const extractParentName = (description) => extractField(description, "本体");
-
-// 截止時間優先用 RSS pubDate (RSSHub 把 end_time 放這),fallback 解 description
-const extractEndTime = (block, description) => {
-  const pubDate = pickTag(block, "pubDate");
-  if (pubDate) {
-    const dt = DateTime.fromHTTP(pubDate);
-    if (dt.isValid) return Math.trunc(dt.toSeconds());
-  }
-  const text = extractField(description, "截止时间");
-  if (text) {
-    const dt = DateTime.fromFormat(text, "yyyy/M/d ah:mm:ss", {
-      zone: "Asia/Shanghai",
-      locale: "zh-CN",
-    });
-    if (dt.isValid) return Math.trunc(dt.toSeconds());
-  }
+const parseScore = (content) => {
+  // "Ratings: Steam 95% (9/10, 12345 recommendations)" 之類
+  const ratings = extractLi(content, "Ratings");
+  if (!ratings) return null;
+  const m = ratings.match(/Steam\s+(\d+(?:\.\d+)?)%/i);
+  if (m) return Number(m[1]) / 10; // 對齊舊欄位 0~10 區間
+  const meta = ratings.match(/Metacritic\s+(\d+(?:\.\d+)?)/i);
+  if (meta) return Number(meta[1]) / 10;
   return null;
 };
 
+const parseOriginalPrice = (content) => {
+  const text = extractLi(content, "Recommended price \\(Steam\\)");
+  if (!text) return null;
+  const m = text.match(/([\d.,]+)\s*EUR/i);
+  return m ? `€${m[1]}` : text;
+};
+
+const parseDescription = (content) => extractLi(content, "Description");
+
 /**
- * 抓「喜加一」RSS。platform 必須是 'epic' | 'steam' | 'gog'。
+ * 抓 LootScraper Atom feed (https://feed.eikowagenknecht.com/lootscraper_*.xml)。
+ * platform 必須是 'epic' | 'steam'。
+ *
  * 回傳 [{ platform, appid, name, image, score, originalPrice, chineseSupport,
- *   endTime, isDlc, parentName }]
+ *   endTime, isDlc, parentName, description, link, duration }]
  */
 const fetchFreeGamesList = async ({
   feedUrl,
@@ -96,7 +116,7 @@ const fetchFreeGamesList = async ({
     responseType: "text",
     transformResponse: [(d) => d],
     headers: {
-      Accept: "application/rss+xml, application/xml;q=0.9, */*;q=0.8",
+      Accept: "application/atom+xml, application/xml;q=0.9, */*;q=0.8",
     },
   });
 
@@ -105,31 +125,32 @@ const fetchFreeGamesList = async ({
     throw new Error(`[freeGames-rss] empty body from ${feedUrl}`);
   }
 
-  const itemBlocks = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
-  return itemBlocks
+  const entryBlocks = xml.match(/<entry\b[\s\S]*?<\/entry>/g) || [];
+  return entryBlocks
     .map((block) => {
-      const title = pickTag(block, "title");
-      const link = pickTag(block, "link");
-      const description = pickTag(block, "description");
+      const title = pickTagText(block, "title");
+      const link = pickAttr(block, "link", "href");
+      const content = pickTagText(block, "content");
 
-      // 「最近沒有喜加一」這種 placeholder item 沒有 link
-      if (!link && !description) return null;
-      if (/最近没有喜加一/.test(title)) return null;
+      if (!title || (!link && !content)) return null;
 
-      const { name, isDlc } = parseTitle(title);
+      const { name, isDlc, duration } = parseTitle(title);
       const appid = extractAppId(link);
 
       return {
         platform,
         appid,
         name,
-        image: extractImage(description),
-        score: extractScore(description),
-        originalPrice: extractOriginalPrice(description),
-        chineseSupport: extractChineseSupport(description),
-        endTime: extractEndTime(block, description),
+        image: extractImage(content),
+        score: parseScore(content),
+        originalPrice: parseOriginalPrice(content),
+        chineseSupport: null, // LootScraper feed 沒這個欄位
+        endTime: parseEndTime(content),
         isDlc,
-        parentName: extractParentName(description),
+        parentName: null,
+        description: parseDescription(content),
+        link: link || null,
+        duration,
       };
     })
     .filter(Boolean);

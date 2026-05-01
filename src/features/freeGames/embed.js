@@ -6,18 +6,14 @@ const COLOR_FREE = 0x06a77d;
 const PLATFORM_META = {
   epic: {
     label: "Epic Games",
-    claimUrl: () => "https://store.epicgames.com/zh-TW/free-games",
+    fallbackUrl: () => "https://store.epicgames.com/zh-TW/free-games",
   },
   steam: {
     label: "Steam",
-    claimUrl: (appid) =>
+    fallbackUrl: (appid) =>
       appid
         ? `https://store.steampowered.com/app/${appid}/?cc=tw`
         : "https://store.steampowered.com/search/?specials=1&maxprice=free",
-  },
-  gog: {
-    label: "GOG",
-    claimUrl: () => "https://www.gog.com/games?priceRange=0,0",
   },
 };
 
@@ -57,14 +53,16 @@ const buildFreeGameEmbed = ({ item, steamData = null }) => {
 
   const authorLabel = item.isDlc ? "限免 DLC" : "限時免費";
 
+  const claimUrl = item.link || meta.fallbackUrl(item.appid);
+
   const embed = new EmbedBuilder()
     .setAuthor({ name: authorLabel })
     .setTitle(displayName.slice(0, 256))
-    .setURL(meta.claimUrl(item.appid))
+    .setURL(claimUrl)
     .setColor(COLOR_FREE)
     .setDescription(summaryParts.join("  ·  "))
     .setTimestamp(new Date())
-    .setFooter({ text: "來源:小黑盒" });
+    .setFooter({ text: "來源:LootScraper" });
 
   const image = (steamData && steamData.header_image) || item.image;
   if (image) embed.setImage(image);
@@ -96,10 +94,11 @@ const buildFreeGameEmbed = ({ item, steamData = null }) => {
     embed.addFields({ name: "本體", value: item.parentName, inline: true });
   }
 
-  if (steamData?.short_description) {
+  const shortDesc = steamData?.short_description || item.description;
+  if (shortDesc) {
     embed.addFields({
       name: "簡介",
-      value: truncate(steamData.short_description, 100),
+      value: truncate(shortDesc, 100),
     });
   }
 
