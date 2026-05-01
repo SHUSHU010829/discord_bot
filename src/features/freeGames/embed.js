@@ -1,7 +1,23 @@
 const { EmbedBuilder } = require("discord.js");
 const { DateTime } = require("luxon");
 
-const COLOR_FREE = 0x06a77d;
+const COLOR_FREE = 0x06a77d; // 限時領取 (claimable, 永久持有)
+const COLOR_ALWAYS = 0x3b82f6; // 永久免費 (always free)
+const COLOR_TEMPORARY = 0xf59e0b; // 試玩週末 (不持有)
+
+// LootScraper duration tag → 本地顯示
+const DURATION_META = {
+  "Always Free": {
+    label: "永久免費",
+    color: COLOR_ALWAYS,
+    summary: "**永久免費**",
+  },
+  Temporary: {
+    label: "試玩週末",
+    color: COLOR_TEMPORARY,
+    summary: "**限時試玩** (不可保留)",
+  },
+};
 
 const PLATFORM_META = {
   epic: {
@@ -48,18 +64,21 @@ const buildFreeGameEmbed = ({ item, steamData = null }) => {
   const steamPrice = steamData?.price_overview;
   const originalPriceText = steamPrice?.initial_formatted || item.originalPrice || null;
 
-  const summaryParts = ["**免費領取**"];
-  if (originalPriceText) summaryParts.push(`原價 ~~${originalPriceText}~~`);
+  const durationMeta = DURATION_META[item.duration] || null;
+  const baseLabel = item.isDlc ? "限免 DLC" : durationMeta?.label || "限時免費";
+  const summaryHead = durationMeta?.summary || "**免費領取**";
+  const color = durationMeta?.color || COLOR_FREE;
 
-  const authorLabel = item.isDlc ? "限免 DLC" : "限時免費";
+  const summaryParts = [summaryHead];
+  if (originalPriceText) summaryParts.push(`原價 ~~${originalPriceText}~~`);
 
   const claimUrl = item.link || meta.fallbackUrl(item.appid);
 
   const embed = new EmbedBuilder()
-    .setAuthor({ name: authorLabel })
+    .setAuthor({ name: baseLabel })
     .setTitle(displayName.slice(0, 256))
     .setURL(claimUrl)
-    .setColor(COLOR_FREE)
+    .setColor(color)
     .setDescription(summaryParts.join("  ·  "))
     .setTimestamp(new Date())
     .setFooter({ text: "來源:LootScraper" });
