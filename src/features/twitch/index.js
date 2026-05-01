@@ -33,7 +33,6 @@ const buildMessageContent = (template, displayName, mention) => {
  * @param {boolean} [opts.dryRun]
  */
 const runTwitchLiveJob = async ({ client, channelId, config, dryRun = false }) => {
-  const startedAt = Date.now();
   const stats = { checked: 0, live: 0, pushed: 0, errors: 0 };
 
   const streamers = Array.isArray(config.streamers) ? config.streamers : [];
@@ -132,11 +131,6 @@ const runTwitchLiveJob = async ({ client, channelId, config, dryRun = false }) =
     }
   }
 
-  const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
-  console.log(
-    `[INFO] Twitch 開台檢查完成 (${elapsed}s) checked=${stats.checked} live=${stats.live} pushed=${stats.pushed} errors=${stats.errors}`
-      .cyan
-  );
   return stats;
 };
 

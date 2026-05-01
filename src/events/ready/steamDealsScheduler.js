@@ -46,8 +46,7 @@ module.exports = async (client) => {
       .cyan
   );
 
-  const runOnce = async (label) => {
-    console.log(`[INFO] Steam特價推播 ${label} 觸發`.cyan);
+  const runOnce = async () => {
     try {
       await runSteamDealsJob({
         client,
@@ -65,10 +64,10 @@ module.exports = async (client) => {
 
   if (process.env.STEAM_DEALS_RUN_ON_START === "true") {
     // 故意不 await,讓 ready 流程繼續跑
-    runOnce("啟動時");
+    runOnce();
   }
 
-  cron.schedule(cronSchedule, () => runOnce("cron"), {
+  cron.schedule(cronSchedule, () => runOnce(), {
     scheduled: true,
     timezone,
   });
