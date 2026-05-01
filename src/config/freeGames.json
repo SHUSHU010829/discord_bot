@@ -10,13 +10,11 @@
     },
     "platforms": {
       "epic": true,
-      "steam": true,
-      "gog": false
+      "steam": true
     },
     "feeds": {
-      "epic": "https://discord-news.zeabur.app/xiaoheihe/add2cart/epic",
-      "steam": "https://discord-news.zeabur.app/xiaoheihe/add2cart/steam",
-      "gog": "https://discord-news.zeabur.app/xiaoheihe/add2cart/gog"
+      "epic": "https://feed.eikowagenknecht.com/lootscraper_epic_game.xml",
+      "steam": "https://feed.eikowagenknecht.com/lootscraper_steam_game.xml"
     }
   }
 }

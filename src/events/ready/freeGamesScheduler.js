@@ -35,7 +35,7 @@ module.exports = async (client) => {
     await ensureIndexes(client.freeGamesCollection);
   }
 
-  // 平台 → feed URL 對照,支援 env 覆寫
+  // 平台 → feed URL 對照,支援 env 覆寫。來源:LootScraper
   const platforms = [
     {
       platform: "epic",
@@ -43,7 +43,7 @@ module.exports = async (client) => {
       feedUrl:
         process.env.FREE_GAMES_EPIC_FEED_URL ||
         cfg.feeds?.epic ||
-        "https://discord-news.zeabur.app/xiaoheihe/add2cart/epic",
+        "https://feed.eikowagenknecht.com/lootscraper_epic_game.xml",
     },
     {
       platform: "steam",
@@ -51,15 +51,7 @@ module.exports = async (client) => {
       feedUrl:
         process.env.FREE_GAMES_STEAM_FEED_URL ||
         cfg.feeds?.steam ||
-        "https://discord-news.zeabur.app/xiaoheihe/add2cart/steam",
-    },
-    {
-      platform: "gog",
-      enabled: cfg.platforms?.gog === true, // GOG 預設關
-      feedUrl:
-        process.env.FREE_GAMES_GOG_FEED_URL ||
-        cfg.feeds?.gog ||
-        "https://discord-news.zeabur.app/xiaoheihe/add2cart/gog",
+        "https://feed.eikowagenknecht.com/lootscraper_steam_game.xml",
     },
   ].filter((p) => p.enabled);
 
