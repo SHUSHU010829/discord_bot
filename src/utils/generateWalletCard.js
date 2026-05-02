@@ -3,7 +3,6 @@ const path = require("path");
 const satori = require("satori").default || require("satori");
 const { html } = require("satori-html");
 const { Resvg } = require("@resvg/resvg-js");
-const axios = require("axios");
 
 const { loadAdditionalAsset } = require("./satoriEmoji");
 const LruCache = require("./lruCache");
@@ -28,90 +27,67 @@ async function loadFonts() {
   return fontsCache;
 }
 
-async function fetchAvatarDataUri(url) {
-  if (!url) return null;
-  try {
-    const res = await axios.get(url, {
-      responseType: "arraybuffer",
-      timeout: 8000,
-    });
-    const ext = url.toLowerCase().includes(".png") ? "png" : "jpeg";
-    const b64 = Buffer.from(res.data).toString("base64");
-    return `data:image/${ext};base64,${b64}`;
-  } catch (e) {
-    return null;
-  }
-}
-
 function buildMarkup(data) {
   const {
     username,
-    avatarDataUri,
     totalCoins,
     lifetimeCoins,
-    earnedToday,
+    cardNo = "0000",
     tier = "standard",
   } = data;
 
-  const avatarSize = 48;
-  const avatarHtml = avatarDataUri
-    ? `<img src="${avatarDataUri}" style="display:flex;width:${avatarSize}px;height:${avatarSize}px;border-radius:${avatarSize}px;object-fit:cover;" />`
-    : `<div style="display:flex;width:${avatarSize}px;height:${avatarSize}px;border-radius:${avatarSize}px;background:#FFFFFF;color:#1A55C2;font-family:'NotoSansTC';font-weight:900;font-size:24px;justify-content:center;align-items:center;">${(username || "?").charAt(0).toUpperCase()}</div>`;
+  // 米色 / 紅 / 墨褐配色，沿用 profileCard 的色票
+  const card = "#F4ECD8";
+  const ink = "#2A2420";
+  const muted = "#A89270";
+  const subtle = "#E8DFC8";
+  const accent = "#C73E2E";
+
+  const handle = `@${(username || "shushu").toUpperCase()}`;
 
   return `
-    <div style="display:flex;width:1080px;height:680px;background:#11151C;padding:40px;box-sizing:border-box;align-items:center;justify-content:center;font-family:'NotoSansTC';">
-      <div style="display:flex;flex-direction:column;width:1000px;height:600px;border-radius:36px;background:linear-gradient(135deg,#2D7BE8 0%,#1A55C2 55%,#0F3F9C 100%);padding:44px 52px;box-sizing:border-box;position:relative;overflow:hidden;">
+    <div style="display:flex;width:1080px;height:600px;background:${card};padding:24px;box-sizing:border-box;font-family:'NotoSansTC';">
+      <div style="display:flex;flex-direction:column;width:100%;height:100%;background:${card};border:3px solid ${ink};padding:36px 44px;box-sizing:border-box;">
 
-        <!-- 亮面光暈（右上） -->
-        <div style="display:flex;position:absolute;top:-260px;right:-160px;width:820px;height:820px;border-radius:820px;background:linear-gradient(225deg,rgba(255,255,255,0.28) 0%,rgba(255,255,255,0.10) 35%,rgba(255,255,255,0) 65%);"></div>
-        <!-- 底部第二道淡光暈 -->
-        <div style="display:flex;position:absolute;bottom:-300px;left:-180px;width:700px;height:700px;border-radius:700px;background:radial-gradient(closest-side,rgba(255,255,255,0.10),rgba(255,255,255,0));"></div>
-
-        <!-- 頂列：品牌 logo + tier -->
+        <!-- Header：logo 方塊 + SHUSHU + tier，右上 CARD NO. -->
         <div style="display:flex;width:100%;justify-content:space-between;align-items:flex-start;">
-          <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:64px;color:#FFFFFF;letter-spacing:-2px;line-height:1;">shushu.</div>
-          <div style="display:flex;margin-top:18px;font-family:'NotoSansTC';font-weight:500;font-size:24px;color:#FFFFFF;letter-spacing:1px;">${tier}</div>
-        </div>
-
-        <!-- 三行幣值（中間黃色強調） -->
-        <div style="display:flex;flex-direction:column;margin-top:42px;">
-          <div style="display:flex;align-items:center;font-family:'NotoSansTC';font-weight:700;font-size:34px;color:#FFFFFF;">
-            <div style="display:flex;font-size:32px;line-height:1;">💰</div>
-            <div style="display:flex;margin-left:14px;">${totalCoins.toLocaleString()} Credits</div>
-          </div>
-          <div style="display:flex;align-items:center;margin-top:16px;font-family:'NotoSansTC';font-weight:700;font-size:34px;color:#FFD93D;">
-            <div style="display:flex;font-size:32px;line-height:1;">🪙</div>
-            <div style="display:flex;margin-left:14px;">+${earnedToday.toLocaleString()} Today</div>
-          </div>
-          <div style="display:flex;align-items:center;margin-top:16px;font-family:'NotoSansTC';font-weight:700;font-size:34px;color:#FFFFFF;">
-            <div style="display:flex;font-size:32px;line-height:1;">💬</div>
-            <div style="display:flex;margin-left:14px;">${lifetimeCoins.toLocaleString()} Lifetime</div>
-          </div>
-        </div>
-
-        <!-- 晶片（右側，主體區下半） -->
-        <div style="display:flex;flex-direction:column;position:absolute;top:248px;right:64px;width:124px;height:98px;border-radius:14px;background:linear-gradient(135deg,#F8F1D8 0%,#D9C68A 60%,#B89A4A 100%);padding:10px 12px;box-sizing:border-box;justify-content:space-between;">
-          <div style="display:flex;width:100%;height:6px;background:rgba(0,0,0,0.18);border-radius:4px;"></div>
-          <div style="display:flex;width:100%;height:6px;background:rgba(0,0,0,0.18);border-radius:4px;"></div>
-          <div style="display:flex;width:100%;height:6px;background:rgba(0,0,0,0.18);border-radius:4px;"></div>
-          <div style="display:flex;width:100%;height:6px;background:rgba(0,0,0,0.18);border-radius:4px;"></div>
-          <div style="display:flex;width:100%;height:6px;background:rgba(0,0,0,0.18);border-radius:4px;"></div>
-        </div>
-
-        <!-- 底列：頭像 + 使用者名稱（左）・四個白點（右） -->
-        <div style="display:flex;width:100%;justify-content:space-between;align-items:center;margin-top:auto;">
           <div style="display:flex;align-items:center;">
-            <div style="display:flex;width:54px;height:54px;border-radius:54px;background:#FFFFFF;align-items:center;justify-content:center;padding:3px;box-sizing:border-box;">
-              ${avatarHtml}
+            <div style="display:flex;width:84px;height:84px;background:${accent};border:3px solid ${ink};box-sizing:border-box;align-items:center;justify-content:center;">
+              <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:54px;color:${card};line-height:1;">S</div>
             </div>
-            <div style="display:flex;margin-left:14px;font-family:'NotoSansTC';font-weight:700;font-size:24px;color:#FFFFFF;letter-spacing:0.5px;">${username}</div>
+            <div style="display:flex;flex-direction:column;margin-left:24px;">
+              <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:54px;color:${ink};line-height:1;letter-spacing:4px;">SHUSHU</div>
+              <div style="display:flex;align-self:flex-start;margin-top:10px;padding:6px 16px;background:${ink};font-family:'NotoSansTC';font-weight:500;font-size:16px;color:${card};letter-spacing:5px;">${tier.toUpperCase()}</div>
+            </div>
           </div>
-          <div style="display:flex;align-items:center;">
-            <div style="display:flex;width:12px;height:12px;border-radius:12px;background:#FFFFFF;"></div>
-            <div style="display:flex;width:12px;height:12px;border-radius:12px;background:#FFFFFF;margin-left:16px;"></div>
-            <div style="display:flex;width:12px;height:12px;border-radius:12px;background:#FFFFFF;margin-left:16px;"></div>
-            <div style="display:flex;width:12px;height:12px;border-radius:12px;background:#FFFFFF;margin-left:16px;"></div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;">
+            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:3px;color:${muted};">CARD NO.</div>
+            <div style="display:flex;margin-top:6px;font-family:'SpaceMono';font-size:26px;color:${ink};letter-spacing:3px;">${cardNo}</div>
           </div>
+        </div>
+
+        <!-- BALANCE 標籤 + 點點分隔線 -->
+        <div style="display:flex;width:100%;align-items:center;margin-top:36px;">
+          <div style="display:flex;font-family:'SpaceMono';font-size:14px;letter-spacing:6px;color:${muted};">— &nbsp;BALANCE&nbsp; —</div>
+          <div style="display:flex;flex:1;height:0;border-top:2px dotted ${muted};margin-left:18px;"></div>
+        </div>
+
+        <!-- 大數字 + CREDITS -->
+        <div style="display:flex;align-items:flex-end;width:100%;margin-top:14px;">
+          <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:170px;color:${accent};line-height:1;letter-spacing:-4px;">${totalCoins.toLocaleString()}</div>
+          <div style="display:flex;margin-left:24px;margin-bottom:24px;font-family:'NotoSansTC';font-weight:500;font-size:36px;color:${ink};letter-spacing:8px;">CREDITS</div>
+        </div>
+
+        <!-- 下方點點分隔線 -->
+        <div style="display:flex;width:100%;height:0;margin-top:18px;border-top:2px dotted ${muted};"></div>
+
+        <!-- Footer：LIFETIME（左）・@USERNAME（右） -->
+        <div style="display:flex;width:100%;justify-content:space-between;align-items:center;margin-top:auto;">
+          <div style="display:flex;align-items:baseline;">
+            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${muted};">LIFETIME</div>
+            <div style="display:flex;margin-left:14px;font-family:'NotoSansTC';font-weight:900;font-size:26px;color:${ink};">${lifetimeCoins.toLocaleString()}</div>
+          </div>
+          <div style="display:flex;font-family:'SpaceMono';font-size:15px;letter-spacing:6px;color:${ink};">${handle}</div>
         </div>
 
       </div>
@@ -124,10 +100,9 @@ function buildCacheKey(data) {
     data.userId || "",
     data.guildId || "",
     data.username || "",
-    data.avatarUrl || "",
     data.totalCoins ?? "",
     data.lifetimeCoins ?? "",
-    data.earnedToday ?? "",
+    data.cardNo || "",
     data.tier || "",
   ].join("|");
 }
@@ -138,13 +113,12 @@ async function generateWalletCard(data) {
   if (cached) return cached;
 
   const fonts = await loadFonts();
-  const avatarDataUri = await fetchAvatarDataUri(data.avatarUrl);
-  const markup = buildMarkup({ ...data, avatarDataUri });
+  const markup = buildMarkup(data);
   const element = html(markup);
 
   const svg = await satori(element, {
     width: 1080,
-    height: 680,
+    height: 600,
     fonts,
     loadAdditionalAsset,
   });
