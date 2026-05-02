@@ -4,6 +4,7 @@ const { getLevelProgress } = require("../../utils/levelMath");
 const { levelSystem } = require("../../config");
 const { getCurrentMultiplier } = require("../../utils/xpMultiplier");
 const { getTwitchSubBonus } = require("../../utils/twitchSubBonus");
+const { getServerBoostBonus } = require("../../utils/serverBoostBonus");
 const syncLevelRoles = require("./levelRoles");
 const announceLevelUp = require("./levelUpAnnouncer");
 const checkBadges = require("./badgeChecker");
@@ -15,16 +16,20 @@ module.exports = async (client, opts) => {
   const tz = levelSystem?.daily?.resetTimezone || "Asia/Taipei";
   const today = DateTime.now().setZone(tz).toISODate();
 
-  // XP 倍率事件（admin/手動 grant 不套用）
-  const isAdminSource = ["admin"].includes(opts.source);
-  const eventInfo = isAdminSource
+  // XP 倍率事件（admin/boost 一次性 grant 不套用倍率）
+  const skipMultipliers = ["admin", "boost"].includes(opts.source);
+  const eventInfo = skipMultipliers
     ? { multiplier: 1, names: [] }
     : getCurrentMultiplier(opts.source, DateTime.now().setZone(tz));
-  const twitchInfo = isAdminSource
+  const twitchInfo = skipMultipliers
     ? { multiplier: 1, name: null }
     : getTwitchSubBonus(opts.member, opts.source);
+  const boostInfo = skipMultipliers
+    ? { multiplier: 1, name: null }
+    : getServerBoostBonus(opts.member, opts.source);
   const baseAmount = opts.amount;
-  const totalMultiplier = eventInfo.multiplier * twitchInfo.multiplier;
+  const totalMultiplier =
+    eventInfo.multiplier * twitchInfo.multiplier * boostInfo.multiplier;
   if (totalMultiplier > 1) {
     opts.amount = Math.floor(opts.amount * totalMultiplier);
   }
@@ -147,5 +152,7 @@ module.exports = async (client, opts) => {
     eventMultiplier: eventInfo.multiplier,
     twitchSubName: twitchInfo.name,
     twitchSubMultiplier: twitchInfo.multiplier,
+    boostBonusName: boostInfo.name,
+    boostBonusMultiplier: boostInfo.multiplier,
   };
 };
