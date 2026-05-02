@@ -50,84 +50,68 @@ function buildMarkup(data) {
     totalCoins,
     lifetimeCoins,
     earnedToday,
-    sources,
-    issuedAt,
+    tier = "standard",
   } = data;
 
-  // Tatsu-card 風配色：金屬黑卡 + 金色 accent
-  const ink = "#0E0B08";
-  const card = "#1A1410";
-  const cardLight = "#241B14";
-  const accent = "#E9C46A";
-  const accentDark = "#B8862E";
-  const muted = "#7A6B55";
-  const text = "#F4ECD8";
-
-  const avatarSize = 96;
+  const avatarSize = 48;
   const avatarHtml = avatarDataUri
     ? `<img src="${avatarDataUri}" style="display:flex;width:${avatarSize}px;height:${avatarSize}px;border-radius:${avatarSize}px;object-fit:cover;" />`
-    : `<div style="display:flex;width:${avatarSize}px;height:${avatarSize}px;border-radius:${avatarSize}px;background:${accentDark};color:${ink};font-family:'NotoSansTC';font-weight:900;font-size:48px;justify-content:center;align-items:center;">${(username || "?").charAt(0).toUpperCase()}</div>`;
-
-  const sourceRows = sources
-    .map(
-      (s) => `
-        <div style="display:flex;flex:1;flex-direction:column;background:${cardLight};border:1px solid ${accentDark};padding:10px 14px;box-sizing:border-box;">
-          <div style="display:flex;font-family:'SpaceMono';font-size:11px;letter-spacing:2px;color:${muted};">${s.label}</div>
-          <div style="display:flex;align-items:baseline;margin-top:6px;">
-            <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:22px;color:${text};line-height:1;">${s.value.toLocaleString()}</div>
-            <div style="display:flex;margin-left:4px;font-family:'NotoSansTC';font-weight:500;font-size:12px;color:${muted};">枚</div>
-          </div>
-        </div>
-      `
-    )
-    .join("");
+    : `<div style="display:flex;width:${avatarSize}px;height:${avatarSize}px;border-radius:${avatarSize}px;background:#FFFFFF;color:#1A55C2;font-family:'NotoSansTC';font-weight:900;font-size:24px;justify-content:center;align-items:center;">${(username || "?").charAt(0).toUpperCase()}</div>`;
 
   return `
-    <div style="display:flex;width:1080px;height:600px;background:${ink};padding:24px;box-sizing:border-box;font-family:'NotoSansTC';">
-      <div style="display:flex;flex-direction:column;width:100%;height:100%;background:${card};border:3px solid ${accent};padding:32px 40px;box-sizing:border-box;position:relative;">
+    <div style="display:flex;width:1080px;height:680px;background:#11151C;padding:40px;box-sizing:border-box;align-items:center;justify-content:center;font-family:'NotoSansTC';">
+      <div style="display:flex;flex-direction:column;width:1000px;height:600px;border-radius:36px;background:linear-gradient(135deg,#2D7BE8 0%,#1A55C2 55%,#0F3F9C 100%);padding:44px 52px;box-sizing:border-box;position:relative;overflow:hidden;">
 
-        <!-- Brand strip (信用卡風) -->
-        <div style="display:flex;width:100%;justify-content:space-between;align-items:center;">
-          <div style="display:flex;flex-direction:column;">
-            <div style="display:flex;font-family:'SpaceMono';font-size:12px;letter-spacing:6px;color:${accent};">SHUSHU CREDIT</div>
-            <div style="display:flex;margin-top:4px;font-family:'NotoSansTC';font-weight:900;font-size:36px;color:${text};letter-spacing:2px;">金幣錢包</div>
-          </div>
-          <div style="display:flex;font-family:'SpaceMono';font-size:36px;letter-spacing:4px;color:${accent};">★</div>
+        <!-- 亮面光暈（右上） -->
+        <div style="display:flex;position:absolute;top:-260px;right:-160px;width:820px;height:820px;border-radius:820px;background:linear-gradient(225deg,rgba(255,255,255,0.28) 0%,rgba(255,255,255,0.10) 35%,rgba(255,255,255,0) 65%);"></div>
+        <!-- 底部第二道淡光暈 -->
+        <div style="display:flex;position:absolute;bottom:-300px;left:-180px;width:700px;height:700px;border-radius:700px;background:radial-gradient(closest-side,rgba(255,255,255,0.10),rgba(255,255,255,0));"></div>
+
+        <!-- 頂列：品牌 logo + tier -->
+        <div style="display:flex;width:100%;justify-content:space-between;align-items:flex-start;">
+          <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:64px;color:#FFFFFF;letter-spacing:-2px;line-height:1;">shushu.</div>
+          <div style="display:flex;margin-top:18px;font-family:'NotoSansTC';font-weight:500;font-size:24px;color:#FFFFFF;letter-spacing:1px;">${tier}</div>
         </div>
 
-        <!-- Avatar + name -->
-        <div style="display:flex;width:100%;align-items:center;margin-top:24px;">
-          <div style="display:flex;width:104px;height:104px;border-radius:104px;background:${accent};padding:4px;box-sizing:border-box;align-items:center;justify-content:center;">
-            ${avatarHtml}
+        <!-- 三行幣值（中間黃色強調） -->
+        <div style="display:flex;flex-direction:column;margin-top:42px;">
+          <div style="display:flex;align-items:center;font-family:'NotoSansTC';font-weight:700;font-size:34px;color:#FFFFFF;">
+            <div style="display:flex;font-size:32px;line-height:1;">💰</div>
+            <div style="display:flex;margin-left:14px;">${totalCoins.toLocaleString()} Credits</div>
           </div>
-          <div style="display:flex;flex-direction:column;margin-left:22px;">
-            <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:30px;color:${text};line-height:1.1;letter-spacing:1px;">${username}</div>
-            <div style="display:flex;margin-top:6px;font-family:'SpaceMono';font-size:12px;letter-spacing:3px;color:${muted};">CARD HOLDER</div>
+          <div style="display:flex;align-items:center;margin-top:16px;font-family:'NotoSansTC';font-weight:700;font-size:34px;color:#FFD93D;">
+            <div style="display:flex;font-size:32px;line-height:1;">🪙</div>
+            <div style="display:flex;margin-left:14px;">+${earnedToday.toLocaleString()} Today</div>
           </div>
-        </div>
-
-        <!-- Big balance -->
-        <div style="display:flex;flex-direction:column;width:100%;margin-top:28px;background:${cardLight};border:2px solid ${accent};padding:22px 28px;box-sizing:border-box;">
-          <div style="display:flex;font-family:'SpaceMono';font-size:12px;letter-spacing:5px;color:${accent};">CURRENT BALANCE</div>
-          <div style="display:flex;align-items:baseline;margin-top:6px;">
-            <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:78px;color:${accent};line-height:1;letter-spacing:-1px;">${totalCoins.toLocaleString()}</div>
-            <div style="display:flex;margin-left:14px;font-family:'NotoSansTC';font-weight:900;font-size:22px;color:${text};">金幣</div>
-          </div>
-          <div style="display:flex;width:100%;justify-content:space-between;margin-top:10px;">
-            <div style="display:flex;font-family:'SpaceMono';font-size:13px;color:${muted};">歷史總獲得 ${lifetimeCoins.toLocaleString()}</div>
-            <div style="display:flex;font-family:'SpaceMono';font-size:13px;color:${muted};">今日已賺 +${earnedToday.toLocaleString()}</div>
+          <div style="display:flex;align-items:center;margin-top:16px;font-family:'NotoSansTC';font-weight:700;font-size:34px;color:#FFFFFF;">
+            <div style="display:flex;font-size:32px;line-height:1;">💬</div>
+            <div style="display:flex;margin-left:14px;">${lifetimeCoins.toLocaleString()} Lifetime</div>
           </div>
         </div>
 
-        <!-- Sources grid -->
-        <div style="display:flex;width:100%;margin-top:18px;gap:10px;">
-          ${sourceRows}
+        <!-- 晶片（右側，主體區下半） -->
+        <div style="display:flex;flex-direction:column;position:absolute;top:248px;right:64px;width:124px;height:98px;border-radius:14px;background:linear-gradient(135deg,#F8F1D8 0%,#D9C68A 60%,#B89A4A 100%);padding:10px 12px;box-sizing:border-box;justify-content:space-between;">
+          <div style="display:flex;width:100%;height:6px;background:rgba(0,0,0,0.18);border-radius:4px;"></div>
+          <div style="display:flex;width:100%;height:6px;background:rgba(0,0,0,0.18);border-radius:4px;"></div>
+          <div style="display:flex;width:100%;height:6px;background:rgba(0,0,0,0.18);border-radius:4px;"></div>
+          <div style="display:flex;width:100%;height:6px;background:rgba(0,0,0,0.18);border-radius:4px;"></div>
+          <div style="display:flex;width:100%;height:6px;background:rgba(0,0,0,0.18);border-radius:4px;"></div>
         </div>
 
-        <!-- Footer -->
-        <div style="display:flex;width:100%;justify-content:space-between;align-items:center;margin-top:auto;padding-top:18px;border-top:1px dashed ${accentDark};">
-          <div style="display:flex;font-family:'SpaceMono';font-size:11px;letter-spacing:3px;color:${muted};">VALID THRU NEXT FOREVER</div>
-          <div style="display:flex;font-family:'SpaceMono';font-size:11px;letter-spacing:2px;color:${muted};">ISSUED ${issuedAt}</div>
+        <!-- 底列：頭像 + 使用者名稱（左）・四個白點（右） -->
+        <div style="display:flex;width:100%;justify-content:space-between;align-items:center;margin-top:auto;">
+          <div style="display:flex;align-items:center;">
+            <div style="display:flex;width:54px;height:54px;border-radius:54px;background:#FFFFFF;align-items:center;justify-content:center;padding:3px;box-sizing:border-box;">
+              ${avatarHtml}
+            </div>
+            <div style="display:flex;margin-left:14px;font-family:'NotoSansTC';font-weight:700;font-size:24px;color:#FFFFFF;letter-spacing:0.5px;">${username}</div>
+          </div>
+          <div style="display:flex;align-items:center;">
+            <div style="display:flex;width:12px;height:12px;border-radius:12px;background:#FFFFFF;"></div>
+            <div style="display:flex;width:12px;height:12px;border-radius:12px;background:#FFFFFF;margin-left:16px;"></div>
+            <div style="display:flex;width:12px;height:12px;border-radius:12px;background:#FFFFFF;margin-left:16px;"></div>
+            <div style="display:flex;width:12px;height:12px;border-radius:12px;background:#FFFFFF;margin-left:16px;"></div>
+          </div>
         </div>
 
       </div>
@@ -144,8 +128,7 @@ function buildCacheKey(data) {
     data.totalCoins ?? "",
     data.lifetimeCoins ?? "",
     data.earnedToday ?? "",
-    (data.sources || []).map((s) => `${s.label}:${s.value}`).join(","),
-    data.issuedAt || "",
+    data.tier || "",
   ].join("|");
 }
 
@@ -161,7 +144,7 @@ async function generateWalletCard(data) {
 
   const svg = await satori(element, {
     width: 1080,
-    height: 600,
+    height: 680,
     fonts,
     loadAdditionalAsset,
   });

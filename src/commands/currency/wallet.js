@@ -43,14 +43,9 @@ module.exports = {
         .toArray();
       const earnedToday = Math.max(0, todayAgg[0]?.total || 0);
 
-      const sources = [
-        { label: "MESSAGE", value: doc.coinsFrom_message || 0 },
-        { label: "VOICE", value: doc.coinsFrom_voice || 0 },
-        { label: "REACTION", value: doc.coinsFrom_reaction || 0 },
-        { label: "DAILY", value: doc.coinsFrom_daily || 0 },
-        { label: "LEVELUP", value: doc.coinsFrom_levelup || 0 },
-        { label: "MILESTONE", value: doc.coinsFrom_milestone || 0 },
-      ];
+      const lifetime = doc.lifetimeCoins || 0;
+      const tier =
+        lifetime >= 20000 ? "platinum" : lifetime >= 5000 ? "premium" : "standard";
 
       const buf = await generateWalletCard({
         userId,
@@ -62,10 +57,9 @@ module.exports = {
           size: 256,
         }),
         totalCoins: doc.totalCoins || 0,
-        lifetimeCoins: doc.lifetimeCoins || 0,
+        lifetimeCoins: lifetime,
         earnedToday,
-        sources,
-        issuedAt: today,
+        tier,
       });
 
       const attachment = new AttachmentBuilder(buf, {
