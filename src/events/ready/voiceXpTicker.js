@@ -1,8 +1,9 @@
 require("colors");
 const cron = require("node-cron");
-const { levelSystem } = require("../../config");
+const { levelSystem, coinSystem } = require("../../config");
 const { isVoiceXpEligible } = require("../../utils/xpGuards");
 const grantXp = require("../../features/leveling/grantXp");
+const grantCoins = require("../../features/economy/grantCoins");
 const voiceSessionStore = require("../../utils/voiceSessionStore");
 
 module.exports = async (client) => {
@@ -128,6 +129,32 @@ module.exports = async (client) => {
             channel: null,
             member,
           });
+
+          // 語音金幣：每 N 分鐘給 1（由 minute-of-session 判斷）
+          if (coinSystem?.enabled && client.userCoinsCollection) {
+            const tickMinutes = coinSystem.voice?.tickMinutes ?? 2;
+            const coinsPerTick = coinSystem.voice?.coinsPerTick ?? 1;
+            const elapsedMin = Math.floor(
+              (Date.now() - (session.joinedAt || Date.now())) / 60000
+            );
+            if (
+              tickMinutes > 0 &&
+              coinsPerTick > 0 &&
+              elapsedMin > 0 &&
+              elapsedMin % tickMinutes === 0
+            ) {
+              await grantCoins(client, {
+                userId: session.userId,
+                guildId: session.guildId,
+                username: member.user.username || session.username,
+                avatarHash: member.user.avatar,
+                amount: coinsPerTick,
+                source: "voice",
+                meta: { channelId: currentChannelId },
+                member,
+              });
+            }
+          }
         } catch (error) {
           console.log(`[ERROR] voiceXp tick (${key}):\n${error}`.red);
         }
