@@ -25,8 +25,10 @@ module.exports = async (client, opts) => {
 
   const { afterLevel, beforeLevel, member, after, channel, newBadges } = opts;
   const milestones = cfg.milestones || [];
-  const isMilestone = milestones.includes(afterLevel);
-  if (!isMilestone) return;
+  const crossedMilestone = milestones.some(
+    (m) => m > beforeLevel && m <= afterLevel
+  );
+  if (!crossedMilestone) return;
 
   let targetChannel = null;
   if (cfg.channelId) {
