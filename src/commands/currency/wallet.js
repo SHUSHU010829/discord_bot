@@ -4,7 +4,6 @@ const {
   AttachmentBuilder,
   MessageFlags,
 } = require("discord.js");
-const { DateTime } = require("luxon");
 
 const { coinSystem } = require("../../config");
 const generateWalletCard = require("../../utils/generateWalletCard");
@@ -22,7 +21,7 @@ module.exports = {
       if (!coinSystem?.enabled) {
         return interaction.editReply("🔧 金幣系統尚未啟動！");
       }
-      if (!client.userCoinsCollection || !client.coinTransactionsCollection) {
+      if (!client.userCoinsCollection) {
         return interaction.editReply("🔧 金幣系統尚未啟動，請聯絡舒舒！");
       }
 
@@ -31,17 +30,6 @@ module.exports = {
 
       const doc =
         (await client.userCoinsCollection.findOne({ userId, guildId })) || {};
-
-      // 今日已獲得（全來源加總）
-      const tz = coinSystem?.daily?.resetTimezone || "Asia/Taipei";
-      const today = DateTime.now().setZone(tz).toISODate();
-      const todayAgg = await client.coinTransactionsCollection
-        .aggregate([
-          { $match: { userId, guildId, date: today } },
-          { $group: { _id: null, total: { $sum: "$amount" } } },
-        ])
-        .toArray();
-      const earnedToday = Math.max(0, todayAgg[0]?.total || 0);
 
       const lifetime = doc.lifetimeCoins || 0;
       const tier =
@@ -52,13 +40,9 @@ module.exports = {
         guildId,
         username:
           interaction.member?.displayName || interaction.user.username,
-        avatarUrl: interaction.user.displayAvatarURL({
-          extension: "png",
-          size: 256,
-        }),
         totalCoins: doc.totalCoins || 0,
         lifetimeCoins: lifetime,
-        earnedToday,
+        cardNo: userId.slice(-4),
         tier,
       });
 
