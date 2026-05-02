@@ -15,6 +15,18 @@ const {
 const { getLevelProgress } = require("../../utils/levelMath");
 const { getTier } = require("../../utils/levelTier");
 const { getTwitchSubBonus } = require("../../utils/twitchSubBonus");
+const { getServerBoostBonus } = require("../../utils/serverBoostBonus");
+
+function getPersonalMultiplier(member) {
+  if (!member) return 1;
+  const sub = getTwitchSubBonus(member);
+  const boost = getServerBoostBonus(member);
+  return sub.multiplier * boost.multiplier;
+}
+
+function formatMultiplier(mult) {
+  return Number.isInteger(mult) ? `${mult}` : `${mult.toFixed(2)}`;
+}
 
 const PAGE_SIZE = 10;
 const PAGINATION_TIMEOUT = 5 * 60 * 1000;
@@ -56,10 +68,10 @@ function renderRow(doc, globalIndex, memberMap) {
   const medal = medals[globalIndex] || `**${globalIndex + 1}.**`;
 
   const member = memberMap?.get(doc.userId);
-  const sub = member ? getTwitchSubBonus(member) : { multiplier: 1 };
-  const subBadge = sub.multiplier > 1 ? ` 💜x${sub.multiplier}` : "";
+  const totalMult = getPersonalMultiplier(member);
+  const bonusBadge = totalMult > 1 ? ` ✨x${formatMultiplier(totalMult)}` : "";
 
-  return `${medal} <@${doc.userId}> ・ ${tier.emoji} **Lv.${prog.level}** ・ ${doc.totalXp.toLocaleString()} XP${subBadge}`;
+  return `${medal} <@${doc.userId}> ・ ${tier.emoji} **Lv.${prog.level}** ・ ${doc.totalXp.toLocaleString()} XP${bonusBadge}`;
 }
 
 async function buildMemberMap(guild, docs) {
@@ -132,13 +144,13 @@ function buildContainer({
   if (myRank && myDoc) {
     const myProg = getLevelProgress(myDoc.totalXp);
     const myTier = getTier(myProg.level);
-    const mySub = myMember ? getTwitchSubBonus(myMember) : { multiplier: 1 };
-    const mySubBadge = mySub.multiplier > 1 ? ` 💜x${mySub.multiplier}` : "";
+    const myMult = getPersonalMultiplier(myMember);
+    const myBonusBadge = myMult > 1 ? ` ✨x${formatMultiplier(myMult)}` : "";
     container
       .addSeparatorComponents(new SeparatorBuilder())
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          `**你的排名**：#${myRank} ・ ${myTier.emoji} Lv.${myProg.level} ・ ${myDoc.totalXp.toLocaleString()} XP${mySubBadge}`
+          `**你的排名**：#${myRank} ・ ${myTier.emoji} Lv.${myProg.level} ・ ${myDoc.totalXp.toLocaleString()} XP${myBonusBadge}`
         )
       );
   }

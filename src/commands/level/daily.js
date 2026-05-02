@@ -243,10 +243,14 @@ module.exports = {
         grantResult?.twitchSubMultiplier > 1
           ? `\n-# 💜 ${grantResult.twitchSubName} 加成：x${grantResult.twitchSubMultiplier}`
           : "";
+      const boostLine =
+        grantResult?.boostBonusMultiplier > 1
+          ? `\n-# 🚀 ${grantResult.boostBonusName}：x${grantResult.boostBonusMultiplier}`
+          : "";
 
       container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          `-# 連續 7 天 +50% ・ 連續 30 天 x2 ・ 🛡️ 庫存 ${freezesAfter}/${maxStock}${eventLine}${twitchLine}`
+          `-# 連續 7 天 +50% ・ 連續 30 天 x2 ・ 🛡️ 庫存 ${freezesAfter}/${maxStock}${eventLine}${twitchLine}${boostLine}`
         )
       );
 
