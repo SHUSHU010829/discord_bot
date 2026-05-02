@@ -1,7 +1,8 @@
 require("colors");
 const { DateTime } = require("luxon");
-const { levelSystem } = require("../../config");
+const { levelSystem, coinSystem } = require("../../config");
 const grantXp = require("../../features/leveling/grantXp");
+const grantCoins = require("../../features/economy/grantCoins");
 
 const COOLDOWN_MS = 30 * 1000;
 
@@ -96,7 +97,58 @@ module.exports = async (client, reaction, user) => {
       channel: message.channel,
       member: authorMember,
     });
+
+    // 反應金幣：每 N 個反應給 1 金幣（counter 存在 userCoinsCollection 上）
+    await tryGrantReactionCoin(client, message, authorMember, today, user, reaction);
   } catch (error) {
     console.log(`[ERROR] reactionXp:\n${error}`.red);
   }
 };
+
+async function tryGrantReactionCoin(client, message, authorMember, today, reactor, reaction) {
+  if (!coinSystem?.enabled) return;
+  if (!client.userCoinsCollection || !client.coinTransactionsCollection) return;
+  const cfg = coinSystem.reaction;
+  if (!cfg) return;
+  const reactionsPerCoin = cfg.reactionsPerCoin ?? 2;
+  if (reactionsPerCoin <= 0) return;
+
+  // atomic counter：每滿 reactionsPerCoin 才給 1 金幣
+  const update = await client.userCoinsCollection.findOneAndUpdate(
+    { userId: message.author.id, guildId: message.guild.id },
+    {
+      $inc: { reactionCounter: 1 },
+      $setOnInsert: {
+        userId: message.author.id,
+        guildId: message.guild.id,
+        createdAt: new Date(),
+      },
+    },
+    { upsert: true, returnDocument: "after" },
+  );
+  const after = update.value || update;
+  const counter = after?.reactionCounter || 0;
+  if (counter < reactionsPerCoin) return;
+
+  // 達標 → 重置計數，發 1 金幣
+  await client.userCoinsCollection.updateOne(
+    { userId: message.author.id, guildId: message.guild.id },
+    { $set: { reactionCounter: 0 } },
+  );
+
+  await grantCoins(client, {
+    userId: message.author.id,
+    guildId: message.guild.id,
+    username: message.author.username,
+    avatarHash: message.author.avatar,
+    amount: 1,
+    source: "reaction",
+    meta: {
+      channelId: message.channelId,
+      messageId: message.id,
+      reactorId: reactor.id,
+      emoji: reaction.emoji?.name || "?",
+    },
+    member: authorMember,
+  });
+}

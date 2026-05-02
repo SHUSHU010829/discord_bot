@@ -50,6 +50,10 @@ module.exports = async (client) => {
     const levelRolesCollection = database.collection("LevelRoles");
     const voiceSessionsCollection = database.collection("VoiceSessions");
 
+    // 金幣系統 collections
+    const userCoinsCollection = database.collection("UserCoins");
+    const coinTransactionsCollection = database.collection("CoinTransactions");
+
     // Twitch chat 同步去重
     const twitchScoreFlushesCollection = database.collection("TwitchScoreFlushes");
 
@@ -72,6 +76,8 @@ module.exports = async (client) => {
     client.dailyCheckinCollection = dailyCheckinCollection;
     client.levelRolesCollection = levelRolesCollection;
     client.voiceSessionsCollection = voiceSessionsCollection;
+    client.userCoinsCollection = userCoinsCollection;
+    client.coinTransactionsCollection = coinTransactionsCollection;
     client.twitchScoreFlushesCollection = twitchScoreFlushesCollection;
     client.twitchLiveStateCollection = twitchLiveStateCollection;
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
@@ -163,6 +169,29 @@ module.exports = async (client) => {
       await twitchScoreFlushesCollection.createIndex(
         { sessionId: 1 },
         { unique: true, name: "uniq_twitch_session" }
+      );
+
+      // 金幣系統索引
+      await userCoinsCollection.createIndex(
+        { userId: 1, guildId: 1 },
+        { unique: true, name: "uniq_coin_user_guild" }
+      );
+
+      await coinTransactionsCollection.createIndex(
+        { userId: 1, guildId: 1, createdAt: -1 },
+        { name: "coin_user_guild_time" }
+      );
+      await coinTransactionsCollection.createIndex(
+        { userId: 1, guildId: 1, source: 1, date: 1 },
+        { name: "coin_user_guild_source_date" }
+      );
+      await coinTransactionsCollection.createIndex(
+        { guildId: 1, date: 1 },
+        { name: "coin_guild_date" }
+      );
+      await coinTransactionsCollection.createIndex(
+        { createdAt: 1 },
+        { expireAfterSeconds: 90 * 24 * 60 * 60, name: "coin_ttl_90d" }
       );
     } catch (indexError) {
       console.log(

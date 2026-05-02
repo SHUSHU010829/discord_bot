@@ -61,6 +61,61 @@
     }
   },
 
+  "coinSystem": {
+    "enabled": true,
+    "message": {
+      "minCoins": 0,
+      "maxCoins": 2,
+      "cooldownSeconds": 60,
+      "minCharacters": 4
+    },
+    "voice": {
+      "coinsPerTick": 1,
+      "tickMinutes": 2
+    },
+    "messageVoiceDailyCap": 30,
+    "reaction": {
+      "reactionsPerCoin": 2,
+      "dailyCapPerUser": 10
+    },
+    "daily": {
+      "baseCoins": 30,
+      "streakBonusPerDay": 5,
+      "streakBonusCapDays": 10,
+      "streak7Multiplier": 2.0,
+      "streak30Multiplier": 3.0,
+      "resetTimezone": "Asia/Taipei"
+    },
+    "levelUp": {
+      "coinsPerLevel": 5,
+      "milestones": {
+        "5": 50,
+        "10": 150,
+        "20": 400,
+        "30": 1000,
+        "50": 2500,
+        "75": 5000,
+        "100": 15000
+      }
+    },
+    "twitchSubBonus": {
+      "enabled": true,
+      "appliesTo": ["message", "voice", "daily"],
+      "tiers": [
+        { "roleId": "1181162291568332891", "name": "Twitch Tier 1", "multiplier": 1.1 },
+        { "roleId": "1181162291568332892", "name": "Twitch Tier 2", "multiplier": 1.3 },
+        { "roleId": "1181162291568332893", "name": "Twitch Tier 3", "multiplier": 1.5 }
+      ]
+    },
+    "serverBoostBonus": {
+      "enabled": true,
+      "appliesTo": ["message", "voice", "daily"],
+      "roleId": "1181220255733907599",
+      "name": "伺服器加成",
+      "multiplier": 1.3
+    }
+  },
+
   "twitchSync": {
     "enabled": true,
     "guildId": "1174352637295067157",

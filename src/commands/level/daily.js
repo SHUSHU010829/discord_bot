@@ -11,8 +11,9 @@ const {
 } = require("discord.js");
 const { DateTime } = require("luxon");
 
-const { levelSystem } = require("../../config");
+const { levelSystem, coinSystem } = require("../../config");
 const grantXp = require("../../features/leveling/grantXp");
+const grantCoins = require("../../features/economy/grantCoins");
 const generateCheckinCard = require("../../utils/generateCheckinCard");
 
 module.exports = {
@@ -155,6 +156,30 @@ module.exports = {
         channel: interaction.channel,
       });
 
+      // 每日金幣（與 XP 同步發，使用相同 streak / 倍率邏輯）
+      let coinResult = null;
+      if (coinSystem?.enabled && client.userCoinsCollection) {
+        const cCfg = coinSystem.daily || {};
+        const baseC = cCfg.baseCoins ?? 30;
+        const bonusDaysC = Math.min(streak, cCfg.streakBonusCapDays || 10);
+        let coinAmt = baseC + bonusDaysC * (cCfg.streakBonusPerDay || 0);
+        let coinMult = 1;
+        if (streak >= 30) coinMult = cCfg.streak30Multiplier || 3.0;
+        else if (streak >= 7) coinMult = cCfg.streak7Multiplier || 2.0;
+        coinAmt = Math.floor(coinAmt * coinMult);
+
+        coinResult = await grantCoins(client, {
+          userId,
+          guildId,
+          username: interaction.user.username,
+          avatarHash: interaction.user.avatar,
+          amount: coinAmt,
+          source: "daily",
+          member: interaction.member,
+          meta: { streak, streakMultiplier: coinMult },
+        });
+      }
+
       const calendarStart = DateTime.now()
         .setZone(tz)
         .minus({ days: 29 })
@@ -188,6 +213,8 @@ module.exports = {
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(
             `## 🗓️ 簽到成功！\n獲得 **+${xp} XP**${
+              coinResult?.granted ? ` ・ **+${coinResult.granted} 💰**` : ""
+            }${
               multiplier > 1 ? ` ・ 連勝加成 x${multiplier}` : ""
             } ・ 連續 **${streak}** 天`
           )

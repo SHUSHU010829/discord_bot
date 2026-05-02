@@ -1,13 +1,14 @@
 require("colors");
 const { DateTime } = require("luxon");
 const { getLevelProgress } = require("../../utils/levelMath");
-const { levelSystem } = require("../../config");
+const { levelSystem, coinSystem } = require("../../config");
 const { getCurrentMultiplier } = require("../../utils/xpMultiplier");
 const { getTwitchSubBonus } = require("../../utils/twitchSubBonus");
 const { getServerBoostBonus } = require("../../utils/serverBoostBonus");
 const syncLevelRoles = require("./levelRoles");
 const announceLevelUp = require("./levelUpAnnouncer");
 const checkBadges = require("./badgeChecker");
+const grantCoins = require("../economy/grantCoins");
 
 module.exports = async (client, opts) => {
   if (!client.userLevelsCollection) return null;
@@ -120,6 +121,43 @@ module.exports = async (client, opts) => {
     console.log(
       `[LEVEL] ${opts.username} ${beforeLevel} → ${afterLevel} (+${opts.amount} from ${opts.source})`.cyan
     );
+
+    // 升級金幣獎勵（每升一級 → level × coinsPerLevel；觸到 milestone → 額外發放）
+    if (coinSystem?.enabled && client.userCoinsCollection) {
+      const coinsPerLevel = coinSystem.levelUp?.coinsPerLevel ?? 0;
+      const milestones = coinSystem.levelUp?.milestones || {};
+      for (let lv = beforeLevel + 1; lv <= afterLevel; lv += 1) {
+        if (coinsPerLevel > 0) {
+          grantCoins(client, {
+            userId: opts.userId,
+            guildId: opts.guildId,
+            username: opts.username,
+            avatarHash: opts.avatarHash,
+            amount: lv * coinsPerLevel,
+            source: "levelup",
+            meta: { level: lv },
+            member: opts.member,
+          }).catch((e) =>
+            console.log(`[ERROR] grantCoins levelup: ${e}`.red)
+          );
+        }
+        const msReward = milestones[String(lv)];
+        if (msReward && msReward > 0) {
+          grantCoins(client, {
+            userId: opts.userId,
+            guildId: opts.guildId,
+            username: opts.username,
+            avatarHash: opts.avatarHash,
+            amount: msReward,
+            source: "milestone",
+            meta: { level: lv },
+            member: opts.member,
+          }).catch((e) =>
+            console.log(`[ERROR] grantCoins milestone: ${e}`.red)
+          );
+        }
+      }
+    }
 
     // 等級身分組同步（fire-and-forget，失敗不影響回傳）
     if (opts.member) {
