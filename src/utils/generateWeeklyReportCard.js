@@ -3,6 +3,7 @@ const path = require("path");
 const satori = require("satori").default || require("satori");
 const { html } = require("satori-html");
 const { Resvg } = require("@resvg/resvg-js");
+const { loadAdditionalAsset } = require("./satoriEmoji");
 
 const FONT_DIR = path.join(__dirname, "../../fonts");
 let fontsCache = null;
@@ -95,6 +96,7 @@ module.exports = async function generateWeeklyReportCard(data) {
     width: 1080,
     height: 1350,
     fonts,
+    loadAdditionalAsset,
   });
 
   const png = new Resvg(svg, {
