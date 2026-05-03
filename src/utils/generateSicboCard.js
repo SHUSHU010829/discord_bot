@@ -136,8 +136,8 @@ function buildMarkup(data) {
         </div>
 
         <!-- SUM -->
-        <div style="display:flex;justify-content:center;align-items:center;width:100%;margin-top:24px;">
-          <div style="display:flex;font-family:'SpaceMono';font-size:16px;letter-spacing:6px;color:${muted};">SUM</div>
+        <div style="display:flex;justify-content:center;align-items:flex-end;width:100%;margin-top:24px;">
+          <div style="display:flex;font-family:'SpaceMono';font-size:16px;letter-spacing:6px;color:${muted};line-height:1;">SUM</div>
           <div style="display:flex;margin-left:16px;font-family:'NotoSansTC';font-weight:900;font-size:54px;color:${accent};line-height:1;">${sum}</div>
         </div>
 
@@ -148,14 +148,14 @@ function buildMarkup(data) {
 
         <!-- 底部 BET / BALANCE / @USER -->
         <div style="display:flex;width:100%;justify-content:space-between;align-items:center;margin-top:auto;padding-top:14px;border-top:2px dashed ${muted};">
-          <div style="display:flex;align-items:baseline;">
-            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${muted};">BET</div>
-            <div style="display:flex;margin-left:12px;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${ink};">${betAmount.toLocaleString()}</div>
-            ${won ? `<div style="display:flex;margin-left:18px;font-family:'SpaceMono';font-size:13px;letter-spacing:3px;color:${muted};">×${multiplier}</div>` : ""}
+          <div style="display:flex;align-items:flex-end;">
+            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${muted};line-height:1;">BET</div>
+            <div style="display:flex;margin-left:12px;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${ink};line-height:1;">${betAmount.toLocaleString()}</div>
+            ${won ? `<div style="display:flex;margin-left:18px;font-family:'SpaceMono';font-size:13px;letter-spacing:3px;color:${muted};line-height:1;">×${multiplier}</div>` : ""}
           </div>
-          <div style="display:flex;align-items:baseline;">
-            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${muted};">BALANCE</div>
-            <div style="display:flex;margin-left:12px;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${ink};">${balance.toLocaleString()}</div>
+          <div style="display:flex;align-items:flex-end;">
+            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${muted};line-height:1;">BALANCE</div>
+            <div style="display:flex;margin-left:12px;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${ink};line-height:1;">${balance.toLocaleString()}</div>
           </div>
           <div style="display:flex;font-family:'SpaceMono';font-size:14px;letter-spacing:5px;color:${ink};">${handle}</div>
         </div>
