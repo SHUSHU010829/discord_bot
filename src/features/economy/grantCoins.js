@@ -8,6 +8,7 @@ const {
 const { getTodayCoinsBySources } = require("./dailyCoinCap");
 
 const MSG_VOICE_SOURCES = ["message", "voice"];
+const CASINO_SOURCES = ["bet", "payout"];
 
 module.exports = async (client, opts) => {
   if (!coinSystem?.enabled) return null;
@@ -20,10 +21,10 @@ module.exports = async (client, opts) => {
 
   let amount = Math.floor(opts.amount || 0);
   if (amount === 0 && opts.source !== "admin") return null;
-  if (amount < 0 && opts.source !== "admin") return null;
+  if (amount < 0 && opts.source !== "admin" && !CASINO_SOURCES.includes(opts.source)) return null;
 
-  // 倍率（admin 不套用）
-  const skipMultipliers = opts.source === "admin";
+  // 倍率（admin / casino 不套用）
+  const skipMultipliers = opts.source === "admin" || CASINO_SOURCES.includes(opts.source);
   const twitchInfo = skipMultipliers
     ? { multiplier: 1, name: null }
     : getCoinTwitchSubBonus(opts.member, opts.source);

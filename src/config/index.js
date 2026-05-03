@@ -7,6 +7,7 @@ const level = require("./level.json");
 const steamDeals = require("./steamDeals.json");
 const freeGames = require("./freeGames.json");
 const twitch = require("./twitch.json");
+const casino = require("./casino.json");
 
 module.exports = {
   ...server,
@@ -16,4 +17,5 @@ module.exports = {
   ...steamDeals,
   ...freeGames,
   ...twitch,
+  ...casino,
 };
