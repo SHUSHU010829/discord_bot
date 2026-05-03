@@ -18,47 +18,47 @@ const PROPOSAL_TYPE_TO_TEMPLATE = {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("proposal")
-    .setDescription("🗳️ 管理遊戲頻道提案投票")
+    .setDescription("[ADMIN] 🗳️ Manage game-channel proposal votes (admin only)")
     .addSubcommand((subcommand) =>
       subcommand
         .setName("start")
-        .setDescription("發起新遊戲頻道提案投票")
+        .setDescription("Start a new game-channel proposal vote")
         .addStringOption((option) =>
           option
             .setName("game")
-            .setDescription("遊戲名稱")
+            .setDescription("Game name")
             .setRequired(true)
         )
         .addStringOption((option) =>
           option
             .setName("type")
-            .setDescription("提案類型")
+            .setDescription("Proposal type")
             .setRequired(true)
             .addChoices(
-              { name: "新增頻道 (Create)", value: "create" },
-              { name: "封存頻道 (Archive)", value: "archive" }
+              { name: "Create channel", value: "create" },
+              { name: "Archive channel", value: "archive" }
             )
         )
     )
     .addSubcommand((subcommand) =>
       subcommand
         .setName("end")
-        .setDescription("⏭️ 提早結束進行中的投票（管理員）")
+        .setDescription("⏭️ End an ongoing vote early (admin only)")
         .addStringOption((option) =>
           option
             .setName("message_url")
-            .setDescription("投票訊息的網址")
+            .setDescription("URL of the vote message")
             .setRequired(true)
         )
     )
     .addSubcommand((subcommand) =>
       subcommand
         .setName("cancel")
-        .setDescription("🗑️ 取消進行中的投票（管理員）")
+        .setDescription("🗑️ Cancel an ongoing vote (admin only)")
         .addStringOption((option) =>
           option
             .setName("message_url")
-            .setDescription("投票訊息的網址")
+            .setDescription("URL of the vote message")
             .setRequired(true)
         )
     )

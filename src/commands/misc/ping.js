@@ -3,7 +3,7 @@ const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("ping")
-    .setDescription("🏓 測試用")
+    .setDescription("[ADMIN] 🏓 Latency check (admin only)")
     .setDMPermission(false)
     .toJSON(),
 

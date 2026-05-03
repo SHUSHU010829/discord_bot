@@ -12,40 +12,40 @@ const { randomUUID } = require("crypto");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("vote")
-    .setDescription("🗳️ 發起投票提案")
+    .setDescription("[ADMIN] 🗳️ Start a vote proposal (Manage Channels only)")
     .addSubcommand((subcommand) =>
       subcommand
         .setName("create")
-        .setDescription("建立新的投票")
+        .setDescription("Create a new vote")
         .addStringOption((option) =>
           option
             .setName("template")
-            .setDescription("選擇投票模板")
+            .setDescription("Pick a vote template")
             .setRequired(true)
             .addChoices(
-              { name: "🎮 遊戲頻道新增", value: "game_create" },
-              { name: "📦 遊戲頻道封存", value: "game_archive" },
-              { name: "🎉 活動提案", value: "event" },
-              { name: "📜 規則修改", value: "rule_change" },
-              { name: "💡 一般提案", value: "general" }
+              { name: "🎮 Game channel: create", value: "game_create" },
+              { name: "📦 Game channel: archive", value: "game_archive" },
+              { name: "🎉 Event proposal", value: "event" },
+              { name: "📜 Rule change", value: "rule_change" },
+              { name: "💡 General proposal", value: "general" }
             )
         )
         .addStringOption((option) =>
           option
             .setName("title")
-            .setDescription("投票標題（例如：遊戲名稱、活動名稱、規則描述）")
+            .setDescription("Vote title (e.g. game name, event name, rule summary)")
             .setRequired(true)
         )
         .addStringOption((option) =>
           option
             .setName("description")
-            .setDescription("投票詳細說明（可選）")
+            .setDescription("Vote details (optional)")
             .setRequired(false)
         )
         .addIntegerOption((option) =>
           option
             .setName("duration")
-            .setDescription("投票時長（小時，預設 24 小時）")
+            .setDescription("Vote duration in hours (default 24)")
             .setRequired(false)
             .setMinValue(1)
             .setMaxValue(168)
@@ -53,7 +53,7 @@ module.exports = {
         .addChannelOption((option) =>
           option
             .setName("channel")
-            .setDescription("指定投票頻道（可選，預設使用設定的投票頻道）")
+            .setDescription("Override the vote channel (optional, defaults to configured channel)")
             .setRequired(false)
         )
     )

@@ -12,17 +12,17 @@ const { getLevelProgress } = require("../../utils/levelMath");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("levelroles")
-    .setDescription("[ADMIN] 管理等級身分組對應表")
+    .setDescription("[ADMIN] Manage the level → role mapping table (admin only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
     .setDMPermission(false)
     .addSubcommand((sub) =>
       sub
         .setName("set")
-        .setDescription("設定某等級對應的身分組（已存在會覆蓋）")
+        .setDescription("Set the role granted at a level (overwrites if exists)")
         .addIntegerOption((opt) =>
           opt
             .setName("level")
-            .setDescription("達到的等級")
+            .setDescription("Target level")
             .setMinValue(1)
             .setMaxValue(999)
             .setRequired(true)
@@ -30,30 +30,30 @@ module.exports = {
         .addRoleOption((opt) =>
           opt
             .setName("role")
-            .setDescription("要給的身分組")
+            .setDescription("Role to grant")
             .setRequired(true)
         )
     )
     .addSubcommand((sub) =>
       sub
         .setName("remove")
-        .setDescription("移除某等級的對應")
+        .setDescription("Remove the mapping for a level")
         .addIntegerOption((opt) =>
           opt
             .setName("level")
-            .setDescription("要移除的等級")
+            .setDescription("Level to remove")
             .setMinValue(1)
             .setMaxValue(999)
             .setRequired(true)
         )
     )
     .addSubcommand((sub) =>
-      sub.setName("list").setDescription("查看目前所有等級身分組對應")
+      sub.setName("list").setDescription("List the current level → role mappings")
     )
     .addSubcommand((sub) =>
       sub
         .setName("apply")
-        .setDescription("依目前對應表重新同步所有成員的等級身分組（可能需數秒）")
+        .setDescription("Re-sync every member's level roles based on the current table (may take a few seconds)")
     )
     .toJSON(),
 

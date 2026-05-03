@@ -10,26 +10,26 @@ const autocompleteBeverageStore = require("../../utils/autocompleteBeverageStore
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("匯入飲料店菜單")
-    .setDescription("快速匯入整個飲料店的菜單（支援大量品項）🥤")
+    .setName("import-beverage-menu")
+    .setDescription("[ADMIN] 🥤 Import a full beverage-store menu in bulk (admin only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addStringOption((option) =>
       option
         .setName("飲料店")
-        .setDescription("飲料店名稱（例如：可不可紅茶）")
+        .setDescription("Beverage store name (e.g. 可不可紅茶)")
         .setRequired(true)
         .setAutocomplete(true)
     )
     .addStringOption((option) =>
       option
         .setName("菜單")
-        .setDescription("每行一個品項，或用逗號/分號分隔")
+        .setDescription("One item per line, or separated by commas/semicolons")
         .setRequired(true)
     )
     .addBooleanOption((option) =>
       option
         .setName("覆蓋現有")
-        .setDescription("是否刪除該店現有菜單後重新匯入（預設：否）")
+        .setDescription("Wipe the store's existing menu before importing (default: false)")
     ),
 
   autocomplete: autocompleteBeverageStore,

@@ -18,29 +18,29 @@ const {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("setup-suggestion")
-    .setDescription("💡 設置建議系統面板")
+    .setDescription("[ADMIN] 💡 Set up the suggestion panel (admin only)")
     .addStringOption((option) =>
       option
         .setName("title")
-        .setDescription("建議面板標題（留空使用預設）")
+        .setDescription("Suggestion panel title (leave empty for default)")
         .setRequired(false)
     )
     .addStringOption((option) =>
       option
         .setName("description")
-        .setDescription("建議面板描述（留空使用預設）")
+        .setDescription("Suggestion panel description (leave empty for default)")
         .setRequired(false)
     )
     .addStringOption((option) =>
       option
         .setName("category_id")
-        .setDescription("建議類別 ID（留空使用預設）")
+        .setDescription("Suggestion category ID (leave empty for default)")
         .setRequired(false)
     )
     .addRoleOption((option) =>
       option
         .setName("support_role")
-        .setDescription("支援團隊身份組（留空使用預設）")
+        .setDescription("Support team role (leave empty for default)")
         .setRequired(false)
     )
     .setDMPermission(false)
