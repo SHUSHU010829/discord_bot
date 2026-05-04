@@ -15,15 +15,19 @@ let fontsCache = null;
 
 async function loadFonts() {
   if (fontsCache) return fontsCache;
-  const [tcBlack, tcMedium, mono] = await Promise.all([
+  const [tcBlack, tcMedium, jpBlack, jpMedium, mono] = await Promise.all([
     fs.readFile(path.join(FONT_DIR, "NotoSansTC-Black.woff")),
     fs.readFile(path.join(FONT_DIR, "NotoSansTC-Medium.woff")),
+    fs.readFile(path.join(FONT_DIR, "NotoSansJP-Black.otf")),
+    fs.readFile(path.join(FONT_DIR, "NotoSansJP-Medium.otf")),
     fs.readFile(path.join(FONT_DIR, "SpaceMono-Regular.woff")),
   ]);
   fontsCache = [
     { name: "SpaceMono", data: mono, weight: 400, style: "normal" },
     { name: "NotoSansTC", data: tcMedium, weight: 500, style: "normal" },
     { name: "NotoSansTC", data: tcBlack, weight: 900, style: "normal" },
+    { name: "NotoSansJP", data: jpMedium, weight: 500, style: "normal" },
+    { name: "NotoSansJP", data: jpBlack, weight: 900, style: "normal" },
   ];
   return fontsCache;
 }
