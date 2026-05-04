@@ -1,0 +1,314 @@
+// 樂透開獎流程 + 期數管理。
+// - getCurrentOpenDraw: 取得當期 open draw
+// - ensureNextDraw: 開新一期(含 rollover、期中提醒排程)
+// - runDraw: 執行開獎(鎖期 → 抽號 → 比對 → 派彩 → 滾池 → 開新期)
+
+require("colors");
+const { DateTime } = require("luxon");
+
+const { casino } = require("../../../config");
+const { generateWinningNumbers, buildDrawId } = require("./draw");
+const { countMatches } = require("./numbers");
+const { calculatePayout } = require("./payout");
+const { generateReminderSchedule } = require("./reminderScheduler");
+const grantCoins = require("../../economy/grantCoins");
+
+const TZ = "Asia/Taipei";
+
+function getLotteryConfig() {
+  return casino?.lottery || {};
+}
+
+function getTypeConfig(lotteryType) {
+  return getLotteryConfig().types?.[lotteryType] || {};
+}
+
+/**
+ * 計算下一個週日 21:00 (Asia/Taipei) 的時間。
+ */
+function nextSundayDrawTime(after = DateTime.now().setZone(TZ)) {
+  // luxon weekday: 1=Mon, 7=Sun
+  let d = after.set({ hour: 21, minute: 0, second: 0, millisecond: 0 });
+  // 推到週日
+  while (d.weekday !== 7) d = d.plus({ days: 1 });
+  // 如果今天就是週日但已經過 21:00,推到下個週日
+  if (d <= after) d = d.plus({ weeks: 1 });
+  return d;
+}
+
+function formatDrawIdDate(scheduledAt) {
+  return DateTime.fromJSDate(scheduledAt).setZone(TZ).toFormat("yyyyMMdd");
+}
+
+async function getCurrentOpenDraw(client, lotteryType) {
+  if (!client.lotteryDrawsCollection) return null;
+  return client.lotteryDrawsCollection.findOne({
+    lotteryType,
+    status: "open",
+  });
+}
+
+/**
+ * 開新一期(若尚未存在)。
+ * @param {object} client
+ * @param {string} lotteryType
+ * @param {object} options
+ * @param {number} [options.rolledOverAmount=0]
+ * @param {string} [options.rolledOverFromDrawId]
+ * @returns {Promise<object|null>} 新建的 draw doc (若已有 open 期則回傳該期)
+ */
+async function ensureNextDraw(client, lotteryType, options = {}) {
+  if (!client.lotteryDrawsCollection) return null;
+
+  const existing = await getCurrentOpenDraw(client, lotteryType);
+  if (existing) return existing;
+
+  const typeCfg = getTypeConfig(lotteryType);
+  if (!typeCfg.enabled) return null;
+
+  const drawTime = nextSundayDrawTime();
+  const dateStr = formatDrawIdDate(drawTime.toJSDate());
+  const drawId = buildDrawId(dateStr, lotteryType);
+
+  // 先檢查 drawId 是否已存在(可能是 settled 期),若存在就略過
+  const dup = await client.lotteryDrawsCollection.findOne({ drawId });
+  if (dup) {
+    if (dup.status === "open") return dup;
+    return null;
+  }
+
+  // drawNumber:該玩法已開過幾期 + 1
+  const lastBy = await client.lotteryDrawsCollection
+    .find({ lotteryType })
+    .sort({ drawNumber: -1 })
+    .limit(1)
+    .toArray();
+  const drawNumber = (lastBy[0]?.drawNumber || 0) + 1;
+
+  const systemSeed = typeCfg.systemSeed || 0;
+  const rolledOverAmount = Math.max(0, Math.floor(options.rolledOverAmount || 0));
+  const initialPool = systemSeed + rolledOverAmount;
+
+  const scheduledReminders = generateReminderSchedule(drawTime.toJSDate());
+
+  const doc = {
+    drawId,
+    lotteryType,
+    drawNumber,
+    status: "open",
+    scheduledAt: drawTime.toJSDate(),
+    drawnAt: null,
+    winningNumbers: null,
+    pool: initialPool,
+    systemSeedAmount: systemSeed,
+    rolledOverFrom: rolledOverAmount > 0 ? options.rolledOverFromDrawId || null : null,
+    announcedMilestones: [],
+    scheduledReminders,
+    payout: null,
+    totalTickets: 0,
+    totalRevenue: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  try {
+    const result = await client.lotteryDrawsCollection.insertOne(doc);
+    doc._id = result.insertedId;
+    console.log(
+      `[LOTTERY] 開新期 ${drawId}(底池 ${initialPool},開獎 ${drawTime.toFormat("MM-dd HH:mm")})`.green
+    );
+    return doc;
+  } catch (err) {
+    if (err.code === 11000) {
+      // 別人剛好同時開了,讀回來
+      return client.lotteryDrawsCollection.findOne({ drawId });
+    }
+    throw err;
+  }
+}
+
+/**
+ * 執行開獎(冪等,只會處理 status=open 的期)。
+ */
+async function runDraw(client, lotteryType) {
+  if (!client.lotteryDrawsCollection || !client.lotteryTicketsCollection) {
+    throw new Error("DB not ready");
+  }
+
+  // 鎖期:open → drawing
+  const lockResult = await client.lotteryDrawsCollection.findOneAndUpdate(
+    { lotteryType, status: "open" },
+    { $set: { status: "drawing", updatedAt: new Date() } },
+    { returnDocument: "after" }
+  );
+  const draw = lockResult?.value || lockResult;
+  if (!draw) {
+    console.log(`[LOTTERY] runDraw ${lotteryType}: 沒有 open 期可開`.yellow);
+    return null;
+  }
+
+  console.log(`[LOTTERY] 開始開獎 ${draw.drawId}(彩池 ${draw.pool})`.cyan);
+
+  const winningNumbers = generateWinningNumbers(lotteryType);
+  const tickets = await client.lotteryTicketsCollection
+    .find({ drawId: draw.drawId })
+    .toArray();
+
+  // 比對每張票
+  const ticketMatched = tickets.map((t) => ({
+    ticketId: t.ticketId,
+    matched: countMatches(t.numbers, winningNumbers),
+  }));
+
+  const typeCfg = getTypeConfig(lotteryType);
+  const { prizes, ticketAssignments } = calculatePayout({
+    lotteryType,
+    pool: draw.pool,
+    tickets: ticketMatched,
+    config: typeCfg,
+  });
+
+  // bulkWrite 票券更新
+  const ticketsById = new Map(tickets.map((t) => [t.ticketId, t]));
+  if (ticketAssignments.length > 0) {
+    const ops = [];
+    for (const a of ticketAssignments) {
+      const tk = ticketsById.get(a.ticketId);
+      const matched = ticketMatched.find((m) => m.ticketId === a.ticketId)?.matched || 0;
+      ops.push({
+        updateOne: {
+          filter: { ticketId: a.ticketId },
+          update: {
+            $set: {
+              matched,
+              prize: a.prize,
+              payoutAmount: a.payoutAmount,
+            },
+          },
+        },
+      });
+      // 派彩(只發中獎的)
+      if (a.prize && a.payoutAmount > 0 && tk) {
+        await grantCoins(client, {
+          userId: tk.userId,
+          guildId: tk.guildId,
+          username: tk.username,
+          amount: a.payoutAmount,
+          source: "payout",
+          meta: {
+            game: "lottery",
+            lotteryType,
+            drawId: draw.drawId,
+            ticketId: a.ticketId,
+            prize: a.prize,
+            matched,
+          },
+        });
+      }
+    }
+    if (ops.length > 0) {
+      await client.lotteryTicketsCollection.bulkWrite(ops, { ordered: false });
+    }
+  }
+
+  // 包牌彙總
+  const wheelingIds = new Set(
+    tickets.map((t) => t.wheelingId).filter(Boolean)
+  );
+  for (const wid of wheelingIds) {
+    const wheelTickets = tickets.filter((t) => t.wheelingId === wid);
+    let totalWon = 0;
+    let bestPrize = null;
+    const prizeRank = { jackpot: 4, second: 3, third: 2, fourth: 1 };
+    for (const t of wheelTickets) {
+      const a = ticketAssignments.find((x) => x.ticketId === t.ticketId);
+      if (!a) continue;
+      totalWon += a.payoutAmount || 0;
+      if (a.prize && (!bestPrize || prizeRank[a.prize] > prizeRank[bestPrize])) {
+        bestPrize = a.prize;
+      }
+    }
+    await client.lotteryWheelsCollection?.updateOne(
+      { wheelingId: wid },
+      { $set: { totalWon, bestPrize } }
+    );
+  }
+
+  // 更新訂閱統計(該期被買的票對應的 subscriptionId)
+  const subIds = new Set(
+    tickets.map((t) => t.subscriptionId).filter(Boolean)
+  );
+  for (const sid of subIds) {
+    const subTickets = tickets.filter((t) => t.subscriptionId === sid);
+    let won = 0;
+    for (const t of subTickets) {
+      const a = ticketAssignments.find((x) => x.ticketId === t.ticketId);
+      if (a) won += a.payoutAmount || 0;
+    }
+    if (won > 0) {
+      await client.lotterySubscriptionsCollection?.updateOne(
+        { subscriptionId: sid },
+        { $inc: { totalWon: won } }
+      );
+    }
+  }
+
+  // 結算 draw doc
+  const rolledOverAmount = prizes.rolledOver?.amount || 0;
+  const payoutDoc = {
+    jackpot: prizes.jackpot,
+    second: prizes.second,
+    fourth: prizes.fourth || null,
+    third: prizes.third || null,
+    rolledOver: { amount: rolledOverAmount, toDrawId: null },
+  };
+
+  await client.lotteryDrawsCollection.updateOne(
+    { _id: draw._id },
+    {
+      $set: {
+        status: "settled",
+        drawnAt: new Date(),
+        winningNumbers,
+        payout: payoutDoc,
+        updatedAt: new Date(),
+      },
+    }
+  );
+
+  console.log(
+    `[LOTTERY] ${draw.drawId} 開獎完成。中獎號碼 [${winningNumbers.join(",")}],滾池 ${rolledOverAmount}`.green
+  );
+
+  // 開新期
+  const newDraw = await ensureNextDraw(client, lotteryType, {
+    rolledOverAmount,
+    rolledOverFromDrawId: draw.drawId,
+  });
+  if (newDraw && rolledOverAmount > 0) {
+    await client.lotteryDrawsCollection.updateOne(
+      { _id: draw._id },
+      { $set: { "payout.rolledOver.toDrawId": newDraw.drawId } }
+    );
+  }
+
+  return {
+    draw: {
+      ...draw,
+      winningNumbers,
+      payout: payoutDoc,
+      status: "settled",
+      drawnAt: new Date(),
+    },
+    nextDraw: newDraw,
+    tickets,
+    ticketAssignments,
+  };
+}
+
+module.exports = {
+  getCurrentOpenDraw,
+  ensureNextDraw,
+  runDraw,
+  nextSundayDrawTime,
+};
