@@ -70,7 +70,7 @@ function settleHeadline(state) {
     case "push":
       return `🤝 **平手** 退回 ${stake.toLocaleString()} credits`;
     case "lose":
-      return `💸 **莊家贏了**，下次加油！`;
+      return `💸 **莊家贏了** －${stake.toLocaleString()} credits，下次加油！`;
     default:
       return "";
   }

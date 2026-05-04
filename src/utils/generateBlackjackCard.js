@@ -161,19 +161,24 @@ function buildMarkup(data) {
     ? `<div style="display:flex;margin-left:14px;padding:2px 10px;background:${PALETTE.gold};color:${PALETTE.ink};font-family:'SpaceMono';font-size:14px;letter-spacing:2px;">BJ</div>`
     : "";
 
-  // 結算文案：push 顯示退回金額、win/blackjack 顯示派彩、lose 不顯示金額
-  const settleAmount =
-    state.result === "push"
-      ? stake
-      : state.payout > 0
-      ? state.payout
-      : 0;
-  const settleAmountPrefix = state.result === "push" ? "退回 " : "+";
+  // 結算金額：push = 退回本金、win/blackjack = 派彩、lose = 顯示輸掉的本金
+  let settleAmount = 0;
+  let settleAmountPrefix = "";
+  if (state.result === "push") {
+    settleAmount = stake;
+    settleAmountPrefix = "退回 ";
+  } else if (state.result === "lose") {
+    settleAmount = stake;
+    settleAmountPrefix = "−";
+  } else if (state.payout > 0) {
+    settleAmount = state.payout;
+    settleAmountPrefix = "+";
+  }
 
   const resultBlock = resultLabel
     ? `
       <div style="display:flex;flex-direction:row;align-items:center;justify-content:center;width:100%;margin-top:18px;">
-        <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:42px;color:${resultLabel.color};letter-spacing:6px;line-height:1;">${resultLabel.text}</div>
+        <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:42px;color:${resultLabel.color};letter-spacing:2px;line-height:1;">${resultLabel.text}</div>
         ${
           settleAmount > 0
             ? `<div style="display:flex;align-items:flex-end;margin-left:24px;">
