@@ -32,7 +32,7 @@ function buildMarkup(data) {
     username,
     totalCoins,
     lifetimeCoins,
-    cardNo = "0000",
+    cardNo,
     tier = "standard",
   } = data;
 
@@ -40,42 +40,47 @@ function buildMarkup(data) {
   const card = "#F4ECD8";
   const ink = "#2A2420";
   const muted = "#A89270";
-  const subtle = "#E8DFC8";
   const accent = "#C73E2E";
 
-  const handle = `@${(username || "shushu").toUpperCase()}`;
+  const safeName = (username || "shushu").trim() || "shushu";
+  const displayName = safeName.toUpperCase();
+  // 取第一個字母（英）或第一個字（中）當 logo
+  const logoChar = Array.from(safeName)[0]?.toUpperCase() || "S";
+  const handle = `@${displayName}`;
+  // 卡號：前面零補滿 4 碼
+  const cardNoStr = String(cardNo ?? "0000").padStart(4, "0");
 
   return `
     <div style="display:flex;width:1080px;height:600px;background:${card};padding:24px;box-sizing:border-box;font-family:'NotoSansTC';">
       <div style="display:flex;flex-direction:column;width:100%;height:100%;background:${card};border:3px solid ${ink};padding:36px 44px;box-sizing:border-box;">
 
-        <!-- Header：logo 方塊 + SHUSHU + tier，右上 CARD NO. -->
+        <!-- Header：logo 方塊 + 使用者名 + tier，右上 CARD NO. -->
         <div style="display:flex;width:100%;justify-content:space-between;align-items:flex-start;">
           <div style="display:flex;align-items:center;">
             <div style="display:flex;width:84px;height:84px;background:${accent};border:3px solid ${ink};box-sizing:border-box;align-items:center;justify-content:center;">
-              <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:54px;color:${card};line-height:1;">S</div>
+              <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:54px;color:${card};line-height:1;">${logoChar}</div>
             </div>
             <div style="display:flex;flex-direction:column;margin-left:24px;">
-              <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:54px;color:${ink};line-height:1;letter-spacing:4px;">SHUSHU</div>
-              <div style="display:flex;align-self:flex-start;margin-top:10px;padding:6px 16px;background:${ink};font-family:'NotoSansTC';font-weight:500;font-size:16px;color:${card};letter-spacing:5px;">${tier.toUpperCase()}</div>
+              <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:54px;color:${ink};line-height:1;letter-spacing:4px;padding-right:4px;">${displayName}</div>
+              <div style="display:flex;align-self:flex-start;margin-top:10px;padding:6px 16px;background:${ink};font-family:'NotoSansTC';font-weight:500;font-size:16px;color:${card};letter-spacing:5px;padding-right:21px;">${tier.toUpperCase()}</div>
             </div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;">
-            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:3px;color:${muted};">CARD NO.</div>
-            <div style="display:flex;margin-top:6px;font-family:'SpaceMono';font-size:26px;color:${ink};letter-spacing:3px;">${cardNo}</div>
+            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:3px;color:${muted};padding-right:3px;">CARD NO.</div>
+            <div style="display:flex;margin-top:6px;font-family:'SpaceMono';font-size:26px;color:${ink};letter-spacing:3px;padding-right:3px;">${cardNoStr}</div>
           </div>
         </div>
 
         <!-- BALANCE 標籤 + 點點分隔線 -->
         <div style="display:flex;width:100%;align-items:center;margin-top:36px;">
-          <div style="display:flex;font-family:'SpaceMono';font-size:14px;letter-spacing:6px;color:${muted};">— &nbsp;BALANCE&nbsp; —</div>
+          <div style="display:flex;font-family:'SpaceMono';font-size:14px;letter-spacing:6px;color:${muted};padding-right:6px;">— BALANCE —</div>
           <div style="display:flex;flex:1;height:0;border-top:2px dashed ${muted};margin-left:18px;"></div>
         </div>
 
         <!-- 大數字 + CREDITS -->
         <div style="display:flex;align-items:flex-end;width:100%;margin-top:14px;">
           <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:170px;color:${accent};line-height:1;letter-spacing:-4px;">${totalCoins.toLocaleString()}</div>
-          <div style="display:flex;margin-left:24px;margin-bottom:24px;font-family:'NotoSansTC';font-weight:500;font-size:36px;color:${ink};letter-spacing:8px;">CREDITS</div>
+          <div style="display:flex;margin-left:24px;margin-bottom:24px;font-family:'NotoSansTC';font-weight:500;font-size:36px;color:${ink};letter-spacing:8px;padding-right:8px;">CREDITS</div>
         </div>
 
         <!-- 下方點點分隔線 -->
@@ -84,10 +89,10 @@ function buildMarkup(data) {
         <!-- Footer：LIFETIME（左）・@USERNAME（右） -->
         <div style="display:flex;width:100%;justify-content:space-between;align-items:center;margin-top:auto;">
           <div style="display:flex;align-items:baseline;">
-            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${muted};">LIFETIME</div>
-            <div style="display:flex;margin-left:14px;font-family:'NotoSansTC';font-weight:900;font-size:26px;color:${ink};">${lifetimeCoins.toLocaleString()}</div>
+            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${muted};padding-right:5px;">LIFETIME</div>
+            <div style="display:flex;margin-left:14px;font-family:'NotoSansTC';font-weight:900;font-size:26px;color:${ink};">${(lifetimeCoins ?? 0).toLocaleString()}</div>
           </div>
-          <div style="display:flex;font-family:'SpaceMono';font-size:15px;letter-spacing:6px;color:${ink};">${handle}</div>
+          <div style="display:flex;font-family:'SpaceMono';font-size:15px;letter-spacing:6px;color:${ink};padding-right:6px;">${handle}</div>
         </div>
 
       </div>

@@ -206,16 +206,16 @@ function buildMarkup(data) {
         <div style="display:flex;width:100%;justify-content:space-between;align-items:center;">
           <div style="display:flex;align-items:center;">
             <div style="display:flex;width:60px;height:60px;background:${accent};border:3px solid ${PALETTE.ink};box-sizing:border-box;align-items:center;justify-content:center;font-family:'SpaceMono';font-weight:400;font-size:30px;color:${PALETTE.card};letter-spacing:-2px;">21</div>
-            <div style="display:flex;margin-left:18px;font-family:'NotoSansTC';font-weight:900;font-size:38px;color:${PALETTE.ink};letter-spacing:6px;">BLACKJACK</div>
+            <div style="display:flex;margin-left:18px;font-family:'NotoSansTC';font-weight:900;font-size:38px;color:${PALETTE.ink};letter-spacing:6px;padding-right:6px;">BLACKJACK</div>
           </div>
-          <div style="display:flex;align-items:center;padding:6px 16px;background:${PALETTE.ink};font-family:'NotoSansTC';font-weight:500;font-size:16px;color:${PALETTE.card};letter-spacing:3px;">逼逼賭場</div>
+          <div style="display:flex;align-items:center;padding:6px 16px;background:${PALETTE.ink};font-family:'NotoSansTC';font-weight:500;font-size:16px;color:${PALETTE.card};letter-spacing:3px;padding-right:19px;">逼逼賭場</div>
         </div>
 
         <div style="display:flex;width:100%;height:0;margin-top:14px;border-top:2px dashed ${PALETTE.muted};"></div>
 
         <div style="display:flex;width:100%;align-items:center;margin-top:18px;">
-          <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:18px;letter-spacing:6px;color:${PALETTE.muted};line-height:1;">莊家</div>
-          <div style="display:flex;margin-left:14px;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${PALETTE.ink};line-height:1;">${dealerVisibleTotal}</div>
+          <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:18px;letter-spacing:6px;color:${PALETTE.muted};line-height:1;padding-right:6px;">莊家</div>
+          <div style="display:flex;margin-left:8px;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${PALETTE.ink};line-height:1;">${dealerVisibleTotal}</div>
           ${dealerBadge}
         </div>
         <div style="display:flex;width:100%;justify-content:center;margin-top:6px;">${dealerCards}</div>
@@ -223,8 +223,8 @@ function buildMarkup(data) {
         <div style="display:flex;width:100%;height:0;margin-top:14px;border-top:2px dashed ${PALETTE.muted};"></div>
 
         <div style="display:flex;width:100%;align-items:center;margin-top:14px;">
-          <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:18px;letter-spacing:6px;color:${PALETTE.muted};line-height:1;">玩家</div>
-          <div style="display:flex;margin-left:14px;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${PALETTE.ink};line-height:1;">${playerEval.total}${playerEval.isSoft && !playerEval.isBust ? " (S)" : ""}</div>
+          <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:18px;letter-spacing:6px;color:${PALETTE.muted};line-height:1;padding-right:6px;">玩家</div>
+          <div style="display:flex;margin-left:8px;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${PALETTE.ink};line-height:1;">${playerEval.total}${playerEval.isSoft && !playerEval.isBust ? " (S)" : ""}</div>
           ${playerBadge}
         </div>
         <div style="display:flex;width:100%;justify-content:center;margin-top:6px;">${playerCards}</div>
@@ -233,14 +233,14 @@ function buildMarkup(data) {
 
         <div style="display:flex;width:100%;justify-content:space-between;align-items:center;margin-top:auto;padding-top:12px;border-top:2px dashed ${PALETTE.muted};">
           <div style="display:flex;align-items:flex-end;">
-            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${PALETTE.muted};line-height:1;">BET</div>
-            <div style="display:flex;margin-left:12px;font-family:'NotoSansTC';font-weight:900;font-size:22px;color:${PALETTE.ink};line-height:1;">${stakeLabel}</div>
+            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${PALETTE.muted};line-height:1;padding-right:5px;">BET</div>
+            <div style="display:flex;margin-left:7px;font-family:'NotoSansTC';font-weight:900;font-size:22px;color:${PALETTE.ink};line-height:1;">${stakeLabel}</div>
           </div>
           <div style="display:flex;align-items:flex-end;">
-            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${PALETTE.muted};line-height:1;">BALANCE</div>
-            <div style="display:flex;margin-left:12px;font-family:'NotoSansTC';font-weight:900;font-size:22px;color:${PALETTE.ink};line-height:1;">${(balance ?? 0).toLocaleString()}</div>
+            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${PALETTE.muted};line-height:1;padding-right:5px;">BALANCE</div>
+            <div style="display:flex;margin-left:7px;font-family:'NotoSansTC';font-weight:900;font-size:22px;color:${PALETTE.ink};line-height:1;">${(balance ?? 0).toLocaleString()}</div>
           </div>
-          <div style="display:flex;font-family:'SpaceMono';font-size:14px;letter-spacing:5px;color:${PALETTE.ink};">${handle}</div>
+          <div style="display:flex;font-family:'SpaceMono';font-size:14px;letter-spacing:5px;color:${PALETTE.ink};padding-right:5px;">${handle}</div>
         </div>
 
       </div>

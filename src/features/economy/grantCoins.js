@@ -113,14 +113,17 @@ module.exports = async (client, opts) => {
   const after = result.value || result;
   if (!after) return null;
 
-  if (amount > 0) {
-    console.log(
-      `[COIN] ${opts.username || opts.userId} +${amount} (from ${opts.source}, base ${baseAmount}, x${totalMultiplier})`.yellow
-    );
-  } else {
-    console.log(
-      `[COIN] ${opts.username || opts.userId} ${amount} (from ${opts.source})`.yellow
-    );
+  // 賭場單筆 bet/payout 不印 log（量太大），其他 source 才印
+  if (!CASINO_SOURCES.includes(opts.source)) {
+    if (amount > 0) {
+      console.log(
+        `[COIN] ${opts.username || opts.userId} +${amount} (from ${opts.source}, base ${baseAmount}, x${totalMultiplier})`.yellow
+      );
+    } else {
+      console.log(
+        `[COIN] ${opts.username || opts.userId} ${amount} (from ${opts.source})`.yellow
+      );
+    }
   }
 
   return {
