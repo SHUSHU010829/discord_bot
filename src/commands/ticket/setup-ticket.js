@@ -37,7 +37,7 @@ module.exports = {
   deleted: true,
   data: {
     name: "setup-ticket",
-    description: "🎫 設置票務系統面板（已停用）"
+    description: "[ADMIN] 🎫 Set up the ticket panel (admin only, disabled)"
   }
 };
 

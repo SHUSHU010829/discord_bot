@@ -1,25 +1,28 @@
 require("colors");
-const { SlashCommandBuilder, MessageFlags } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  PermissionFlagsBits,
+  MessageFlags,
+} = require("discord.js");
 
 const grantCoins = require("../../features/economy/grantCoins");
 
 module.exports = {
-  devOnly: true,
-
   data: new SlashCommandBuilder()
-    .setName("給金幣")
-    .setDescription("[DEV ONLY] 給某位成員金幣（可填負數扣款）")
+    .setName("give-coins")
+    .setDescription("[ADMIN] Grant coins to a member (use a negative amount to deduct)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .setDMPermission(false)
     .addUserOption((opt) =>
       opt
         .setName("user")
-        .setDescription("收金幣的成員")
+        .setDescription("Member receiving the coins")
         .setRequired(true),
     )
     .addIntegerOption((opt) =>
       opt
         .setName("amount")
-        .setDescription("要給的金幣數（可為負數扣款）")
+        .setDescription("Amount of coins to grant (negative to deduct)")
         .setMinValue(-1000000)
         .setMaxValue(1000000)
         .setRequired(true),
@@ -27,10 +30,12 @@ module.exports = {
     .addStringOption((opt) =>
       opt
         .setName("reason")
-        .setDescription("原因（會記錄在交易紀錄）")
+        .setDescription("Reason (logged in the transaction history)")
         .setRequired(false),
     )
     .toJSON(),
+
+  userPermissions: [PermissionFlagsBits.Administrator],
 
   run: async (client, interaction) => {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -78,7 +83,7 @@ module.exports = {
         }`,
       );
     } catch (error) {
-      console.log(`[ERROR] /給金幣:\n${error}\n${error.stack}`.red);
+      console.log(`[ERROR] /give-coins:\n${error}\n${error.stack}`.red);
       await interaction
         .editReply("🔧 給金幣失敗，看 console")
         .catch(() => {});

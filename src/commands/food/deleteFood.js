@@ -14,14 +14,14 @@ const {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("刪除食物")
-    .setDescription("刪除現有食物")
+    .setName("delete-food")
+    .setDescription("[ADMIN] Delete an existing food entry (admin only)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addStringOption((option) =>
       option
         .setName("食物名稱")
         .setDescription(
-          "刪除食物的名稱(不知道食物名稱可以用「有什麼能吃」查看)"
+          "Name of the food to delete (use 有什麼能吃 to look up names)"
         )
         .setRequired(true)
         .setAutocomplete(true)
@@ -29,13 +29,13 @@ module.exports = {
     .addStringOption((option) =>
       option
         .setName("類別")
-        .setDescription("選擇食物類別（如有同名食物請指定）")
+        .setDescription("Pick a food category (specify when the name is ambiguous)")
         .addChoices(...CATEGORY_CHOICES)
     )
     .addStringOption((option) =>
       option
         .setName("飲料店")
-        .setDescription("飲料店名稱（僅在類別為飲料時需要填寫）")
+        .setDescription("Beverage store name (required only when category is beverage)")
         .setAutocomplete(true)
     ),
 
