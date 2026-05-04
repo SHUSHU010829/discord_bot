@@ -33,10 +33,9 @@ const CATEGORY_META = {
   stats: { label: "統計", emoji: "📊", order: 6, blurb: "訊息/語音統計與排行榜" },
   roles: { label: "身份組", emoji: "🎮", order: 7, blurb: "遊戲身份組選單管理" },
   ticket: { label: "票務投票", emoji: "🎫", order: 8, blurb: "建議面板、票務、遊戲頻道提案投票" },
-  general: { label: "一般", emoji: "📰", order: 10, blurb: "每日早報與本手冊" },
+  general: { label: "一般", emoji: "📰", order: 10, blurb: "本手冊" },
   post: { label: "情勒文", emoji: "📝", order: 11, blurb: "情勒文產生與新增" },
   ask: { label: "問答", emoji: "💬", order: 12, blurb: "跟逼逼機器人聊天" },
-  misc: { label: "其他", emoji: "🛠️", order: 13, blurb: "雜項小工具" },
 };
 
 const OPTION_TYPE_LABEL = {

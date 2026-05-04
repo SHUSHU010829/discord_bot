@@ -71,9 +71,9 @@ src/
 │   ├── ask/                # 詢問星座運勢、占卜
 │   ├── currency/           # 加密貨幣、匯率
 │   ├── draw/               # 抽籤、樂透、抽一個
-│   ├── food/               # 食物/飲料 CRUD、抽食物、抽飲料
-│   ├── general/            # /help、/today-report
-│   ├── misc/               # /ping
+│   ├── economy/            # /錢包、/骰寶、/give-coins
+│   ├── food/               # 食物/飲料 CRUD、/吃什麼
+│   ├── general/            # /help
 │   ├── post/               # 整人小工具（瓦斯燈）
 │   ├── roles/              # /setup-roles
 │   ├── stats/              # /stats、/leaderboard
@@ -362,7 +362,6 @@ embed.js → 發送 Embed
 | `/stats`、`/leaderboard` | 訊息與語音時長統計（由 `messageStats.js`、`voiceStats.js` 累積） |
 | `/gaslight`、`/increase-gaslight` | 整人小工具 |
 | `/help` | 查看指令說明 |
-| `/ping` | 測試延遲 |
 
 ---
 
