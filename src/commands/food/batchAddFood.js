@@ -1,9 +1,6 @@
 require("colors");
 
-const {
-  SlashCommandBuilder,
-  PermissionFlagsBits,
-} = require("discord.js");
+const { SlashCommandBuilder } = require("discord.js");
 
 const autocompleteBeverageStore = require("../../utils/autocompleteBeverageStore");
 const {
@@ -14,8 +11,7 @@ const {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("batch-add-food")
-    .setDescription("[ADMIN] Bulk-add foods, comma-separated (admin only)")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDescription("Bulk-add foods, comma-separated")
     .addStringOption((option) =>
       option
         .setName("食物清單")

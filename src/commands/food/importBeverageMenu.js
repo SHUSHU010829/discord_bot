@@ -1,18 +1,13 @@
 require("colors");
 
-const {
-  SlashCommandBuilder,
-  EmbedBuilder,
-  PermissionFlagsBits,
-} = require("discord.js");
+const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 
 const autocompleteBeverageStore = require("../../utils/autocompleteBeverageStore");
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("import-beverage-menu")
-    .setDescription("[ADMIN] 🥤 Import a full beverage-store menu in bulk (admin only)")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDescription("🥤 Import a full beverage-store menu in bulk")
     .addStringOption((option) =>
       option
         .setName("飲料店")
