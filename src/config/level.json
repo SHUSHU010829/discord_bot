@@ -79,8 +79,8 @@
       "dailyCapPerUser": 10
     },
     "daily": {
-      "baseCoins": 30,
-      "streakBonusPerDay": 5,
+      "baseCoins": 60,
+      "streakBonusPerDay": 10,
       "streakBonusCapDays": 10,
       "streak7Multiplier": 1.5,
       "streak30Multiplier": 2.0,
