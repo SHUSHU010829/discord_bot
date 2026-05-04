@@ -1,7 +1,6 @@
 require("colors");
 
 const { serverId } = require("../../config");
-const commandComparing = require("../../utils/commandComparing");
 const getApplicationCommands = require("../../utils/getApplicationCommands");
 const getLocalCommands = require("../../utils/getLocalCommands");
 
@@ -16,11 +15,11 @@ module.exports = async (client) => {
 
     for (const localCommand of localCommands) {
       const { data, deleted } = localCommand;
-      let {
-        name: commandName,
-        description: commandDescription,
-        options: commandOptions,
-      } = data;
+
+      // 將 SlashCommandBuilder 序列化為純 JSON，確保所有 option 都帶有 type 欄位
+      const commandJSON =
+        typeof data?.toJSON === "function" ? data.toJSON() : { ...data };
+      const commandName = commandJSON.name;
 
       // 跳過已標記為刪除的指令
       if (deleted) {
@@ -42,6 +41,7 @@ module.exports = async (client) => {
 
             console.log(`[INFO] Loaded ${beverageStores.length} beverage stores from database`.cyan);
 
+            const commandOptions = commandJSON.options;
             if (commandOptions && commandOptions.length > 0) {
               const drinkSubcommand = commandOptions.find(
                 (opt) => opt.name === "drink"
@@ -64,11 +64,7 @@ module.exports = async (client) => {
         }
       }
 
-      commandsToRegister.push({
-        name: commandName,
-        description: commandDescription,
-        options: commandOptions,
-      });
+      commandsToRegister.push(commandJSON);
     }
 
     // 使用批量覆蓋 API - Discord 會自動處理差異（新增/更新/刪除）
