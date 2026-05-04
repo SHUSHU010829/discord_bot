@@ -1,7 +1,6 @@
 require("colors");
 
 const {
-  SlashCommandBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -13,12 +12,8 @@ const {
   MessageFlags,
 } = require("discord.js");
 
-const {
-  CATEGORY_DISPLAY,
-  CATEGORY_CHOICES,
-} = require("../../constants/foodCategories");
+const { CATEGORY_DISPLAY } = require("../../../constants/foodCategories");
 
-// V2 TextDisplay 上限約 4000 字，留個安全邊界
 const PAGE_TEXT_LIMIT = 3500;
 const ITEMS_PER_PAGE = 50;
 const PAGINATION_TIMEOUT = 5 * 60 * 1000;
@@ -62,12 +57,10 @@ function createPaginationButtons(currentPage, totalPages) {
   );
 }
 
-// === 單一類別：將品項清單切成多頁字串 ===
 function createCategoryPages(category, foodList) {
   const pages = [];
 
   if (category === "beverage") {
-    // 飲料按店家分組
     const byStore = {};
     foodList.forEach((food) => {
       const store = food.beverageStore || "其他";
@@ -95,7 +88,6 @@ function createCategoryPages(category, foodList) {
   return pages.length > 0 ? pages : ["（無資料）"];
 }
 
-// === 全類別：將所有類別合成多頁字串 ===
 function createAllCategoriesPages(categorizedFood) {
   const order = [
     "breakfast",
@@ -106,7 +98,6 @@ function createAllCategoriesPages(categorizedFood) {
     "uncategorized",
   ];
 
-  // 先把每個類別轉成 markdown 區塊
   const blocks = [];
   for (const cat of order) {
     const foods = categorizedFood[cat];
@@ -132,7 +123,6 @@ function createAllCategoriesPages(categorizedFood) {
     }
   }
 
-  // 把多個區塊塞進頁面
   const pages = [];
   let current = "";
   for (const block of blocks) {
@@ -193,69 +183,100 @@ function buildPageContainer({
   return container;
 }
 
-module.exports = {
-  data: new SlashCommandBuilder()
-    .setName("有什麼能吃")
-    .setDescription("查看現在食物列表... 📚")
-    .addStringOption((option) =>
-      option
-        .setName("類別")
-        .setDescription("選擇要查看的食物類別（不選則顯示所有）")
-        .addChoices(...CATEGORY_CHOICES)
-    ),
+async function run(client, interaction) {
+  const collection = client.collection;
+  const category = interaction.options.getString("類別");
 
-  run: async (client, interaction) => {
-    const collection = client.collection;
-    const category = interaction.options.getString("類別");
+  await interaction.deferReply();
 
-    await interaction.deferReply();
+  try {
+    const query = category ? { category } : {};
+    const foodList = await collection.find(query).toArray();
 
-    try {
-      const query = category ? { category } : {};
-      const foodList = await collection.find(query).toArray();
+    if (foodList.length === 0) {
+      const msg = category
+        ? `目前沒有 ${CATEGORY_DISPLAY[category]} 選項。`
+        : "目前沒有可供選擇的食物選項。";
+      await interaction.editReply(msg);
+      return;
+    }
 
-      if (foodList.length === 0) {
-        const msg = category
-          ? `目前沒有 ${CATEGORY_DISPLAY[category]} 選項。`
-          : "目前沒有可供選擇的食物選項。";
-        await interaction.editReply(msg);
-        return;
-      }
+    let headerTitle;
+    let pages;
+    let uncategorizedNotice = null;
 
-      // ====== 設定每種模式的 header 與 pages ======
-      let headerTitle;
-      let pages;
-      let uncategorizedNotice = null;
-
-      if (category) {
-        headerTitle = `## 📚 ${CATEGORY_DISPLAY[category]} 選項`;
-        pages = createCategoryPages(category, foodList);
-      } else {
-        const categorized = {
-          breakfast: [],
-          lunch: [],
-          dinner: [],
-          snack: [],
-          beverage: [],
-          uncategorized: [],
-        };
-        foodList.forEach((food) => {
-          if (food.category && categorized[food.category]) {
-            categorized[food.category].push(food);
-          } else if (!food.category) {
-            categorized.uncategorized.push(food);
-          }
-        });
-
-        headerTitle = "## 📚 食物清單";
-        pages = createAllCategoriesPages(categorized);
-        if (categorized.uncategorized.length > 0) {
-          uncategorizedNotice = `發現 ${categorized.uncategorized.length} 筆未分類的舊資料，請執行遷移腳本：node scripts/migrateFoodData.js`;
+    if (category) {
+      headerTitle = `## 📚 ${CATEGORY_DISPLAY[category]} 選項`;
+      pages = createCategoryPages(category, foodList);
+    } else {
+      const categorized = {
+        breakfast: [],
+        lunch: [],
+        dinner: [],
+        snack: [],
+        beverage: [],
+        uncategorized: [],
+      };
+      foodList.forEach((food) => {
+        if (food.category && categorized[food.category]) {
+          categorized[food.category].push(food);
+        } else if (!food.category) {
+          categorized.uncategorized.push(food);
         }
+      });
+
+      headerTitle = "## 📚 食物清單";
+      pages = createAllCategoriesPages(categorized);
+      if (categorized.uncategorized.length > 0) {
+        uncategorizedNotice = `發現 ${categorized.uncategorized.length} 筆未分類的舊資料，請執行遷移腳本：node scripts/migrateFoodData.js`;
+      }
+    }
+
+    let currentPage = 0;
+    const message = await interaction.editReply({
+      components: [
+        buildPageContainer({
+          headerTitle,
+          pages,
+          currentPage,
+          uncategorizedNotice,
+        }),
+      ],
+      flags: MessageFlags.IsComponentsV2,
+    });
+
+    if (pages.length <= 1) return;
+
+    const collector = message.createMessageComponentCollector({
+      componentType: ComponentType.Button,
+      time: PAGINATION_TIMEOUT,
+    });
+
+    collector.on("collect", async (btnInteraction) => {
+      if (btnInteraction.user.id !== interaction.user.id) {
+        return btnInteraction.reply({
+          content:
+            "這不是你的清單！請使用 /food list 查看你自己的清單。",
+          ephemeral: true,
+        });
       }
 
-      let currentPage = 0;
-      const message = await interaction.editReply({
+      switch (btnInteraction.customId) {
+        case "first":
+          currentPage = 0;
+          break;
+        case "prev":
+          currentPage = Math.max(0, currentPage - 1);
+          break;
+        case "next":
+          currentPage = Math.min(pages.length - 1, currentPage + 1);
+          break;
+        case "last":
+          currentPage = pages.length - 1;
+          break;
+      }
+
+      await btnInteraction.update({
         components: [
           buildPageContainer({
             headerTitle,
@@ -266,76 +287,32 @@ module.exports = {
         ],
         flags: MessageFlags.IsComponentsV2,
       });
+    });
 
-      // 單頁不需要互動
-      if (pages.length <= 1) return;
-
-      const collector = message.createMessageComponentCollector({
-        componentType: ComponentType.Button,
-        time: PAGINATION_TIMEOUT,
-      });
-
-      collector.on("collect", async (btnInteraction) => {
-        if (btnInteraction.user.id !== interaction.user.id) {
-          return btnInteraction.reply({
-            content:
-              "這不是你的清單！請使用 /有什麼能吃 查看你自己的清單。",
-            ephemeral: true,
-          });
-        }
-
-        switch (btnInteraction.customId) {
-          case "first":
-            currentPage = 0;
-            break;
-          case "prev":
-            currentPage = Math.max(0, currentPage - 1);
-            break;
-          case "next":
-            currentPage = Math.min(pages.length - 1, currentPage + 1);
-            break;
-          case "last":
-            currentPage = pages.length - 1;
-            break;
-        }
-
-        await btnInteraction.update({
+    collector.on("end", () => {
+      interaction
+        .editReply({
           components: [
             buildPageContainer({
               headerTitle,
               pages,
               currentPage,
               uncategorizedNotice,
+              withControls: false,
             }),
           ],
           flags: MessageFlags.IsComponentsV2,
-        });
-      });
-
-      collector.on("end", () => {
-        // 結束後拿掉控制按鈕，但保留當前頁面內容
-        interaction
-          .editReply({
-            components: [
-              buildPageContainer({
-                headerTitle,
-                pages,
-                currentPage,
-                uncategorizedNotice,
-                withControls: false,
-              }),
-            ],
-            flags: MessageFlags.IsComponentsV2,
-          })
-          .catch(() => {});
-      });
-    } catch (error) {
-      console.log(
-        `[ERROR] An error occurred inside the food list:\n${error}`.red
-      );
-      await interaction
-        .editReply("🔧 獲取食物清單失敗，請呼叫舒舒！")
+        })
         .catch(() => {});
-    }
-  },
-};
+    });
+  } catch (error) {
+    console.log(
+      `[ERROR] An error occurred inside the food list:\n${error}`.red
+    );
+    await interaction
+      .editReply("🔧 獲取食物清單失敗，請呼叫舒舒！")
+      .catch(() => {});
+  }
+}
+
+module.exports = { run };

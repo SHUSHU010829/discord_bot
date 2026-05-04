@@ -28,14 +28,15 @@ const CATEGORY_META = {
   draw: { label: "抽選工具", emoji: "🎲", order: 2, blurb: "抽籤、二選一、鹹魚翻身樂透" },
   weather: { label: "天氣", emoji: "🌤️", order: 3, blurb: "全台與個別縣市天氣查詢" },
   currency: { label: "匯率", emoji: "💱", order: 4, blurb: "即時匯率與加密貨幣報價" },
-  level: { label: "等級系統", emoji: "🏅", order: 5, blurb: "等級卡、簽到、徽章、稱號、排行榜" },
+  level: { label: "等級系統", emoji: "🏅", order: 5, blurb: "等級卡、徽章、稱號、排行榜（簽到/連勝保護卡 仍是獨立指令）" },
   stats: { label: "統計", emoji: "📊", order: 6, blurb: "訊息/語音統計與排行榜" },
   roles: { label: "身份組", emoji: "🎮", order: 7, blurb: "遊戲身份組選單管理" },
   ticket: { label: "票務投票", emoji: "🎫", order: 8, blurb: "建議面板、票務、遊戲頻道提案投票" },
-  general: { label: "一般", emoji: "📰", order: 9, blurb: "每日早報與本手冊" },
-  post: { label: "情勒文", emoji: "📝", order: 10, blurb: "情勒文產生與新增" },
-  ask: { label: "問答", emoji: "💬", order: 11, blurb: "跟逼逼機器人聊天" },
-  misc: { label: "其他", emoji: "🛠️", order: 12, blurb: "雜項小工具" },
+  casino: { label: "賭場小遊戲", emoji: "🎰", order: 9, blurb: "骰寶等小遊戲" },
+  general: { label: "一般", emoji: "📰", order: 10, blurb: "每日早報與本手冊" },
+  post: { label: "情勒文", emoji: "📝", order: 11, blurb: "情勒文產生與新增" },
+  ask: { label: "問答", emoji: "💬", order: 12, blurb: "跟逼逼機器人聊天" },
+  misc: { label: "其他", emoji: "🛠️", order: 13, blurb: "雜項小工具" },
 };
 
 const OPTION_TYPE_LABEL = {
@@ -393,11 +394,42 @@ function findCommand(query) {
   const normalized = normalizeQuery(query);
   if (!normalized) return null;
 
+  // 「food draw」之類的子指令查詢：取第一段當父指令名
+  const head = normalized.split(/\s+/)[0];
+
   return (
     commands.find((c) => c.name.toLowerCase() === normalized) ||
+    commands.find((c) => c.name.toLowerCase() === head) ||
     commands.find((c) => c.name.toLowerCase().includes(normalized)) ||
     null
   );
+}
+
+function buildAutocompleteEntries() {
+  const { commands } = loadCommandIndex();
+  const entries = [];
+  for (const cmd of commands) {
+    entries.push({ label: `/${cmd.name}`, value: cmd.name });
+    const opts = cmd.options || [];
+    for (const opt of opts) {
+      if (opt.type === ApplicationCommandOptionType.Subcommand) {
+        entries.push({
+          label: `/${cmd.name} ${opt.name}`,
+          value: `${cmd.name} ${opt.name}`,
+        });
+      } else if (opt.type === ApplicationCommandOptionType.SubcommandGroup) {
+        for (const inner of opt.options || []) {
+          if (inner.type === ApplicationCommandOptionType.Subcommand) {
+            entries.push({
+              label: `/${cmd.name} ${opt.name} ${inner.name}`,
+              value: `${cmd.name} ${opt.name} ${inner.name}`,
+            });
+          }
+        }
+      }
+    }
+  }
+  return entries;
 }
 
 // 找不到指令時：依名稱與描述比對打分排序，比 charAt(0) 過濾準確很多
@@ -436,9 +468,44 @@ module.exports = {
     .addStringOption((opt) =>
       opt
         .setName("指令")
-        .setDescription("直接跳到特定指令的說明（例如：吃什麼）")
-        .setRequired(false),
+        .setDescription("直接跳到特定指令的說明（例如：food draw）")
+        .setRequired(false)
+        .setAutocomplete(true),
     ),
+
+  autocomplete: async (client, interaction) => {
+    try {
+      const focused = interaction.options.getFocused(true);
+      if (focused.name !== "指令") return interaction.respond([]);
+
+      const q = (focused.value || "").trim().toLowerCase();
+      const entries = buildAutocompleteEntries();
+      const filtered = entries.filter((e) =>
+        !q ||
+        e.value.toLowerCase().includes(q) ||
+        e.label.toLowerCase().includes(q),
+      );
+
+      // 偏好完全前綴匹配
+      filtered.sort((a, b) => {
+        const av = a.value.toLowerCase();
+        const bv = b.value.toLowerCase();
+        const aStarts = av.startsWith(q) ? 0 : 1;
+        const bStarts = bv.startsWith(q) ? 0 : 1;
+        if (aStarts !== bStarts) return aStarts - bStarts;
+        return av.length - bv.length;
+      });
+
+      await interaction.respond(
+        filtered.slice(0, 25).map((e) => ({ name: e.label, value: e.value })),
+      );
+    } catch (error) {
+      console.log(`[ERROR] /help autocomplete: ${error}`.red);
+      try {
+        await interaction.respond([]);
+      } catch {}
+    }
+  },
 
   run: async (client, interaction) => {
     try {

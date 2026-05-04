@@ -1,6 +1,5 @@
 require("colors");
 const {
-  SlashCommandBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -12,10 +11,10 @@ const {
   MessageFlags,
 } = require("discord.js");
 
-const { getLevelProgress } = require("../../utils/levelMath");
-const { getTier } = require("../../utils/levelTier");
-const { getTwitchSubBonus } = require("../../utils/twitchSubBonus");
-const { getServerBoostBonus } = require("../../utils/serverBoostBonus");
+const { getLevelProgress } = require("../../../utils/levelMath");
+const { getTier } = require("../../../utils/levelTier");
+const { getTwitchSubBonus } = require("../../../utils/twitchSubBonus");
+const { getServerBoostBonus } = require("../../../utils/serverBoostBonus");
 
 function getPersonalMultiplier(member) {
   if (!member) return 1;
@@ -122,7 +121,6 @@ function buildContainer({
     const offset = currentPage * PAGE_SIZE;
     const lines = pageDocs.map((d, i) => renderRow(d, offset + i, memberMap));
 
-    // 第一頁前 3 名分區塊顯示
     if (currentPage === 0 && pageDocs.length > 3) {
       const top3 = lines.slice(0, 3).join("\n");
       const rest = lines.slice(3).join("\n");
@@ -159,7 +157,7 @@ function buildContainer({
     .addSeparatorComponents(new SeparatorBuilder())
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `-# 第 ${currentPage + 1} / ${totalPages} 頁 ・ 共 ${total} 人 ・ 用 \`/等級卡\` 看詳細卡片`
+        `-# 第 ${currentPage + 1} / ${totalPages} 頁 ・ 共 ${total} 人 ・ 用 \`/level profile\` 看詳細卡片`
       )
     );
 
@@ -179,48 +177,84 @@ async function fetchPage(client, guildId, page) {
     .toArray();
 }
 
-module.exports = {
-  data: new SlashCommandBuilder()
-    .setName("等級排行榜")
-    .setDescription("查看伺服器等級排行榜 🏆")
-    .setDMPermission(false),
+async function run(client, interaction) {
+  await interaction.deferReply();
 
-  run: async (client, interaction) => {
-    await interaction.deferReply();
+  try {
+    if (!client.userLevelsCollection) {
+      return interaction.editReply("🔧 等級系統尚未啟動");
+    }
 
-    try {
-      if (!client.userLevelsCollection) {
-        return interaction.editReply("🔧 等級系統尚未啟動");
+    const total = await client.userLevelsCollection.countDocuments({
+      guildId: interaction.guildId,
+    });
+
+    if (total === 0) {
+      return interaction.editReply("📊 還沒有人累積等級資料～");
+    }
+
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+    const myDoc = await client.userLevelsCollection.findOne({
+      userId: interaction.user.id,
+      guildId: interaction.guildId,
+    });
+    let myRank = null;
+    if (myDoc) {
+      myRank =
+        (await client.userLevelsCollection.countDocuments({
+          guildId: interaction.guildId,
+          totalXp: { $gt: myDoc.totalXp },
+        })) + 1;
+    }
+
+    let currentPage = 0;
+    let pageDocs = await fetchPage(client, interaction.guildId, currentPage);
+    let memberMap = await buildMemberMap(interaction.guild, pageDocs);
+
+    const message = await interaction.editReply({
+      components: [
+        buildContainer({
+          pageDocs,
+          currentPage,
+          totalPages,
+          total,
+          myRank,
+          myDoc,
+          memberMap,
+          myMember: interaction.member,
+        }),
+      ],
+      flags: MessageFlags.IsComponentsV2,
+    });
+
+    if (totalPages <= 1) return;
+
+    const collector = message.createMessageComponentCollector({
+      componentType: ComponentType.Button,
+      time: PAGINATION_TIMEOUT,
+    });
+
+    collector.on("collect", async (btn) => {
+      switch (btn.customId) {
+        case "first":
+          currentPage = 0;
+          break;
+        case "prev":
+          currentPage = Math.max(0, currentPage - 1);
+          break;
+        case "next":
+          currentPage = Math.min(totalPages - 1, currentPage + 1);
+          break;
+        case "last":
+          currentPage = totalPages - 1;
+          break;
       }
 
-      const total = await client.userLevelsCollection.countDocuments({
-        guildId: interaction.guildId,
-      });
+      pageDocs = await fetchPage(client, interaction.guildId, currentPage);
+      memberMap = await buildMemberMap(interaction.guild, pageDocs);
 
-      if (total === 0) {
-        return interaction.editReply("📊 還沒有人累積等級資料～");
-      }
-
-      const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
-      const myDoc = await client.userLevelsCollection.findOne({
-        userId: interaction.user.id,
-        guildId: interaction.guildId,
-      });
-      let myRank = null;
-      if (myDoc) {
-        myRank =
-          (await client.userLevelsCollection.countDocuments({
-            guildId: interaction.guildId,
-            totalXp: { $gt: myDoc.totalXp },
-          })) + 1;
-      }
-
-      let currentPage = 0;
-      let pageDocs = await fetchPage(client, interaction.guildId, currentPage);
-      let memberMap = await buildMemberMap(interaction.guild, pageDocs);
-
-      const message = await interaction.editReply({
+      await btn.update({
         components: [
           buildContainer({
             pageDocs,
@@ -235,34 +269,11 @@ module.exports = {
         ],
         flags: MessageFlags.IsComponentsV2,
       });
+    });
 
-      if (totalPages <= 1) return;
-
-      const collector = message.createMessageComponentCollector({
-        componentType: ComponentType.Button,
-        time: PAGINATION_TIMEOUT,
-      });
-
-      collector.on("collect", async (btn) => {
-        switch (btn.customId) {
-          case "first":
-            currentPage = 0;
-            break;
-          case "prev":
-            currentPage = Math.max(0, currentPage - 1);
-            break;
-          case "next":
-            currentPage = Math.min(totalPages - 1, currentPage + 1);
-            break;
-          case "last":
-            currentPage = totalPages - 1;
-            break;
-        }
-
-        pageDocs = await fetchPage(client, interaction.guildId, currentPage);
-        memberMap = await buildMemberMap(interaction.guild, pageDocs);
-
-        await btn.update({
+    collector.on("end", () => {
+      interaction
+        .editReply({
           components: [
             buildContainer({
               pageDocs,
@@ -273,35 +284,17 @@ module.exports = {
               myDoc,
               memberMap,
               myMember: interaction.member,
+              withControls: false,
             }),
           ],
           flags: MessageFlags.IsComponentsV2,
-        });
-      });
+        })
+        .catch(() => {});
+    });
+  } catch (error) {
+    console.log(`[ERROR] /level rank:\n${error}\n${error.stack}`.red);
+    await interaction.editReply("🔧 排行榜載入失敗！").catch(() => {});
+  }
+}
 
-      collector.on("end", () => {
-        interaction
-          .editReply({
-            components: [
-              buildContainer({
-                pageDocs,
-                currentPage,
-                totalPages,
-                total,
-                myRank,
-                myDoc,
-                memberMap,
-                myMember: interaction.member,
-                withControls: false,
-              }),
-            ],
-            flags: MessageFlags.IsComponentsV2,
-          })
-          .catch(() => {});
-      });
-    } catch (error) {
-      console.log(`[ERROR] /等級排行榜:\n${error}\n${error.stack}`.red);
-      await interaction.editReply("🔧 排行榜載入失敗！").catch(() => {});
-    }
-  },
-};
+module.exports = { run };
