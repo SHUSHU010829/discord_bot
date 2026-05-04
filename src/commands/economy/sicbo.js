@@ -215,8 +215,13 @@ module.exports = {
           : `✨ **中獎！** 擲出 ${dice.join("・")} = ${sum}，**+${settled.payout.toLocaleString()}** credits`
         : `💸 擲出 ${dice.join("・")} = ${sum}，沒中，下次加油！`;
 
+      const bankruptLine =
+        balanceAfter <= 0
+          ? `\n🚨 **你破產了！** 餘額歸零，去發言、聊天賺金幣再來吧！`
+          : "";
+
       await interaction.editReply({
-        content: `${headline}\n・押法：**${describeBet(betType, betValue)}**　・下注：${betAmount.toLocaleString()}　・餘額：**${balanceAfter.toLocaleString()}**`,
+        content: `${headline}\n・押法：**${describeBet(betType, betValue)}**　・下注：${betAmount.toLocaleString()}　・餘額：**${balanceAfter.toLocaleString()}**${bankruptLine}`,
         files: [attachment],
       });
     } catch (error) {
