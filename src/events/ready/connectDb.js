@@ -54,6 +54,9 @@ module.exports = async (client) => {
     const userCoinsCollection = database.collection("UserCoins");
     const coinTransactionsCollection = database.collection("CoinTransactions");
 
+    // 21 點對局狀態（in-flight + 結算後保留一段時間）
+    const blackjackGamesCollection = database.collection("BlackjackGames");
+
     // Twitch chat 同步去重
     const twitchScoreFlushesCollection = database.collection("TwitchScoreFlushes");
 
@@ -78,6 +81,7 @@ module.exports = async (client) => {
     client.voiceSessionsCollection = voiceSessionsCollection;
     client.userCoinsCollection = userCoinsCollection;
     client.coinTransactionsCollection = coinTransactionsCollection;
+    client.blackjackGamesCollection = blackjackGamesCollection;
     client.twitchScoreFlushesCollection = twitchScoreFlushesCollection;
     client.twitchLiveStateCollection = twitchLiveStateCollection;
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
@@ -192,6 +196,21 @@ module.exports = async (client) => {
       await coinTransactionsCollection.createIndex(
         { createdAt: 1 },
         { expireAfterSeconds: 90 * 24 * 60 * 60, name: "coin_ttl_90d" }
+      );
+
+      // 21 點對局索引：每位玩家同 guild 同時只能有一局 playing，靠 status 過濾不上 unique
+      await blackjackGamesCollection.createIndex(
+        { gameId: 1 },
+        { unique: true, name: "uniq_bj_gameId" }
+      );
+      await blackjackGamesCollection.createIndex(
+        { userId: 1, guildId: 1, status: 1 },
+        { name: "bj_user_guild_status" }
+      );
+      // 用 cron 自己掃 abandoned 局退錢 → 結算後 30 天再清，避免 TTL 提前刪掉還沒退款的 doc
+      await blackjackGamesCollection.createIndex(
+        { updatedAt: 1 },
+        { expireAfterSeconds: 30 * 24 * 60 * 60, name: "bj_ttl_30d" }
       );
     } catch (indexError) {
       console.log(
