@@ -32,7 +32,11 @@ module.exports = async (client, opts) => {
     ? { multiplier: 1, name: null }
     : getCoinServerBoostBonus(opts.member, opts.source);
   const baseAmount = amount;
-  const totalMultiplier = twitchInfo.multiplier * boostInfo.multiplier;
+  const stackingMode = coinSystem?.bonusStackingMode === "max" ? "max" : "multiply";
+  const totalMultiplier =
+    stackingMode === "max"
+      ? Math.max(twitchInfo.multiplier, boostInfo.multiplier)
+      : twitchInfo.multiplier * boostInfo.multiplier;
   if (totalMultiplier > 1 && amount > 0) {
     amount = Math.floor(amount * totalMultiplier);
   }

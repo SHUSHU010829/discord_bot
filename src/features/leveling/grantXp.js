@@ -125,15 +125,23 @@ module.exports = async (client, opts) => {
     // 升級金幣獎勵（每升一級 → level × coinsPerLevel；觸到 milestone → 額外發放）
     if (coinSystem?.enabled && client.userCoinsCollection) {
       const coinsPerLevel = coinSystem.levelUp?.coinsPerLevel ?? 0;
+      const softCapLevel = coinSystem.levelUp?.softCapLevel ?? 0;
+      const softCapDivisor = coinSystem.levelUp?.softCapDivisor ?? 1;
       const milestones = coinSystem.levelUp?.milestones || {};
       for (let lv = beforeLevel + 1; lv <= afterLevel; lv += 1) {
         if (coinsPerLevel > 0) {
+          let coinReward = lv * coinsPerLevel;
+          if (softCapLevel > 0 && lv > softCapLevel && softCapDivisor > 1) {
+            const baseAtCap = softCapLevel * coinsPerLevel;
+            const overflow = (lv - softCapLevel) * coinsPerLevel;
+            coinReward = baseAtCap + Math.floor(overflow / softCapDivisor);
+          }
           grantCoins(client, {
             userId: opts.userId,
             guildId: opts.guildId,
             username: opts.username,
             avatarHash: opts.avatarHash,
-            amount: lv * coinsPerLevel,
+            amount: coinReward,
             source: "levelup",
             meta: { level: lv },
             member: opts.member,
