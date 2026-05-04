@@ -69,7 +69,7 @@ module.exports = {
         return interaction.editReply("🔧 金幣系統尚未啟動。");
       }
 
-      const rows = await fetchCasinoLeaderboard(
+      const { rows, range } = await fetchCasinoLeaderboard(
         client,
         interaction.guild.id,
         type,
@@ -80,7 +80,7 @@ module.exports = {
         return interaction.editReply(`📊 ${meta.emptyHint}`);
       }
 
-      const container = buildContainer({ meta, period, rows });
+      const container = buildContainer({ meta, period, rows, range });
       await interaction.editReply({
         components: [container],
         flags: MessageFlags.IsComponentsV2,
@@ -97,47 +97,66 @@ module.exports = {
 async function fetchCasinoLeaderboard(client, guildId, type, period) {
   const meta = TYPE_META[type];
   const dateFilter = getDateFilter(period);
+  const baseMatch = {
+    guildId,
+    source: { $in: ["bet", "payout"] },
+    ...dateFilter,
+  };
 
-  const data = await client.coinTransactionsCollection
-    .aggregate([
-      {
-        $match: {
-          guildId,
-          source: { $in: ["bet", "payout"] },
-          ...dateFilter,
-        },
-      },
-      {
-        $group: {
-          _id: "$userId",
-          netProfit: { $sum: "$amount" },
-          totalWagered: {
-            $sum: {
-              $cond: [{ $eq: ["$source", "bet"] }, { $abs: "$amount" }, 0],
+  const [data, rangeAgg] = await Promise.all([
+    client.coinTransactionsCollection
+      .aggregate([
+        { $match: baseMatch },
+        {
+          $group: {
+            _id: "$userId",
+            netProfit: { $sum: "$amount" },
+            totalWagered: {
+              $sum: {
+                $cond: [{ $eq: ["$source", "bet"] }, { $abs: "$amount" }, 0],
+              },
+            },
+            totalPayout: {
+              $sum: {
+                $cond: [{ $eq: ["$source", "payout"] }, "$amount", 0],
+              },
             },
           },
-          totalPayout: {
-            $sum: {
-              $cond: [{ $eq: ["$source", "payout"] }, "$amount", 0],
-            },
+        },
+        { $match: meta.profitFilter },
+        { $sort: { netProfit: meta.sort } },
+        { $limit: 10 },
+      ])
+      .toArray(),
+    client.coinTransactionsCollection
+      .aggregate([
+        { $match: baseMatch },
+        {
+          $group: {
+            _id: null,
+            firstDate: { $min: "$date" },
+            lastDate: { $max: "$date" },
           },
         },
-      },
-      { $match: meta.profitFilter },
-      { $sort: { netProfit: meta.sort } },
-      { $limit: 10 },
-    ])
-    .toArray();
+      ])
+      .toArray(),
+  ]);
 
-  return data.map((u) => ({
+  const rows = data.map((u) => ({
     userId: u._id,
     netProfit: u.netProfit,
     totalWagered: u.totalWagered,
     totalPayout: u.totalPayout,
   }));
+
+  const range = rangeAgg[0]
+    ? { firstDate: rangeAgg[0].firstDate, lastDate: rangeAgg[0].lastDate }
+    : null;
+
+  return { rows, range };
 }
 
-function buildContainer({ meta, period, rows }) {
+function buildContainer({ meta, period, rows, range }) {
   const medals = ["🥇", "🥈", "🥉"];
   const renderRow = (row, idx) => {
     const medal = medals[idx] || `**${idx + 1}.**`;
@@ -171,16 +190,28 @@ function buildContainer({ meta, period, rows }) {
       .addTextDisplayComponents(new TextDisplayBuilder().setContent(rest));
   }
 
+  const rangeText = describeRange(range);
   container
     .addSeparatorComponents(new SeparatorBuilder())
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `-# 統計期間：${getPeriodText(period)} ・ <t:${Math.floor(Date.now() / 1000)}:R>\n` +
-          `-# 統計範圍：拉霸、21 點、骰寶、樂透（交易紀錄保留 90 天）`,
+        `-# 統計期間：${getPeriodText(period)}（${rangeText}）・ <t:${Math.floor(Date.now() / 1000)}:R>\n` +
+          `-# 統計範圍：拉霸、21 點、骰寶、樂透（交易紀錄最多保留 90 天）`,
       ),
     );
 
   return container;
+}
+
+function describeRange(range) {
+  if (!range?.firstDate || !range?.lastDate) return "無資料";
+  const first = DateTime.fromISO(range.firstDate, { zone: "Asia/Taipei" });
+  const last = DateTime.fromISO(range.lastDate, { zone: "Asia/Taipei" });
+  const days = Math.max(1, Math.round(last.diff(first, "days").days) + 1);
+  if (range.firstDate === range.lastDate) {
+    return `${range.firstDate}・共 1 天`;
+  }
+  return `${range.firstDate} ~ ${range.lastDate}・共 ${days} 天`;
 }
 
 function getDateFilter(period) {
