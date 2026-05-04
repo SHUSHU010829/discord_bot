@@ -74,30 +74,18 @@ function pickAccent(state) {
   }
 }
 
-function renderCornerLabel(label, suitSvg, color, align) {
-  // 兩個角落都正向（不旋轉），左上 + 右上配置
-  return `
-    <div style="display:flex;flex-direction:column;align-items:${align};line-height:1;color:${color};">
-      <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:28px;line-height:1;">${label}</div>
-      <div style="display:flex;margin-top:2px;">${suitSvg}</div>
-    </div>
-  `;
-}
-
 function renderCard(card) {
   const rank = card[0];
   const suit = card[1];
   const label = RANK_LABEL[rank];
   const color = isRedSuit(suit) ? PALETTE.red : PALETTE.ink;
-  const cornerSuit = renderSuitSvg(suit, 22, color);
-  const centerSuit = renderSuitSvg(suit, 70, color);
+  const suitSvg = renderSuitSvg(suit, 64, color);
+  // 10 兩個字母排起來會超寬，把字級縮一點
+  const rankSize = label.length > 1 ? 78 : 96;
   return `
-    <div style="display:flex;width:140px;height:200px;background:${PALETTE.cardWhite};border:3px solid ${PALETTE.ink};box-sizing:border-box;margin:0 8px;flex-direction:column;padding:10px 12px;">
-      <div style="display:flex;width:100%;justify-content:space-between;">
-        ${renderCornerLabel(label, cornerSuit, color, "flex-start")}
-        ${renderCornerLabel(label, cornerSuit, color, "flex-end")}
-      </div>
-      <div style="display:flex;flex:1;justify-content:center;align-items:center;">${centerSuit}</div>
+    <div style="display:flex;width:140px;height:200px;background:${PALETTE.cardWhite};border:3px solid ${PALETTE.ink};box-sizing:border-box;margin:0 8px;flex-direction:column;justify-content:center;align-items:center;padding:14px 0;">
+      <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:${rankSize}px;color:${color};line-height:1;letter-spacing:-2px;">${label}</div>
+      <div style="display:flex;margin-top:14px;">${suitSvg}</div>
     </div>
   `;
 }
@@ -177,7 +165,7 @@ function buildMarkup(data) {
 
   const resultBlock = resultLabel
     ? `
-      <div style="display:flex;flex-direction:row;align-items:center;justify-content:center;width:100%;margin-top:18px;">
+      <div style="display:flex;flex-direction:row;align-items:center;justify-content:center;width:100%;margin-top:28px;margin-bottom:48px;">
         <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:42px;color:${resultLabel.color};letter-spacing:10px;line-height:1;padding-right:10px;">${resultLabel.text}</div>
         ${
           settleAmount > 0
@@ -190,8 +178,8 @@ function buildMarkup(data) {
       </div>
     `
     : `
-      <div style="display:flex;flex-direction:column;align-items:center;width:100%;margin-top:18px;">
-        <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:22px;color:${PALETTE.muted};letter-spacing:6px;line-height:1;">輪到你了</div>
+      <div style="display:flex;flex-direction:column;align-items:center;width:100%;margin-top:28px;margin-bottom:48px;">
+        <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:22px;color:${PALETTE.muted};letter-spacing:6px;line-height:1;padding-right:6px;">輪到你了</div>
       </div>
     `;
 
@@ -200,7 +188,7 @@ function buildMarkup(data) {
     : `${state.bet.toLocaleString()}`;
 
   return `
-    <div style="display:flex;width:1080px;height:780px;background:${PALETTE.card};padding:24px;box-sizing:border-box;font-family:'NotoSansTC';">
+    <div style="display:flex;width:1080px;height:860px;background:${PALETTE.card};padding:24px;box-sizing:border-box;font-family:'NotoSansTC';">
       <div style="display:flex;flex-direction:column;width:100%;height:100%;background:${PALETTE.card};border:3px solid ${PALETTE.ink};padding:28px 40px;box-sizing:border-box;">
 
         <div style="display:flex;width:100%;justify-content:space-between;align-items:center;">
@@ -231,7 +219,7 @@ function buildMarkup(data) {
 
         ${resultBlock}
 
-        <div style="display:flex;width:100%;justify-content:space-between;align-items:center;margin-top:auto;padding-top:12px;border-top:2px dashed ${PALETTE.muted};">
+        <div style="display:flex;width:100%;justify-content:space-between;align-items:center;margin-top:auto;padding-top:20px;border-top:2px dashed ${PALETTE.muted};">
           <div style="display:flex;align-items:flex-end;">
             <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${PALETTE.muted};line-height:1;padding-right:5px;">BET</div>
             <div style="display:flex;margin-left:7px;font-family:'NotoSansTC';font-weight:900;font-size:22px;color:${PALETTE.ink};line-height:1;">${stakeLabel}</div>
@@ -255,7 +243,7 @@ async function generateBlackjackCard(data) {
 
   const svg = await satori(element, {
     width: 1080,
-    height: 780,
+    height: 860,
     fonts,
     loadAdditionalAsset,
   });
