@@ -36,22 +36,6 @@ async function getTodayBetTotal(client, userId, guildId) {
   return Math.abs(agg[0]?.total || 0);
 }
 
-async function isOnCooldown(client, userId, guildId, cooldownMs) {
-  if (!cooldownMs || cooldownMs <= 0) return false;
-  const since = new Date(Date.now() - cooldownMs);
-  const recent = await client.coinTransactionsCollection.findOne(
-    {
-      userId,
-      guildId,
-      source: "bet",
-      "meta.game": "slot",
-      createdAt: { $gt: since },
-    },
-    { projection: { _id: 1 } }
-  );
-  return !!recent;
-}
-
 function describeMatch(matchType) {
   switch (matchType) {
     case "jackpot":
@@ -100,7 +84,6 @@ module.exports = {
 
       const minBet = cfg.minBet ?? 5;
       const maxBet = cfg.maxBet ?? 500;
-      const cooldownSeconds = cfg.cooldownSeconds ?? 3;
       const dailyBetLimit = cfg.dailyBetLimit ?? 5000;
 
       const bet = interaction.options.getInteger("下注");
@@ -121,10 +104,6 @@ module.exports = {
         return interaction.editReply(
           `💰 餘額不足！目前 **${balance.toLocaleString()}** credits，無法下注 ${bet.toLocaleString()}。`
         );
-      }
-
-      if (await isOnCooldown(client, userId, guildId, cooldownSeconds * 1000)) {
-        return interaction.editReply("🎰 機台還在轉，等個幾秒再來！");
       }
 
       const todayBet = await getTodayBetTotal(client, userId, guildId);
@@ -202,8 +181,13 @@ module.exports = {
           ? `${describeMatch(result.matchType)} ＋${result.payout.toLocaleString()} credits`
           : `💸 沒中，下次再來！`;
 
+      const bankruptLine =
+        balanceAfter <= 0
+          ? `\n🚨 **你破產了！** 餘額歸零，去發言、聊天賺金幣再來吧！`
+          : "";
+
       await interaction.editReply({
-        content: `${headline}\n・下注：**${bet.toLocaleString()}**　・餘額：**${balanceAfter.toLocaleString()}**`,
+        content: `${headline}\n・下注：**${bet.toLocaleString()}**　・餘額：**${balanceAfter.toLocaleString()}**${bankruptLine}`,
         files: [attachment],
       });
     } catch (error) {

@@ -9,7 +9,6 @@
       "enabled": true,
       "minBet": 5,
       "maxBet": 500,
-      "cooldownSeconds": 3,
       "dailyBetLimit": 5000,
       "dailyLossProtection": 2000
     }
