@@ -5,8 +5,8 @@ const { levelSystem } = require("../../config");
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("連勝保護卡")
-    .setDescription("查看你的連勝保護卡庫存與規則 🛡️")
+    .setName("補簽卡")
+    .setDescription("查看你的補簽卡庫存與規則 🛡️")
     .setDMPermission(false)
     .toJSON(),
 
@@ -33,7 +33,7 @@ module.exports = {
       const remainToNext = nextMilestone != null ? nextMilestone - streak : null;
 
       const lines = [
-        `## 🛡️ 連勝保護卡`,
+        `## 🛡️ 補簽卡`,
         `目前庫存：**${stock} / ${max}**`,
         `當前連勝：**${streak}** 天`,
       ];
@@ -59,7 +59,7 @@ module.exports = {
         flags: MessageFlags.Ephemeral,
       });
     } catch (error) {
-      console.log(`[ERROR] /連勝保護卡:\n${error}\n${error.stack}`.red);
+      console.log(`[ERROR] /補簽卡:\n${error}\n${error.stack}`.red);
       const reply = { content: "🔧 載入失敗，請呼叫舒舒！", flags: MessageFlags.Ephemeral };
       if (interaction.replied || interaction.deferred) {
         await interaction.editReply(reply).catch(() => {});

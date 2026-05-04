@@ -71,9 +71,9 @@ src/
 │   ├── ask/                # 詢問星座運勢、占卜
 │   ├── currency/           # 加密貨幣、匯率
 │   ├── draw/               # 抽籤、樂透、抽一個
-│   ├── food/               # 食物/飲料 CRUD、抽食物、抽飲料
-│   ├── general/            # /help、/today-report
-│   ├── misc/               # /ping
+│   ├── economy/            # /錢包、/骰寶、/give-coins
+│   ├── food/               # 食物/飲料 CRUD、/吃什麼
+│   ├── general/            # /help
 │   ├── post/               # 整人小工具（瓦斯燈）
 │   ├── roles/              # /setup-roles
 │   ├── stats/              # /stats、/leaderboard
@@ -362,7 +362,6 @@ embed.js → 發送 Embed
 | `/stats`、`/leaderboard` | 訊息與語音時長統計（由 `messageStats.js`、`voiceStats.js` 累積） |
 | `/gaslight`、`/increase-gaslight` | 整人小工具 |
 | `/help` | 查看指令說明 |
-| `/ping` | 測試延遲 |
 
 ---
 
@@ -396,11 +395,11 @@ embed.js → 發送 Embed
 
 **重置時間**：以 `daily.resetTimezone`（預設 `Asia/Taipei`）的午夜為界，跨日才能再簽。
 
-#### 連勝保護卡 🛡️
+#### 補簽卡 🛡️
 
 - 每連續簽到滿 `streakFreezeUnlockEvery`（預設 30）天 +1 張，庫存上限 `maxStreakFreezeStock`（預設 3）。
 - 漏簽 1 天會自動消耗 1 張、連勝不歸零；漏 2 天以上仍會歸零。
-- 用 `/連勝保護卡` 隨時查庫存與下一張的距離。
+- 用 `/補簽卡` 隨時查庫存與下一張的距離。
 
 #### 徽章與稱號
 
@@ -417,7 +416,7 @@ embed.js → 發送 Embed
 | 指令 | 用途 |
 | --- | --- |
 | `/每日簽到` | 領今日 XP，產生簽到卡與月曆 |
-| `/連勝保護卡` | 查保護卡庫存、下次解鎖距離 |
+| `/補簽卡` | 查補簽卡庫存、下次解鎖距離 |
 | `/等級卡 [用戶] [私密]` | 看自己或他人的等級卡（XP、進度條、稱號） |
 | `/等級排行榜` | 伺服器 Top 排行 |
 | `/徽章圖鑑` | 全徽章解鎖進度 |

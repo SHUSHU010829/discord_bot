@@ -231,12 +231,12 @@ module.exports = {
       const noteLines = [];
       if (consumedFreeze) {
         noteLines.push(
-          `🛡️ 你昨天忘了簽到，但消耗 1 張連勝保護卡，連勝沒歸零！剩餘庫存：${freezesAfter}`
+          `🛡️ 你昨天忘了簽到，但消耗 1 張補簽卡，連勝沒歸零！剩餘庫存：${freezesAfter}`
         );
       }
       if (unlockedFreeze) {
         noteLines.push(
-          `🎁 達成 ${streak} 天連勝里程碑，獲得 1 張連勝保護卡！目前庫存：${freezesAfter}/${maxStock}`
+          `🎁 達成 ${streak} 天連勝里程碑，獲得 1 張補簽卡！目前庫存：${freezesAfter}/${maxStock}`
         );
       }
       if (noteLines.length > 0) {
