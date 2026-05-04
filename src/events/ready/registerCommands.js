@@ -30,10 +30,10 @@ module.exports = async (client) => {
         continue;
       }
 
-      // 動態載入飲料店選項
-      if (commandName === "喝什麼") {
+      // 動態載入飲料店選項到 /food drink 子指令
+      if (commandName === "food") {
         if (!client.collection) {
-          console.log(`[WARNING] Database not connected yet when registering /喝什麼`.yellow);
+          console.log(`[WARNING] Database not connected yet when registering /food`.yellow);
         } else {
           try {
             const beverageStores = await client.collection.distinct("beverageStore", {
@@ -42,20 +42,24 @@ module.exports = async (client) => {
 
             console.log(`[INFO] Loaded ${beverageStores.length} beverage stores from database`.cyan);
 
-            // 更新選項的 choices（最多 25 個，Discord 限制）
             if (commandOptions && commandOptions.length > 0) {
-              const beverageStoreOption = commandOptions.find(opt => opt.name === "飲料店");
+              const drinkSubcommand = commandOptions.find(
+                (opt) => opt.name === "drink"
+              );
+              const beverageStoreOption = drinkSubcommand?.options?.find(
+                (opt) => opt.name === "飲料店"
+              );
               if (beverageStoreOption) {
                 beverageStoreOption.choices = beverageStores
                   .slice(0, 25)
-                  .map(store => ({ name: store, value: store }));
-                console.log(`[INFO] Set ${beverageStoreOption.choices.length} choices for /喝什麼 command`.green);
+                  .map((store) => ({ name: store, value: store }));
+                console.log(`[INFO] Set ${beverageStoreOption.choices.length} choices for /food drink 飲料店`.green);
               } else {
-                console.log(`[WARNING] Could not find "飲料店" option in /喝什麼 command`.yellow);
+                console.log(`[WARNING] Could not find /food drink 飲料店 option`.yellow);
               }
             }
           } catch (error) {
-            console.log(`[WARNING] Failed to load beverage stores for /喝什麼: ${error}`.yellow);
+            console.log(`[WARNING] Failed to load beverage stores for /food drink: ${error}`.yellow);
           }
         }
       }

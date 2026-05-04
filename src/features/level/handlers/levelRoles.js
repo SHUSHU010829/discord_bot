@@ -1,77 +1,9 @@
 require("colors");
-const {
-  SlashCommandBuilder,
-  PermissionFlagsBits,
-  MessageFlags,
-} = require("discord.js");
+const { MessageFlags } = require("discord.js");
 const pLimit = require("p-limit");
 
-const syncLevelRoles = require("../../features/leveling/levelRoles");
-const { getLevelProgress } = require("../../utils/levelMath");
-
-module.exports = {
-  data: new SlashCommandBuilder()
-    .setName("levelroles")
-    .setDescription("[ADMIN] Manage the level → role mapping table (admin only)")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
-    .setDMPermission(false)
-    .addSubcommand((sub) =>
-      sub
-        .setName("set")
-        .setDescription("Set the role granted at a level (overwrites if exists)")
-        .addIntegerOption((opt) =>
-          opt
-            .setName("level")
-            .setDescription("Target level")
-            .setMinValue(1)
-            .setMaxValue(999)
-            .setRequired(true)
-        )
-        .addRoleOption((opt) =>
-          opt
-            .setName("role")
-            .setDescription("Role to grant")
-            .setRequired(true)
-        )
-    )
-    .addSubcommand((sub) =>
-      sub
-        .setName("remove")
-        .setDescription("Remove the mapping for a level")
-        .addIntegerOption((opt) =>
-          opt
-            .setName("level")
-            .setDescription("Level to remove")
-            .setMinValue(1)
-            .setMaxValue(999)
-            .setRequired(true)
-        )
-    )
-    .addSubcommand((sub) =>
-      sub.setName("list").setDescription("List the current level → role mappings")
-    )
-    .addSubcommand((sub) =>
-      sub
-        .setName("apply")
-        .setDescription("Re-sync every member's level roles based on the current table (may take a few seconds)")
-    )
-    .toJSON(),
-
-  run: async (client, interaction) => {
-    if (!client.levelRolesCollection) {
-      return interaction.reply({
-        content: "🔧 等級系統尚未啟動",
-        flags: MessageFlags.Ephemeral,
-      });
-    }
-
-    const sub = interaction.options.getSubcommand();
-    if (sub === "set") return runSet(client, interaction);
-    if (sub === "remove") return runRemove(client, interaction);
-    if (sub === "list") return runList(client, interaction);
-    if (sub === "apply") return runApply(client, interaction);
-  },
-};
+const syncLevelRoles = require("../../leveling/levelRoles");
+const { getLevelProgress } = require("../../../utils/levelMath");
 
 async function runSet(client, interaction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -79,7 +11,6 @@ async function runSet(client, interaction) {
     const level = interaction.options.getInteger("level");
     const role = interaction.options.getRole("role");
 
-    // 確認 bot 自己 role 比目標 role 高（不然加不上）
     const me = interaction.guild.members.me;
     if (me.roles.highest.comparePositionTo(role) <= 0) {
       return interaction.editReply(
@@ -103,10 +34,10 @@ async function runSet(client, interaction) {
 
     await interaction.editReply(
       `✅ 已設定 **Lv.${level}** → ${role}\n` +
-        `-# 既有成員的身分組不會自動套用，要全部同步請用 \`/levelroles apply\``
+        `-# 既有成員的身分組不會自動套用，要全部同步請用 \`/level-admin roles apply\``
     );
   } catch (error) {
-    console.log(`[ERROR] /levelroles set:\n${error}\n${error.stack}`.red);
+    console.log(`[ERROR] /level-admin roles set:\n${error}\n${error.stack}`.red);
     await interaction.editReply("🔧 設定失敗，看 console").catch(() => {});
   }
 }
@@ -129,7 +60,7 @@ async function runRemove(client, interaction) {
         `-# 既有持有該 role 的成員身分組沒有被動掉，要清掉請手動或下次升級時 sync`
     );
   } catch (error) {
-    console.log(`[ERROR] /levelroles remove:\n${error}\n${error.stack}`.red);
+    console.log(`[ERROR] /level-admin roles remove:\n${error}\n${error.stack}`.red);
     await interaction.editReply("🔧 移除失敗，看 console").catch(() => {});
   }
 }
@@ -145,7 +76,7 @@ async function runList(client, interaction) {
     if (docs.length === 0) {
       return interaction.editReply(
         "目前沒有任何等級身分組對應。\n" +
-          "用 `/levelroles set level:5 role:@xxx` 開始設定。"
+          "用 `/level-admin roles set level:5 role:@xxx` 開始設定。"
       );
     }
 
@@ -157,10 +88,10 @@ async function runList(client, interaction) {
 
     await interaction.editReply(
       `## 🏷️ 等級身分組對應表\n${lines.join("\n")}\n\n` +
-        `-# 共 ${docs.length} 筆 ・ 升級到對應等級時自動套用，舊成員可用 \`/levelroles apply\` 補上`
+        `-# 共 ${docs.length} 筆 ・ 升級到對應等級時自動套用，舊成員可用 \`/level-admin roles apply\` 補上`
     );
   } catch (error) {
-    console.log(`[ERROR] /levelroles list:\n${error}\n${error.stack}`.red);
+    console.log(`[ERROR] /level-admin roles list:\n${error}\n${error.stack}`.red);
     await interaction.editReply("🔧 載入失敗，看 console").catch(() => {});
   }
 }
@@ -172,7 +103,6 @@ async function runApply(client, interaction) {
       return interaction.editReply("🔧 等級系統尚未啟動");
     }
 
-    // 先驗證所有 mapping role 的位階都在 bot 之下
     const mappingDocs = await client.levelRolesCollection
       .find({ guildId: interaction.guildId })
       .sort({ level: 1 })
@@ -228,7 +158,7 @@ async function runApply(client, interaction) {
           }
           processed += 1;
 
-          // 節流：每 10 人或處理完才 update（避免 rate limit）
+          // 節流：每 10 人或處理完才 update
           const now = Date.now();
           if (
             (processed % 10 === 0 || processed === total) &&
@@ -249,7 +179,24 @@ async function runApply(client, interaction) {
         `跳過（已離開伺服器或失敗）：${skipped} 位`
     );
   } catch (error) {
-    console.log(`[ERROR] /levelroles apply:\n${error}\n${error.stack}`.red);
+    console.log(`[ERROR] /level-admin roles apply:\n${error}\n${error.stack}`.red);
     await interaction.editReply("🔧 同步失敗，看 console").catch(() => {});
   }
 }
+
+async function run(client, interaction) {
+  if (!client.levelRolesCollection) {
+    return interaction.reply({
+      content: "🔧 等級系統尚未啟動",
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  const sub = interaction.options.getSubcommand();
+  if (sub === "set") return runSet(client, interaction);
+  if (sub === "remove") return runRemove(client, interaction);
+  if (sub === "list") return runList(client, interaction);
+  if (sub === "apply") return runApply(client, interaction);
+}
+
+module.exports = { run };

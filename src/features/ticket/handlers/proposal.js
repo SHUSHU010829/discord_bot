@@ -1,100 +1,28 @@
+require("colors");
 const {
-  SlashCommandBuilder,
   PermissionFlagsBits,
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
 } = require("discord.js");
-const config = require("../../config");
 const { randomUUID } = require("crypto");
-const { finalizeProposal } = require("../../features/voting/finalizeProposal");
+const config = require("../../../config");
+const { finalizeProposal } = require("../../voting/finalizeProposal");
 
 const PROPOSAL_TYPE_TO_TEMPLATE = {
   create: "game_create",
   archive: "game_archive",
 };
 
-module.exports = {
-  data: new SlashCommandBuilder()
-    .setName("proposal")
-    .setDescription("[ADMIN] 🗳️ Manage game-channel proposal votes (admin only)")
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName("start")
-        .setDescription("Start a new game-channel proposal vote")
-        .addStringOption((option) =>
-          option
-            .setName("game")
-            .setDescription("Game name")
-            .setRequired(true)
-        )
-        .addStringOption((option) =>
-          option
-            .setName("type")
-            .setDescription("Proposal type")
-            .setRequired(true)
-            .addChoices(
-              { name: "Create channel", value: "create" },
-              { name: "Archive channel", value: "archive" }
-            )
-        )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName("end")
-        .setDescription("⏭️ End an ongoing vote early (admin only)")
-        .addStringOption((option) =>
-          option
-            .setName("message_url")
-            .setDescription("URL of the vote message")
-            .setRequired(true)
-        )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName("cancel")
-        .setDescription("🗑️ Cancel an ongoing vote (admin only)")
-        .addStringOption((option) =>
-          option
-            .setName("message_url")
-            .setDescription("URL of the vote message")
-            .setRequired(true)
-        )
-    )
-    .setDMPermission(false)
-    .toJSON(),
-
-  userPermissions: [PermissionFlagsBits.Administrator],
-  botPermissions: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels],
-
-  run: async (client, interaction) => {
-    try {
-      const subcommand = interaction.options.getSubcommand();
-
-      if (subcommand === "start") {
-        await handleProposalStart(client, interaction);
-      } else if (subcommand === "end") {
-        await handleProposalEndCommand(client, interaction);
-      } else if (subcommand === "cancel") {
-        await handleProposalCancelCommand(client, interaction);
-      }
-    } catch (error) {
-      console.log(`[ERROR] proposal 指令執行時出錯：\n${error}\n${error.stack}`.red);
-
-      if (interaction.deferred || interaction.replied) {
-        await interaction.editReply({
-          content: "❌ 執行指令時發生錯誤！",
-        }).catch(() => {});
-      } else {
-        await interaction.reply({
-          content: "❌ 執行指令時發生錯誤！",
-          ephemeral: true,
-        }).catch(() => {});
-      }
-    }
-  },
-};
+function extractMessageId(url) {
+  try {
+    const match = url.match(/\/channels\/\d+\/\d+\/(\d+)/);
+    return match ? match[1] : null;
+  } catch (error) {
+    return null;
+  }
+}
 
 async function handleProposalStart(client, interaction) {
   await interaction.deferReply({ ephemeral: true });
@@ -188,7 +116,7 @@ async function handleProposalStart(client, interaction) {
     ticketChannelId: interaction.channel.id,
     proposerId,
     title,
-    gameName, // 保留方便查詢
+    gameName,
     templateKey,
     status: "VOTING",
     messageId: voteMessage.id,
@@ -304,11 +232,31 @@ async function handleProposalCancelCommand(client, interaction) {
   });
 }
 
-function extractMessageId(url) {
+async function run(client, interaction) {
   try {
-    const match = url.match(/\/channels\/\d+\/\d+\/(\d+)/);
-    return match ? match[1] : null;
+    const subcommand = interaction.options.getSubcommand();
+
+    if (subcommand === "start") {
+      await handleProposalStart(client, interaction);
+    } else if (subcommand === "end") {
+      await handleProposalEndCommand(client, interaction);
+    } else if (subcommand === "cancel") {
+      await handleProposalCancelCommand(client, interaction);
+    }
   } catch (error) {
-    return null;
+    console.log(`[ERROR] proposal 指令執行時出錯：\n${error}\n${error.stack}`.red);
+
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({
+        content: "❌ 執行指令時發生錯誤！",
+      }).catch(() => {});
+    } else {
+      await interaction.reply({
+        content: "❌ 執行指令時發生錯誤！",
+        ephemeral: true,
+      }).catch(() => {});
+    }
   }
 }
+
+module.exports = { run };
