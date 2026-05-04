@@ -73,7 +73,7 @@
       "coinsPerTick": 1,
       "tickMinutes": 2
     },
-    "messageVoiceDailyCap": 30,
+    "messageVoiceDailyCap": 100,
     "reaction": {
       "reactionsPerCoin": 2,
       "dailyCapPerUser": 10
