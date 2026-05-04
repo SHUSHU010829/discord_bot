@@ -78,12 +78,12 @@ function buildHeadline(matchType) {
 
 function renderHeadline(headline, color, size, weight) {
   const emojiStyle = `display:flex;font-family:'NotoSansTC';font-weight:500;font-size:${size}px;line-height:1;`;
-  const textStyle = `display:flex;font-family:'NotoSansTC';font-weight:${weight};font-size:${size}px;color:${color};letter-spacing:4px;line-height:1;`;
+  const textStyle = `display:flex;font-family:'NotoSansTC';font-weight:${weight};font-size:${size}px;color:${color};letter-spacing:6px;line-height:1;padding-right:6px;`;
   const left = headline.left
-    ? `<div style="${emojiStyle}margin-right:14px;">${headline.left}</div>`
+    ? `<div style="${emojiStyle}margin-right:${Math.round(size * 0.4)}px;">${headline.left}</div>`
     : "";
   const right = headline.right
-    ? `<div style="${emojiStyle}margin-left:14px;">${headline.right}</div>`
+    ? `<div style="${emojiStyle}margin-left:${Math.round(size * 0.4)}px;">${headline.right}</div>`
     : "";
   return `${left}<div style="${textStyle}">${headline.text}</div>${right}`;
 }
@@ -126,7 +126,7 @@ function buildMarkup(data) {
       </div>
     `
     : `
-      <div style="display:flex;flex-direction:column;align-items:center;width:100%;margin-top:32px;">
+      <div style="display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;width:100%;">
         <div style="display:flex;align-items:center;">${renderHeadline(headline, PALETTE.muted, 48, 900)}</div>
       </div>
     `;

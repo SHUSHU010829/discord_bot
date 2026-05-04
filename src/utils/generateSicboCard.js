@@ -101,11 +101,12 @@ function buildMarkup(data) {
   const dieFrameWidth = isTriple && won ? 4 : 3;
 
   const resultEmoji = won ? (isTriple ? "🎉" : "✨") : "💸";
+  // 注意：NotoSansTC 的 woff 子集沒有 ！ 與 ，，會變成 □（tofu），改用 ASCII 標點。
   const resultText = won
     ? isTriple
-      ? `圍骰！＋${payout.toLocaleString()} CREDITS`
-      : `中獎！＋${payout.toLocaleString()} CREDITS`
-    : `沒中，下次加油！`;
+      ? `圍骰  +${payout.toLocaleString()} CREDITS`
+      : `中獎  +${payout.toLocaleString()} CREDITS`
+    : `沒中  下次再來`;
 
   const handle = `@${(username || "shushu").toUpperCase()}`;
 
@@ -142,10 +143,10 @@ function buildMarkup(data) {
           <div style="display:flex;margin-left:16px;font-family:'NotoSansTC';font-weight:900;font-size:54px;color:${accent};line-height:1;">${sum}</div>
         </div>
 
-        <!-- 結果文字 -->
-        <div style="display:flex;justify-content:center;align-items:center;width:100%;margin-top:18px;">
-          <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:30px;line-height:1;margin-right:12px;">${resultEmoji}</div>
-          <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:30px;color:${accent};letter-spacing:2px;line-height:1;">${resultText}</div>
+        <!-- 結果文字（撐滿剩餘空間並上下置中） -->
+        <div style="display:flex;flex:1;justify-content:center;align-items:center;width:100%;margin-top:18px;">
+          <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:32px;line-height:1;margin-right:18px;">${resultEmoji}</div>
+          <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:32px;color:${accent};letter-spacing:6px;line-height:1;padding-right:6px;">${resultText}</div>
         </div>
 
         <!-- 底部 BET / BALANCE / @USER -->
