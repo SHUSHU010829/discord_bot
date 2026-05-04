@@ -7,6 +7,7 @@ const {
 
 const { coinSystem } = require("../../config");
 const generateWalletCard = require("../../utils/generateWalletCard");
+const { getTheme } = require("../../features/shop/catalog");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -35,6 +36,15 @@ module.exports = {
       const tier =
         lifetime >= 20000 ? "platinum" : lifetime >= 5000 ? "premium" : "standard";
 
+      // 讀取使用者裝備的錢包主題
+      let theme = null;
+      if (client.userLevelsCollection) {
+        const lv = await client.userLevelsCollection
+          .findOne({ userId, guildId }, { projection: { walletTheme: 1 } })
+          .catch(() => null);
+        if (lv?.walletTheme) theme = getTheme(lv.walletTheme);
+      }
+
       const buf = await generateWalletCard({
         userId,
         guildId,
@@ -44,6 +54,7 @@ module.exports = {
         lifetimeCoins: lifetime,
         cardNo: userId.slice(-4),
         tier,
+        theme,
       });
 
       const attachment = new AttachmentBuilder(buf, {

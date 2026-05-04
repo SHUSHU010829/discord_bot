@@ -9,6 +9,7 @@ const syncLevelRoles = require("./levelRoles");
 const announceLevelUp = require("./levelUpAnnouncer");
 const checkBadges = require("./badgeChecker");
 const grantCoins = require("../economy/grantCoins");
+const { getActiveBuffMultiplier } = require("../shop/activeBuff");
 
 module.exports = async (client, opts) => {
   if (!client.userLevelsCollection) return null;
@@ -29,8 +30,14 @@ module.exports = async (client, opts) => {
     ? { multiplier: 1, name: null }
     : getServerBoostBonus(opts.member, opts.source);
   const baseAmount = opts.amount;
+  const buffMultiplier = skipMultipliers
+    ? 1
+    : await getActiveBuffMultiplier(client, opts.userId, opts.guildId, "xp_boost").catch(() => 1);
   const totalMultiplier =
-    eventInfo.multiplier * twitchInfo.multiplier * boostInfo.multiplier;
+    eventInfo.multiplier *
+    twitchInfo.multiplier *
+    boostInfo.multiplier *
+    buffMultiplier;
   if (totalMultiplier > 1) {
     opts.amount = Math.floor(opts.amount * totalMultiplier);
   }

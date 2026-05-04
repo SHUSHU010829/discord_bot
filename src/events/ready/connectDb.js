@@ -57,6 +57,11 @@ module.exports = async (client) => {
     // 21 點對局狀態（in-flight + 結算後保留一段時間）
     const blackjackGamesCollection = database.collection("BlackjackGames");
 
+    // 商店系統 collections
+    const userInventoryCollection = database.collection("UserInventory");
+    const shopTransactionsCollection = database.collection("ShopTransactions");
+    const shopRoleCacheCollection = database.collection("ShopRoleCache");
+
     // Twitch chat 同步去重
     const twitchScoreFlushesCollection = database.collection("TwitchScoreFlushes");
 
@@ -84,6 +89,9 @@ module.exports = async (client) => {
     client.blackjackGamesCollection = blackjackGamesCollection;
     client.twitchScoreFlushesCollection = twitchScoreFlushesCollection;
     client.twitchLiveStateCollection = twitchLiveStateCollection;
+    client.userInventoryCollection = userInventoryCollection;
+    client.shopTransactionsCollection = shopTransactionsCollection;
+    client.shopRoleCacheCollection = shopRoleCacheCollection;
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
 
     // 自動修補沒有 category / drawCount 的舊資料（idempotent，沒事就不動）
@@ -211,6 +219,36 @@ module.exports = async (client) => {
       await blackjackGamesCollection.createIndex(
         { updatedAt: 1 },
         { expireAfterSeconds: 30 * 24 * 60 * 60, name: "bj_ttl_30d" }
+      );
+
+      // 商店：背包索引（同人同 guild 同 itemId 可有多筆，因為到期時間/裝備狀態不同）
+      await userInventoryCollection.createIndex(
+        { userId: 1, guildId: 1 },
+        { name: "inv_user_guild" }
+      );
+      await userInventoryCollection.createIndex(
+        { userId: 1, guildId: 1, itemId: 1 },
+        { name: "inv_user_guild_item" }
+      );
+      await userInventoryCollection.createIndex(
+        { guildId: 1, expiresAt: 1 },
+        { name: "inv_guild_expiry" }
+      );
+
+      // 商店：交易紀錄
+      await shopTransactionsCollection.createIndex(
+        { userId: 1, guildId: 1, createdAt: -1 },
+        { name: "shop_tx_user_guild_time" }
+      );
+      await shopTransactionsCollection.createIndex(
+        { createdAt: 1 },
+        { expireAfterSeconds: 180 * 24 * 60 * 60, name: "shop_tx_ttl_180d" }
+      );
+
+      // 商店：身份組快取（每 guild 每色一筆，避免重複建立）
+      await shopRoleCacheCollection.createIndex(
+        { guildId: 1, hex: 1 },
+        { unique: true, name: "uniq_role_cache_guild_hex" }
       );
     } catch (indexError) {
       console.log(
