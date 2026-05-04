@@ -15,6 +15,7 @@ const generateProfileCard = require("../../../utils/generateProfileCard");
 const { BADGES } = require("../../leveling/badgeDefinitions");
 const { resolveAccent } = require("../../../utils/cardThemes");
 const { getTwitchSubBonus } = require("../../../utils/twitchSubBonus");
+const { getTheme } = require("../../shop/catalog");
 
 async function run(client, interaction) {
   const ephemeral = interaction.options.getBoolean("私密") ?? false;
@@ -75,6 +76,13 @@ async function run(client, interaction) {
 
     const cardAccent = resolveAccent(doc.cardAccent, tier.color);
 
+    // 等級卡風格與錢包卡共用同一裝備（walletTheme 欄位）。
+    let styleId = null;
+    if (doc.walletTheme) {
+      const themeMeta = getTheme(doc.walletTheme);
+      styleId = themeMeta?.styleId || doc.walletTheme;
+    }
+
     const buf = await generateProfileCard({
       username: displayName,
       avatarUrl: target.displayAvatarURL({ extension: "png", size: 256 }),
@@ -93,6 +101,7 @@ async function run(client, interaction) {
       totalVoiceMinutes: doc.totalVoiceMinutes || 0,
       badges: badgeDocs,
       cardAccent,
+      styleId,
     });
 
     const fileName = `profile-${target.id}.png`;

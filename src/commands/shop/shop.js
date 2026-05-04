@@ -97,7 +97,7 @@ async function handleBuy(client, interaction) {
   } else if (item.type === "role_color") {
     lines.push(`・使用 \`/商店 裝備\` 啟用顏色身份組`);
   } else if (item.type === "wallet_theme") {
-    lines.push(`・使用 \`/商店 裝備\` 套用到錢包卡`);
+    lines.push(`・使用 \`/商店 裝備\` 套用到錢包卡與等級卡`);
   } else if (item.type === "custom_title") {
     lines.push(`・使用 \`/商店 設定稱號 <文字>\` 套用稱號`);
   }

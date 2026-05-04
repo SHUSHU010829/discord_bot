@@ -84,7 +84,7 @@ module.exports = {
 
         const TYPE_LABEL = {
           role_color: "🎨 顏色身份組",
-          wallet_theme: "🖼️ 錢包主題",
+          wallet_theme: "🎴 卡面風格",
           custom_title: "🪪 自訂稱號",
           casino_token: "🎲 賭場道具",
         };
