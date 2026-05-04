@@ -18,6 +18,51 @@
       "maxBet": 1000,
       "dailyBetLimit": 10000,
       "gameTtlSeconds": 300
+    },
+    "lottery": {
+      "enabled": true,
+      "announceChannelId": "1174352640210124877",
+      "poolMilestoneChannelId": null,
+      "drawCron": "0 21 * * 0",
+      "subscriptionCron": "30 20 * * 0",
+      "reminderCron": "0 * * * *",
+      "timezone": "Asia/Taipei",
+      "types": {
+        "6_49": {
+          "enabled": true,
+          "ticketPrice": 50,
+          "systemSeed": 5000,
+          "fourthPrizeFixed": 100,
+          "maxTicketsPerOrder": 100,
+          "wheelingEnabled": true,
+          "wheelingMaxBaseNumbers": 10
+        },
+        "3_20": {
+          "enabled": true,
+          "ticketPrice": 10,
+          "systemSeed": 500,
+          "secondPrizeFixed": 50,
+          "maxTicketsPerOrder": 100,
+          "wheelingEnabled": false
+        }
+      },
+      "subscription": {
+        "maxDrawsPerSubscription": 12,
+        "maxTicketsPerDraw": 10,
+        "consecutiveFailureThreshold": 2
+      },
+      "poolMilestones": {
+        "6_49": [10000, 20000, 30000, 50000, 75000, 100000, 150000, 200000],
+        "3_20": [1000, 2000, 5000, 10000]
+      },
+      "reminders": {
+        "enabled": true,
+        "countRange": [1, 2],
+        "earliestAfterOpenHours": 24,
+        "latestBeforeDrawHours": 24,
+        "minIntervalHours": 48,
+        "daytimeWindow": { "startHour": 10, "endHour": 22 }
+      }
     }
   }
 }

@@ -63,6 +63,12 @@ module.exports = async (client) => {
     // Twitch 開台通知狀態 (login → 上次通知過的 streamId)
     const twitchLiveStateCollection = database.collection("TwitchLiveState");
 
+    // 樂透系統 collections
+    const lotteryDrawsCollection = database.collection("LotteryDraws");
+    const lotteryTicketsCollection = database.collection("LotteryTickets");
+    const lotterySubscriptionsCollection = database.collection("LotterySubscriptions");
+    const lotteryWheelsCollection = database.collection("LotteryWheels");
+
     client.database = database;
     client.collection = collection;
     client.gaslightCollection = gaslightCollection;
@@ -84,6 +90,10 @@ module.exports = async (client) => {
     client.blackjackGamesCollection = blackjackGamesCollection;
     client.twitchScoreFlushesCollection = twitchScoreFlushesCollection;
     client.twitchLiveStateCollection = twitchLiveStateCollection;
+    client.lotteryDrawsCollection = lotteryDrawsCollection;
+    client.lotteryTicketsCollection = lotteryTicketsCollection;
+    client.lotterySubscriptionsCollection = lotterySubscriptionsCollection;
+    client.lotteryWheelsCollection = lotteryWheelsCollection;
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
 
     // 自動修補沒有 category / drawCount 的舊資料（idempotent，沒事就不動）
@@ -211,6 +221,63 @@ module.exports = async (client) => {
       await blackjackGamesCollection.createIndex(
         { updatedAt: 1 },
         { expireAfterSeconds: 30 * 24 * 60 * 60, name: "bj_ttl_30d" }
+      );
+
+      // 樂透系統索引(歷史是核心資產,不設 TTL)
+      await lotteryDrawsCollection.createIndex(
+        { drawId: 1 },
+        { unique: true, name: "uniq_lottery_drawId" }
+      );
+      await lotteryDrawsCollection.createIndex(
+        { lotteryType: 1, status: 1 },
+        { name: "lottery_type_status" }
+      );
+      await lotteryDrawsCollection.createIndex(
+        { "scheduledReminders.fireAt": 1, "scheduledReminders.fired": 1 },
+        { name: "lottery_reminders" }
+      );
+
+      await lotteryTicketsCollection.createIndex(
+        { drawId: 1, matched: -1 },
+        { name: "lottery_tickets_draw_matched" }
+      );
+      await lotteryTicketsCollection.createIndex(
+        { userId: 1, guildId: 1, createdAt: -1 },
+        { name: "lottery_tickets_user" }
+      );
+      await lotteryTicketsCollection.createIndex(
+        { subscriptionId: 1 },
+        { name: "lottery_tickets_subscription" }
+      );
+      await lotteryTicketsCollection.createIndex(
+        { wheelingId: 1 },
+        { name: "lottery_tickets_wheel" }
+      );
+      await lotteryTicketsCollection.createIndex(
+        { ticketId: 1 },
+        { unique: true, name: "uniq_lottery_ticketId" }
+      );
+
+      await lotterySubscriptionsCollection.createIndex(
+        { status: 1, nextDrawId: 1 },
+        { name: "lottery_subs_status_next" }
+      );
+      await lotterySubscriptionsCollection.createIndex(
+        { userId: 1, guildId: 1, status: 1 },
+        { name: "lottery_subs_user_status" }
+      );
+      await lotterySubscriptionsCollection.createIndex(
+        { subscriptionId: 1 },
+        { unique: true, name: "uniq_lottery_subscriptionId" }
+      );
+
+      await lotteryWheelsCollection.createIndex(
+        { userId: 1, guildId: 1, createdAt: -1 },
+        { name: "lottery_wheels_user" }
+      );
+      await lotteryWheelsCollection.createIndex(
+        { wheelingId: 1 },
+        { unique: true, name: "uniq_lottery_wheelingId" }
       );
     } catch (indexError) {
       console.log(
