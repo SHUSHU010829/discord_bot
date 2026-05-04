@@ -120,6 +120,15 @@
     "adminGrant": {
       "dailyCapPerAdmin": 500000,
       "auditLogChannelId": ""
+    },
+    "wealthTax": {
+      "enabled": true,
+      "threshold": 50000,
+      "rate": 0.01,
+      "cronSchedule": "0 4 * * 1",
+      "timezone": "Asia/Taipei",
+      "reportChannelId": "",
+      "minDeduction": 1
     }
   },
 
