@@ -53,7 +53,7 @@ function describeMatch(matchType) {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("吃角子老虎")
+    .setName("拉霸")
     .setDescription("拉霸試手氣！🎰")
     .setDMPermission(false)
     .addIntegerOption((opt) =>
@@ -79,7 +79,7 @@ module.exports = {
 
       const cfg = getSlotConfig();
       if (cfg.enabled === false) {
-        return interaction.editReply("🔧 吃角子老虎暫時關閉中！");
+        return interaction.editReply("🔧 拉霸暫時關閉中！");
       }
 
       const minBet = cfg.minBet ?? 5;
@@ -110,7 +110,7 @@ module.exports = {
       if (todayBet + bet > dailyBetLimit) {
         const remain = Math.max(0, dailyBetLimit - todayBet);
         return interaction.editReply(
-          `📈 今日吃角子老虎下注已達上限。今日已下注 **${todayBet.toLocaleString()}** / ${dailyBetLimit.toLocaleString()}，剩 **${remain.toLocaleString()}**。`
+          `📈 今日拉霸下注已達上限。今日已下注 **${todayBet.toLocaleString()}** / ${dailyBetLimit.toLocaleString()}，剩 **${remain.toLocaleString()}**。`
         );
       }
 
@@ -191,9 +191,9 @@ module.exports = {
         files: [attachment],
       });
     } catch (error) {
-      console.log(`[ERROR] /吃角子老虎:\n${error}\n${error.stack}`.red);
+      console.log(`[ERROR] /拉霸:\n${error}\n${error.stack}`.red);
       await interaction
-        .editReply("🔧 吃角子老虎執行失敗，請呼叫舒舒！")
+        .editReply("🔧 拉霸執行失敗，請呼叫舒舒！")
         .catch(() => {});
     }
   },
