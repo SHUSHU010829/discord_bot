@@ -6,6 +6,9 @@ const { Resvg } = require("@resvg/resvg-js");
 
 const { loadAdditionalAsset } = require("./satoriEmoji");
 const { evaluateHand } = require("../features/casino/blackjack/hand");
+const {
+  FIVE_CARD_THRESHOLD,
+} = require("../features/casino/blackjack/engine");
 
 const FONT_DIR = path.join(__dirname, "../../fonts");
 let fontsCache = null;
@@ -64,6 +67,8 @@ function pickAccent(state) {
   switch (state.result) {
     case "blackjack":
       return PALETTE.gold;
+    case "fivecard":
+      return PALETTE.gold;
     case "win":
       return PALETTE.teal;
     case "push":
@@ -109,6 +114,8 @@ function buildResultLabel(state) {
   switch (state.result) {
     case "blackjack":
       return { text: "BLACKJACK", color: PALETTE.gold };
+    case "fivecard":
+      return { text: "過五關", color: PALETTE.gold };
     case "win":
       return { text: "玩家獲勝", color: PALETTE.teal };
     case "push":
@@ -139,6 +146,8 @@ function buildMarkup(data) {
 
   const playerBadge = playerEval.isBust
     ? `<div style="display:flex;margin-left:14px;padding:2px 10px;background:${PALETTE.red};color:${PALETTE.cardWhite};font-family:'SpaceMono';font-size:14px;letter-spacing:2px;">BUST</div>`
+    : state.playerHand.length >= FIVE_CARD_THRESHOLD
+    ? `<div style="display:flex;margin-left:14px;padding:2px 10px;background:${PALETTE.gold};color:${PALETTE.ink};font-family:'SpaceMono';font-size:14px;letter-spacing:2px;">5-CARD</div>`
     : playerEval.isBlackjack && state.playerHand.length === 2
     ? `<div style="display:flex;margin-left:14px;padding:2px 10px;background:${PALETTE.gold};color:${PALETTE.ink};font-family:'SpaceMono';font-size:14px;letter-spacing:2px;">BJ</div>`
     : "";
@@ -177,11 +186,20 @@ function buildMarkup(data) {
         }
       </div>
     `
-    : `
+    : (() => {
+        const remain = FIVE_CARD_THRESHOLD - state.playerHand.length;
+        const showFiveCardHint =
+          remain > 0 && remain < FIVE_CARD_THRESHOLD - 2 && !playerEval.isBust;
+        const hintText = showFiveCardHint
+          ? `再抽 ${remain} 張未爆牌即過五關`
+          : "輪到你了";
+        const hintColor = showFiveCardHint ? PALETTE.gold : PALETTE.muted;
+        return `
       <div style="display:flex;flex-direction:column;align-items:center;width:100%;margin-top:28px;margin-bottom:48px;">
-        <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:22px;color:${PALETTE.muted};letter-spacing:6px;line-height:1;padding-right:6px;">輪到你了</div>
+        <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:22px;color:${hintColor};letter-spacing:6px;line-height:1;padding-right:6px;">${hintText}</div>
       </div>
     `;
+      })();
 
   const stakeLabel = state.doubled
     ? `${state.bet.toLocaleString()} ×2`
