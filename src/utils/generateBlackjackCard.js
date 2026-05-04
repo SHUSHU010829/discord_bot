@@ -54,7 +54,7 @@ const SUIT_PATHS = {
   S: "M50 5 C30 30 5 45 5 65 C5 80 18 90 30 90 C40 90 47 84 50 78 C53 84 60 90 70 90 C82 90 95 80 95 65 C95 45 70 30 50 5 Z M40 92 L60 92 L55 70 L45 70 Z",
   H: "M50 90 C20 65 5 50 5 30 C5 16 16 5 30 5 C40 5 47 11 50 18 C53 11 60 5 70 5 C84 5 95 16 95 30 C95 50 80 65 50 90 Z",
   D: "M50 5 L92 50 L50 95 L8 50 Z",
-  C: "M50 5 C40 5 32 13 32 23 C32 28 34 32 37 35 C28 33 18 38 18 50 C18 60 26 68 36 68 C42 68 47 65 50 60 C53 65 58 68 64 68 C74 68 82 60 82 50 C82 38 72 33 63 35 C66 32 68 28 68 23 C68 13 60 5 50 5 Z M40 92 L60 92 L55 68 L45 68 Z",
+  C: "M50 5 C40 5 32 13 32 23 C32 28 34 32 37 35 C26 33 8 38 8 52 C8 64 20 72 34 72 C42 72 48 68 50 62 C52 68 58 72 66 72 C80 72 92 64 92 52 C92 38 74 33 63 35 C66 32 68 28 68 23 C68 13 60 5 50 5 Z M40 92 L60 92 L55 72 L45 72 Z",
 };
 
 function renderSuitSvg(suit, size, color) {
@@ -84,13 +84,13 @@ function renderCard(card) {
   const suit = card[1];
   const label = RANK_LABEL[rank];
   const color = isRedSuit(suit) ? PALETTE.red : PALETTE.ink;
-  const suitSvg = renderSuitSvg(suit, 64, color);
+  const suitSvg = renderSuitSvg(suit, 72, color);
   // 10 兩個字母排起來會超寬，把字級縮一點
-  const rankSize = label.length > 1 ? 78 : 96;
+  const rankSize = label.length > 1 ? 70 : 80;
   return `
     <div style="display:flex;width:140px;height:200px;background:${PALETTE.cardWhite};border:3px solid ${PALETTE.ink};box-sizing:border-box;margin:0 8px;flex-direction:column;justify-content:center;align-items:center;padding:14px 0;">
       <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:${rankSize}px;color:${color};line-height:1;letter-spacing:-2px;">${label}</div>
-      <div style="display:flex;margin-top:14px;">${suitSvg}</div>
+      <div style="display:flex;margin-top:20px;">${suitSvg}</div>
     </div>
   `;
 }
