@@ -28,7 +28,7 @@ const CATEGORY_META = {
   draw: { label: "抽選工具", emoji: "🎲", order: 2, blurb: "抽籤、二選一、鹹魚翻身樂透" },
   weather: { label: "天氣", emoji: "🌤️", order: 3, blurb: "全台與個別縣市天氣查詢" },
   currency: { label: "匯率", emoji: "💱", order: 4, blurb: "即時匯率與加密貨幣報價" },
-  economy: { label: "金幣專區", emoji: "💰", order: 9, blurb: "錢包、骰寶等小遊戲，未來會加入商店等功能" },
+  economy: { label: "經濟系統", emoji: "💰", order: 9, blurb: "錢包、骰寶等小遊戲，未來會加入商店等功能" },
   level: { label: "等級系統", emoji: "🏅", order: 5, blurb: "等級卡、徽章、稱號、排行榜（簽到/補簽卡 仍是獨立指令）" },
   stats: { label: "統計", emoji: "📊", order: 6, blurb: "訊息/語音統計與排行榜" },
   roles: { label: "身份組", emoji: "🎮", order: 7, blurb: "遊戲身份組選單管理" },
