@@ -61,19 +61,31 @@ function renderReel(emoji, accent, highlight) {
   `;
 }
 
-function buildHeadline(matchType, payout) {
+function buildHeadline(matchType) {
   switch (matchType) {
     case "jackpot":
-      return `🎉 JACKPOT 🎉`;
+      return { left: "🎉", text: "JACKPOT", right: "🎉" };
     case "triple":
-      return `🎊 三連線中獎`;
+      return { left: "🎊", text: "三連線中獎", right: null };
     case "double_cherry":
-      return `🍒 兩個櫻桃`;
+      return { left: "🍒", text: "兩個櫻桃", right: null };
     case "double":
-      return `✨ 兩個一樣`;
+      return { left: "✨", text: "兩個一樣", right: null };
     default:
-      return `💸 NO MATCH`;
+      return { left: "💸", text: "NO MATCH", right: null };
   }
+}
+
+function renderHeadline(headline, color, size, weight) {
+  const emojiStyle = `display:flex;font-family:'NotoSansTC';font-weight:500;font-size:${size}px;line-height:1;`;
+  const textStyle = `display:flex;font-family:'NotoSansTC';font-weight:${weight};font-size:${size}px;color:${color};letter-spacing:4px;line-height:1;`;
+  const left = headline.left
+    ? `<div style="${emojiStyle}margin-right:14px;">${headline.left}</div>`
+    : "";
+  const right = headline.right
+    ? `<div style="${emojiStyle}margin-left:14px;">${headline.right}</div>`
+    : "";
+  return `${left}<div style="${textStyle}">${headline.text}</div>${right}`;
 }
 
 function buildMarkup(data) {
@@ -106,7 +118,7 @@ function buildMarkup(data) {
   const payoutBlock = won
     ? `
       <div style="display:flex;flex-direction:column;align-items:center;width:100%;margin-top:18px;">
-        <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:30px;color:${accent};letter-spacing:4px;">${headline}</div>
+        <div style="display:flex;align-items:center;">${renderHeadline(headline, accent, 30, 900)}</div>
         <div style="display:flex;align-items:flex-end;margin-top:8px;">
           <div style="display:flex;font-family:'SpaceMono';font-size:32px;color:${accent};line-height:1;margin-right:8px;">＋</div>
           <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:84px;color:${accent};line-height:1;">${payout.toLocaleString()}</div>
@@ -115,7 +127,7 @@ function buildMarkup(data) {
     `
     : `
       <div style="display:flex;flex-direction:column;align-items:center;width:100%;margin-top:32px;">
-        <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:48px;color:${PALETTE.muted};letter-spacing:6px;">${headline}</div>
+        <div style="display:flex;align-items:center;">${renderHeadline(headline, PALETTE.muted, 48, 900)}</div>
       </div>
     `;
 

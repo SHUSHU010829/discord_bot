@@ -38,7 +38,7 @@ module.exports = {
 
   data: new SlashCommandBuilder()
     .setName("slottest")
-    .setDescription("[DEV ONLY] 吃角子老虎測試工具")
+    .setDescription("[DEV ONLY] 拉霸測試工具")
     .setDMPermission(false)
     .addSubcommand((sub) =>
       sub

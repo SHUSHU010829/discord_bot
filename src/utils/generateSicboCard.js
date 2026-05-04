@@ -100,11 +100,12 @@ function buildMarkup(data) {
   const dieFrame = isTriple && won ? gold : ink;
   const dieFrameWidth = isTriple && won ? 4 : 3;
 
-  const resultLine = won
+  const resultEmoji = won ? (isTriple ? "🎉" : "✨") : "💸";
+  const resultText = won
     ? isTriple
-      ? `🎉 圍骰！＋${payout.toLocaleString()} CREDITS`
-      : `✨ 中獎！＋${payout.toLocaleString()} CREDITS`
-    : `💸 沒中，下次加油！`;
+      ? `圍骰！＋${payout.toLocaleString()} CREDITS`
+      : `中獎！＋${payout.toLocaleString()} CREDITS`
+    : `沒中，下次加油！`;
 
   const handle = `@${(username || "shushu").toUpperCase()}`;
 
@@ -142,8 +143,9 @@ function buildMarkup(data) {
         </div>
 
         <!-- 結果文字 -->
-        <div style="display:flex;justify-content:center;width:100%;margin-top:18px;">
-          <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:30px;color:${accent};letter-spacing:2px;">${resultLine}</div>
+        <div style="display:flex;justify-content:center;align-items:center;width:100%;margin-top:18px;">
+          <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:30px;line-height:1;margin-right:12px;">${resultEmoji}</div>
+          <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:30px;color:${accent};letter-spacing:2px;line-height:1;">${resultText}</div>
         </div>
 
         <!-- 底部 BET / BALANCE / @USER -->

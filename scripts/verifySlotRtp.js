@@ -1,4 +1,4 @@
-// 跑吃角子老虎的 Monte Carlo 模擬，驗證 RTP 落在目標區間內。
+// 跑拉霸的 Monte Carlo 模擬，驗證 RTP 落在目標區間內。
 // 用法：node scripts/verifySlotRtp.js
 
 const { spin } = require("../src/features/casino/slot/slotMachine");
