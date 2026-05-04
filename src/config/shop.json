@@ -4,67 +4,36 @@
     "currency": "金幣",
     "themes": {
       "default": {
-        "name": "經典紅",
-        "card": "#F4ECD8",
-        "ink": "#2A2420",
-        "muted": "#A89270",
-        "accent": "#C73E2E"
+        "name": "廟宇籤詩",
+        "styleId": "temple"
       },
-      "sunset": {
-        "name": "日落",
-        "card": "#FFF1E6",
-        "ink": "#3B2417",
-        "muted": "#C8997A",
-        "accent": "#E76F51"
+      "temple": {
+        "name": "廟宇籤詩",
+        "styleId": "temple"
       },
-      "ocean": {
-        "name": "海洋",
-        "card": "#E8F4F8",
-        "ink": "#0E2A3A",
-        "muted": "#7CA3B8",
-        "accent": "#2A9D8F"
+      "glitch": {
+        "name": "故障藝術",
+        "styleId": "glitch"
       },
-      "forest": {
-        "name": "森林",
-        "card": "#EEF2E6",
-        "ink": "#1F2C1A",
-        "muted": "#7E9468",
-        "accent": "#4A7C32"
+      "vaporwave": {
+        "name": "蒸汽波",
+        "styleId": "vaporwave"
       },
-      "galaxy": {
-        "name": "星河",
-        "card": "#1A1330",
-        "ink": "#E8E0FF",
-        "muted": "#7A6BB0",
-        "accent": "#B388FF"
+      "nordic": {
+        "name": "北歐極簡",
+        "styleId": "nordic"
       },
-      "cherry": {
-        "name": "櫻花",
-        "card": "#FFEEF3",
-        "ink": "#3A1A2A",
-        "muted": "#D49AAF",
-        "accent": "#FF6B9D"
+      "leather": {
+        "name": "皮革撲克",
+        "styleId": "leather"
       },
-      "cyberpunk": {
-        "name": "賽博龐克",
-        "card": "#0A0014",
-        "ink": "#FFF200",
-        "muted": "#FF00C8",
-        "accent": "#00FFE5"
+      "hologram": {
+        "name": "全息投影",
+        "styleId": "hologram"
       },
-      "gold": {
-        "name": "黃金尊爵",
-        "card": "#FAF3DC",
-        "ink": "#2B1A00",
-        "muted": "#B89B5E",
-        "accent": "#D4AF37"
-      },
-      "minimal": {
-        "name": "極簡黑",
-        "card": "#F5F5F5",
-        "ink": "#1A1A1A",
-        "muted": "#888888",
-        "accent": "#333333"
+      "graffiti": {
+        "name": "街頭塗鴉",
+        "styleId": "graffiti"
       }
     },
     "items": [
@@ -85,14 +54,13 @@
       { "id": "boost_coin_1h", "category": "加成藥水", "type": "coin_boost", "name": "金幣藥水（1.5×／1 小時）", "description": "1 小時內所有金幣來源 ×1.5", "price": 800, "payload": { "multiplier": 1.5, "durationMinutes": 60 } },
       { "id": "boost_coin_1d", "category": "加成藥水", "type": "coin_boost", "name": "金幣藥水（1.5×／1 日）", "description": "24 小時內所有金幣來源 ×1.5", "price": 5000, "payload": { "multiplier": 1.5, "durationMinutes": 1440 } },
 
-      { "id": "theme_sunset", "category": "錢包主題", "type": "wallet_theme", "name": "日落主題", "description": "永久解鎖：橘紅色錢包卡背景", "price": 8000, "payload": { "themeId": "sunset" } },
-      { "id": "theme_ocean", "category": "錢包主題", "type": "wallet_theme", "name": "海洋主題", "description": "永久解鎖：海藍配色錢包卡", "price": 8000, "payload": { "themeId": "ocean" } },
-      { "id": "theme_forest", "category": "錢包主題", "type": "wallet_theme", "name": "森林主題", "description": "永久解鎖：自然綠色錢包卡", "price": 8000, "payload": { "themeId": "forest" } },
-      { "id": "theme_cherry", "category": "錢包主題", "type": "wallet_theme", "name": "櫻花主題", "description": "永久解鎖：粉嫩配色錢包卡", "price": 8000, "payload": { "themeId": "cherry" } },
-      { "id": "theme_minimal", "category": "錢包主題", "type": "wallet_theme", "name": "極簡黑", "description": "永久解鎖：灰階極簡風錢包卡", "price": 5000, "payload": { "themeId": "minimal" } },
-      { "id": "theme_galaxy", "category": "錢包主題", "type": "wallet_theme", "name": "星河主題", "description": "永久解鎖：深紫銀河風錢包卡", "price": 12000, "payload": { "themeId": "galaxy" } },
-      { "id": "theme_cyberpunk", "category": "錢包主題", "type": "wallet_theme", "name": "賽博龐克", "description": "永久解鎖：霓虹電子風錢包卡", "price": 15000, "payload": { "themeId": "cyberpunk" } },
-      { "id": "theme_gold", "category": "錢包主題", "type": "wallet_theme", "name": "黃金尊爵主題", "description": "永久解鎖：頂級金色錢包卡", "price": 20000, "payload": { "themeId": "gold" } },
+      { "id": "theme_temple", "category": "卡面風格", "type": "wallet_theme", "name": "廟宇籤詩", "description": "永久解鎖：米黃紙底 + 朱紅外框 + 大寫漢字數字，像一張求財籤", "price": 6000, "payload": { "themeId": "temple" } },
+      { "id": "theme_glitch", "category": "卡面風格", "type": "wallet_theme", "name": "故障藝術", "description": "永久解鎖：黑底 + RGB 三層分離疊字 + 駭客感橫向色帶", "price": 9000, "payload": { "themeId": "glitch" } },
+      { "id": "theme_vaporwave", "category": "卡面風格", "type": "wallet_theme", "name": "蒸汽波", "description": "永久解鎖：深紫底 + 粉紅條紋太陽 + 青藍透視網格地平線", "price": 9000, "payload": { "themeId": "vaporwave" } },
+      { "id": "theme_nordic", "category": "卡面風格", "type": "wallet_theme", "name": "北歐極簡", "description": "永久解鎖：米白底 + 莫蘭迪藍綠 + 珊瑚橘點綴，大量留白", "price": 7000, "payload": { "themeId": "nordic" } },
+      { "id": "theme_leather", "category": "卡面風格", "type": "wallet_theme", "name": "皮革撲克", "description": "永久解鎖：深咖啡皮革 + 燙金邊框 + 撲克牌四角佈局", "price": 12000, "payload": { "themeId": "leather" } },
+      { "id": "theme_hologram", "category": "卡面風格", "type": "wallet_theme", "name": "全息投影", "description": "永久解鎖：深藍底 + 虹彩疊字 + 四角 L 形掃描框", "price": 15000, "payload": { "themeId": "hologram" } },
+      { "id": "theme_graffiti", "category": "卡面風格", "type": "wallet_theme", "name": "街頭塗鴉", "description": "永久解鎖：黑磚牆 + 螢光黃噴漆 + 紅色陰影 + 黃膠帶貼紙", "price": 18000, "payload": { "themeId": "graffiti" } },
 
       { "id": "title_custom", "category": "自訂稱號", "type": "custom_title", "name": "自訂稱號（30 天）", "description": "在錢包卡與升等公告顯示自訂稱號 30 天", "price": 10000, "durationDays": 30, "payload": {} },
 

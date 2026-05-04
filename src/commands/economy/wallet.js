@@ -36,13 +36,16 @@ module.exports = {
       const tier =
         lifetime >= 20000 ? "platinum" : lifetime >= 5000 ? "premium" : "standard";
 
-      // 讀取使用者裝備的錢包主題
-      let theme = null;
+      // 讀取使用者裝備的卡面風格（以 walletTheme 欄位儲存 styleId）
+      let styleId = null;
       if (client.userLevelsCollection) {
         const lv = await client.userLevelsCollection
           .findOne({ userId, guildId }, { projection: { walletTheme: 1 } })
           .catch(() => null);
-        if (lv?.walletTheme) theme = getTheme(lv.walletTheme);
+        if (lv?.walletTheme) {
+          const themeMeta = getTheme(lv.walletTheme);
+          styleId = themeMeta?.styleId || lv.walletTheme;
+        }
       }
 
       const buf = await generateWalletCard({
@@ -54,7 +57,7 @@ module.exports = {
         lifetimeCoins: lifetime,
         cardNo: userId.slice(-4),
         tier,
-        theme,
+        styleId,
       });
 
       const attachment = new AttachmentBuilder(buf, {
