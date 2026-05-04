@@ -74,6 +74,16 @@ function pickAccent(state) {
   }
 }
 
+function renderCornerLabel(label, suitSvg, color, align) {
+  // 兩個角落都正向（不旋轉），左上 + 右上配置
+  return `
+    <div style="display:flex;flex-direction:column;align-items:${align};line-height:1;color:${color};">
+      <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:28px;line-height:1;">${label}</div>
+      <div style="display:flex;margin-top:2px;">${suitSvg}</div>
+    </div>
+  `;
+}
+
 function renderCard(card) {
   const rank = card[0];
   const suit = card[1];
@@ -82,16 +92,12 @@ function renderCard(card) {
   const cornerSuit = renderSuitSvg(suit, 22, color);
   const centerSuit = renderSuitSvg(suit, 70, color);
   return `
-    <div style="display:flex;width:140px;height:200px;background:${PALETTE.cardWhite};border:3px solid ${PALETTE.ink};box-sizing:border-box;margin:0 8px;flex-direction:column;justify-content:space-between;padding:10px 12px;">
-      <div style="display:flex;flex-direction:column;align-items:flex-start;line-height:1;color:${color};">
-        <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:28px;line-height:1;">${label}</div>
-        <div style="display:flex;margin-top:2px;">${cornerSuit}</div>
+    <div style="display:flex;width:140px;height:200px;background:${PALETTE.cardWhite};border:3px solid ${PALETTE.ink};box-sizing:border-box;margin:0 8px;flex-direction:column;padding:10px 12px;">
+      <div style="display:flex;width:100%;justify-content:space-between;">
+        ${renderCornerLabel(label, cornerSuit, color, "flex-start")}
+        ${renderCornerLabel(label, cornerSuit, color, "flex-end")}
       </div>
-      <div style="display:flex;justify-content:center;align-items:center;">${centerSuit}</div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;line-height:1;color:${color};transform:rotate(180deg);">
-        <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:28px;line-height:1;">${label}</div>
-        <div style="display:flex;margin-top:2px;">${cornerSuit}</div>
-      </div>
+      <div style="display:flex;flex:1;justify-content:center;align-items:center;">${centerSuit}</div>
     </div>
   `;
 }
@@ -116,12 +122,12 @@ function buildResultLabel(state) {
     case "blackjack":
       return { text: "BLACKJACK", color: PALETTE.gold };
     case "win":
-      return { text: "PLAYER WINS", color: PALETTE.teal };
+      return { text: "玩家獲勝", color: PALETTE.teal };
     case "push":
-      return { text: "PUSH", color: PALETTE.neutral };
+      return { text: "平手", color: PALETTE.neutral };
     case "lose":
     default:
-      return { text: "DEALER WINS", color: PALETTE.muted };
+      return { text: "莊家獲勝", color: PALETTE.muted };
   }
 }
 
@@ -155,23 +161,32 @@ function buildMarkup(data) {
     ? `<div style="display:flex;margin-left:14px;padding:2px 10px;background:${PALETTE.gold};color:${PALETTE.ink};font-family:'SpaceMono';font-size:14px;letter-spacing:2px;">BJ</div>`
     : "";
 
+  // 結算文案：push 顯示退回金額、win/blackjack 顯示派彩、lose 不顯示金額
+  const settleAmount =
+    state.result === "push"
+      ? stake
+      : state.payout > 0
+      ? state.payout
+      : 0;
+  const settleAmountPrefix = state.result === "push" ? "退回 " : "+";
+
   const resultBlock = resultLabel
     ? `
-      <div style="display:flex;flex-direction:column;align-items:center;width:100%;margin-top:14px;">
+      <div style="display:flex;flex-direction:row;align-items:center;justify-content:center;width:100%;margin-top:18px;">
         <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:42px;color:${resultLabel.color};letter-spacing:6px;line-height:1;">${resultLabel.text}</div>
         ${
-          state.payout > 0
-            ? `<div style="display:flex;align-items:flex-end;margin-top:8px;">
-                 <div style="display:flex;font-family:'SpaceMono';font-size:28px;color:${resultLabel.color};line-height:1;margin-right:8px;">＋</div>
-                 <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:64px;color:${resultLabel.color};line-height:1;">${state.payout.toLocaleString()}</div>
+          settleAmount > 0
+            ? `<div style="display:flex;align-items:flex-end;margin-left:24px;">
+                 <div style="display:flex;font-family:'SpaceMono';font-weight:400;font-size:24px;color:${resultLabel.color};line-height:1;margin-right:8px;margin-bottom:4px;">${settleAmountPrefix}</div>
+                 <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:42px;color:${resultLabel.color};line-height:1;">${settleAmount.toLocaleString()}</div>
                </div>`
             : ""
         }
       </div>
     `
     : `
-      <div style="display:flex;flex-direction:column;align-items:center;width:100%;margin-top:14px;">
-        <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:24px;color:${PALETTE.muted};letter-spacing:6px;line-height:1;">YOUR MOVE</div>
+      <div style="display:flex;flex-direction:column;align-items:center;width:100%;margin-top:18px;">
+        <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:22px;color:${PALETTE.muted};letter-spacing:6px;line-height:1;">輪到你了</div>
       </div>
     `;
 
@@ -185,7 +200,7 @@ function buildMarkup(data) {
 
         <div style="display:flex;width:100%;justify-content:space-between;align-items:center;">
           <div style="display:flex;align-items:center;">
-            <div style="display:flex;width:60px;height:60px;background:${accent};border:3px solid ${PALETTE.ink};box-sizing:border-box;align-items:center;justify-content:center;font-family:'NotoSansTC';font-weight:900;font-size:32px;color:${PALETTE.card};">廿</div>
+            <div style="display:flex;width:60px;height:60px;background:${accent};border:3px solid ${PALETTE.ink};box-sizing:border-box;align-items:center;justify-content:center;font-family:'SpaceMono';font-weight:400;font-size:30px;color:${PALETTE.card};letter-spacing:-2px;">21</div>
             <div style="display:flex;margin-left:18px;font-family:'NotoSansTC';font-weight:900;font-size:38px;color:${PALETTE.ink};letter-spacing:6px;">BLACKJACK</div>
           </div>
           <div style="display:flex;align-items:center;padding:6px 16px;background:${PALETTE.ink};font-family:'NotoSansTC';font-weight:500;font-size:16px;color:${PALETTE.card};letter-spacing:3px;">逼逼賭場</div>
@@ -194,7 +209,7 @@ function buildMarkup(data) {
         <div style="display:flex;width:100%;height:0;margin-top:14px;border-top:2px dashed ${PALETTE.muted};"></div>
 
         <div style="display:flex;width:100%;align-items:center;margin-top:18px;">
-          <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${PALETTE.muted};line-height:1;">DEALER</div>
+          <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:18px;letter-spacing:6px;color:${PALETTE.muted};line-height:1;">莊家</div>
           <div style="display:flex;margin-left:14px;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${PALETTE.ink};line-height:1;">${dealerVisibleTotal}</div>
           ${dealerBadge}
         </div>
@@ -203,7 +218,7 @@ function buildMarkup(data) {
         <div style="display:flex;width:100%;height:0;margin-top:14px;border-top:2px dashed ${PALETTE.muted};"></div>
 
         <div style="display:flex;width:100%;align-items:center;margin-top:14px;">
-          <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${PALETTE.muted};line-height:1;">PLAYER</div>
+          <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:18px;letter-spacing:6px;color:${PALETTE.muted};line-height:1;">玩家</div>
           <div style="display:flex;margin-left:14px;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${PALETTE.ink};line-height:1;">${playerEval.total}${playerEval.isSoft && !playerEval.isBust ? " (S)" : ""}</div>
           ${playerBadge}
         </div>

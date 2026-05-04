@@ -41,19 +41,19 @@ function buildButtons(state, balance) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`bj_hit_${gameId}`)
-      .setLabel("Hit")
+      .setLabel("要牌")
       .setEmoji("🃏")
       .setStyle(ButtonStyle.Primary)
       .setDisabled(state.status !== "playing"),
     new ButtonBuilder()
       .setCustomId(`bj_stand_${gameId}`)
-      .setLabel("Stand")
+      .setLabel("停牌")
       .setEmoji("✋")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(state.status !== "playing"),
     new ButtonBuilder()
       .setCustomId(`bj_double_${gameId}`)
-      .setLabel("Double")
+      .setLabel("加倍")
       .setEmoji("💰")
       .setStyle(ButtonStyle.Success)
       .setDisabled(!canDouble)
