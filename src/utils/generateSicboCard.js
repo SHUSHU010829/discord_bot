@@ -101,11 +101,12 @@ function buildMarkup(data) {
   const dieFrameWidth = isTriple && won ? 4 : 3;
 
   const resultEmoji = won ? (isTriple ? "🎉" : "✨") : "💸";
+  // 注意：NotoSansTC 的 woff 子集沒有 ！ 與 ，，會變成 □（tofu），改用 ASCII 標點。
   const resultText = won
     ? isTriple
-      ? `圍骰！＋${payout.toLocaleString()} CREDITS`
-      : `中獎！＋${payout.toLocaleString()} CREDITS`
-    : `沒中，下次加油！`;
+      ? `圍骰  +${payout.toLocaleString()} CREDITS`
+      : `中獎  +${payout.toLocaleString()} CREDITS`
+    : `沒中  下次再來`;
 
   const handle = `@${(username || "shushu").toUpperCase()}`;
 
@@ -121,9 +122,9 @@ function buildMarkup(data) {
         <div style="display:flex;width:100%;justify-content:space-between;align-items:center;">
           <div style="display:flex;align-items:center;">
             <div style="display:flex;width:64px;height:64px;background:${accent};border:3px solid ${ink};box-sizing:border-box;align-items:center;justify-content:center;font-family:'NotoSansTC';font-weight:900;font-size:36px;color:${card};">骰</div>
-            <div style="display:flex;margin-left:20px;font-family:'NotoSansTC';font-weight:900;font-size:44px;color:${ink};letter-spacing:6px;">SIC BO</div>
+            <div style="display:flex;margin-left:20px;font-family:'NotoSansTC';font-weight:900;font-size:44px;color:${ink};letter-spacing:6px;padding-right:6px;">SIC BO</div>
           </div>
-          <div style="display:flex;align-items:center;padding:8px 18px;background:${ink};font-family:'NotoSansTC';font-weight:500;font-size:18px;color:${card};letter-spacing:3px;">${betLabel}</div>
+          <div style="display:flex;align-items:center;padding:8px 18px;background:${ink};font-family:'NotoSansTC';font-weight:500;font-size:18px;color:${card};letter-spacing:3px;padding-right:21px;">${betLabel}</div>
         </div>
 
         <!-- 點點分隔線 -->
@@ -138,28 +139,28 @@ function buildMarkup(data) {
 
         <!-- SUM -->
         <div style="display:flex;justify-content:center;align-items:flex-end;width:100%;margin-top:24px;">
-          <div style="display:flex;font-family:'SpaceMono';font-size:16px;letter-spacing:6px;color:${muted};line-height:1;">SUM</div>
-          <div style="display:flex;margin-left:16px;font-family:'NotoSansTC';font-weight:900;font-size:54px;color:${accent};line-height:1;">${sum}</div>
+          <div style="display:flex;font-family:'SpaceMono';font-size:16px;letter-spacing:6px;color:${muted};line-height:1;padding-right:6px;">SUM</div>
+          <div style="display:flex;margin-left:10px;font-family:'NotoSansTC';font-weight:900;font-size:54px;color:${accent};line-height:1;">${sum}</div>
         </div>
 
-        <!-- 結果文字 -->
-        <div style="display:flex;justify-content:center;align-items:center;width:100%;margin-top:18px;">
-          <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:30px;line-height:1;margin-right:12px;">${resultEmoji}</div>
-          <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:30px;color:${accent};letter-spacing:2px;line-height:1;">${resultText}</div>
+        <!-- 結果文字（撐滿剩餘空間並上下置中） -->
+        <div style="display:flex;flex:1;justify-content:center;align-items:center;width:100%;margin-top:18px;">
+          <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:32px;line-height:1;margin-right:18px;">${resultEmoji}</div>
+          <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:32px;color:${accent};letter-spacing:6px;line-height:1;padding-right:6px;">${resultText}</div>
         </div>
 
         <!-- 底部 BET / BALANCE / @USER -->
         <div style="display:flex;width:100%;justify-content:space-between;align-items:center;margin-top:auto;padding-top:14px;border-top:2px dashed ${muted};">
           <div style="display:flex;align-items:flex-end;">
-            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${muted};line-height:1;">BET</div>
-            <div style="display:flex;margin-left:12px;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${ink};line-height:1;">${betAmount.toLocaleString()}</div>
-            ${won ? `<div style="display:flex;margin-left:18px;font-family:'SpaceMono';font-size:13px;letter-spacing:3px;color:${muted};line-height:1;">×${multiplier}</div>` : ""}
+            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${muted};line-height:1;padding-right:5px;">BET</div>
+            <div style="display:flex;margin-left:7px;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${ink};line-height:1;">${betAmount.toLocaleString()}</div>
+            ${won ? `<div style="display:flex;margin-left:18px;font-family:'SpaceMono';font-size:13px;letter-spacing:3px;color:${muted};line-height:1;padding-right:3px;">×${multiplier}</div>` : ""}
           </div>
           <div style="display:flex;align-items:flex-end;">
-            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${muted};line-height:1;">BALANCE</div>
-            <div style="display:flex;margin-left:12px;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${ink};line-height:1;">${balance.toLocaleString()}</div>
+            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${muted};line-height:1;padding-right:5px;">BALANCE</div>
+            <div style="display:flex;margin-left:7px;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${ink};line-height:1;">${balance.toLocaleString()}</div>
           </div>
-          <div style="display:flex;font-family:'SpaceMono';font-size:14px;letter-spacing:5px;color:${ink};">${handle}</div>
+          <div style="display:flex;font-family:'SpaceMono';font-size:14px;letter-spacing:5px;color:${ink};padding-right:5px;">${handle}</div>
         </div>
 
       </div>
