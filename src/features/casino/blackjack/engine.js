@@ -5,6 +5,7 @@
 //   - 玩家可 hit / stand / double
 //   - 莊家 ≥17 必停（含 soft 17，不 hit S17）
 //   - Blackjack（兩張 A+10/J/Q/K）賠率 3:2，一般贏 1:1，平手退本金
+//   - 過五關（Five-Card Charlie）：玩家持有 5 張未爆牌自動獲勝，賠率 2:1
 //
 // State 結構：
 //   {
@@ -14,12 +15,17 @@
 //     deck: string[],         // 剩餘牌堆
 //     playerHand: string[],
 //     dealerHand: string[],   // 結算前 dealerHand[1] 視為暗牌
-//     result: "blackjack"|"win"|"push"|"lose"|null,
+//     result: "blackjack"|"fivecard"|"win"|"push"|"lose"|null,
 //     payout: number,         // 拿回的總額（含本金）；輸 = 0
 //   }
 
 const { freshShuffledDeck, drawOne } = require("./deck");
 const { evaluateHand } = require("./hand");
+
+// 過五關門檻：抽到第 N 張未爆牌即自動結算為過五關
+const FIVE_CARD_THRESHOLD = 5;
+// 過五關賠率倍數（拿回的總額 = 注額 × 此倍數）。3 = 2:1 賠率（本金 + 2 倍贏額）
+const FIVE_CARD_PAYOUT_MULTIPLIER = 3;
 
 function startGame({ bet }) {
   let deck = freshShuffledDeck();
@@ -60,6 +66,10 @@ function hit(state) {
   const next = { ...state, deck, playerHand };
   const ev = evaluateHand(playerHand);
   if (ev.isBust) {
+    return settle(next);
+  }
+  // 過五關：抽到第 5 張未爆牌，自動獲勝
+  if (playerHand.length >= FIVE_CARD_THRESHOLD) {
     return settle(next);
   }
   // 玩家湊到 21 自動 stand（不可能再 hit 出更好結果）
@@ -113,11 +123,22 @@ function settle(state) {
     return finalize(state, "lose", 0);
   }
 
+  const totalStake = state.bet * (state.doubled ? 2 : 1);
+
+  // 過五關：玩家持有 5 張以上未爆牌 → 自動獲勝，不比莊家點數
+  // 仍把莊家牌跑完讓畫面看得到完整對局，但結果固定
+  if (state.playerHand.length >= FIVE_CARD_THRESHOLD) {
+    const afterDealer = playDealer(state);
+    return finalize(
+      afterDealer,
+      "fivecard",
+      totalStake * FIVE_CARD_PAYOUT_MULTIPLIER
+    );
+  }
+
   // 跑莊家
   const afterDealer = playDealer(state);
   const dealerEval = evaluateHand(afterDealer.dealerHand);
-
-  const totalStake = state.bet * (state.doubled ? 2 : 1);
 
   // BJ 對撞 → push
   if (playerEval.isBlackjack && dealerEval.isBlackjack) {
@@ -159,6 +180,8 @@ module.exports = {
   hit,
   stand,
   doubleDown,
+  FIVE_CARD_THRESHOLD,
+  FIVE_CARD_PAYOUT_MULTIPLIER,
   // exposed for testing
   settle,
   playDealer,

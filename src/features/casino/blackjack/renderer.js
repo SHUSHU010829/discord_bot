@@ -9,6 +9,7 @@ const {
 } = require("discord.js");
 
 const { evaluateHand } = require("./hand");
+const { FIVE_CARD_THRESHOLD } = require("./engine");
 const generateBlackjackCard = require("../../../utils/generateBlackjackCard");
 
 const SUIT_EMOJI = { S: "♠", H: "♥", D: "♦", C: "♣" };
@@ -65,6 +66,8 @@ function settleHeadline(state) {
   switch (state.result) {
     case "blackjack":
       return `🎉 **BLACKJACK！** ＋${state.payout.toLocaleString()} credits`;
+    case "fivecard":
+      return `🏆 **過五關！** ＋${state.payout.toLocaleString()} credits`;
     case "win":
       return `✨ **你贏了！** ＋${state.payout.toLocaleString()} credits`;
     case "push":
@@ -107,6 +110,13 @@ function renderText(state, { username, balance } = {}) {
     dealerLine,
     playerLine,
   ];
+
+  if (isPlaying && state.playerHand.length >= 3 && !playerEval.isBust) {
+    const remain = FIVE_CARD_THRESHOLD - state.playerHand.length;
+    if (remain > 0) {
+      lines.push(`🏆 再抽 ${remain} 張未爆牌即過五關（賠率 2:1）`);
+    }
+  }
 
   if (!isPlaying) {
     lines.push("─────────────────────");
