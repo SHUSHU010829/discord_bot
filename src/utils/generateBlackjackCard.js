@@ -178,11 +178,11 @@ function buildMarkup(data) {
   const resultBlock = resultLabel
     ? `
       <div style="display:flex;flex-direction:row;align-items:center;justify-content:center;width:100%;margin-top:18px;">
-        <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:42px;color:${resultLabel.color};letter-spacing:8px;line-height:1;padding-right:8px;">${resultLabel.text}</div>
+        <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:42px;color:${resultLabel.color};letter-spacing:10px;line-height:1;padding-right:10px;">${resultLabel.text}</div>
         ${
           settleAmount > 0
-            ? `<div style="display:flex;align-items:flex-end;margin-left:36px;">
-                 <div style="display:flex;font-family:'SpaceMono';font-weight:400;font-size:24px;color:${resultLabel.color};line-height:1;margin-right:10px;margin-bottom:4px;">${settleAmountPrefix}</div>
+            ? `<div style="display:flex;align-items:flex-end;margin-left:56px;">
+                 <div style="display:flex;font-family:'SpaceMono';font-weight:400;font-size:24px;color:${resultLabel.color};line-height:1;margin-right:12px;margin-bottom:4px;">${settleAmountPrefix}</div>
                  <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:42px;color:${resultLabel.color};line-height:1;">${settleAmount.toLocaleString()}</div>
                </div>`
             : ""
