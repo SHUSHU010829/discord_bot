@@ -10,25 +10,25 @@ const {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("batch-add-food")
-    .setDescription("Bulk-add foods, comma-separated")
+    .setName("批次新增食物")
+    .setDescription("一次新增多個食物（用逗號分隔）")
     .addStringOption((option) =>
       option
         .setName("食物清單")
-        .setDescription("Food names separated by commas (e.g. 蛋餅,三明治,漢堡)")
+        .setDescription("食物名稱，用逗號分隔（例如：蛋餅,三明治,漢堡）")
         .setRequired(true)
     )
     .addStringOption((option) =>
       option
         .setName("類別")
-        .setDescription("Pick a food category")
+        .setDescription("選擇食物類別")
         .setRequired(true)
         .addChoices(...CATEGORY_CHOICES)
     )
     .addStringOption((option) =>
       option
         .setName("飲料店")
-        .setDescription("Beverage store name (required only when category is beverage)")
+        .setDescription("飲料店名稱（僅在類別為飲料時需要填寫）")
         .setAutocomplete(true)
     ),
 
