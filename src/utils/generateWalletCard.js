@@ -34,13 +34,14 @@ function buildMarkup(data) {
     lifetimeCoins,
     cardNo,
     tier = "standard",
+    theme,
   } = data;
 
-  // 米色 / 紅 / 墨褐配色，沿用 profileCard 的色票
-  const card = "#F4ECD8";
-  const ink = "#2A2420";
-  const muted = "#A89270";
-  const accent = "#C73E2E";
+  // 預設米色 / 紅 / 墨褐配色；可被 theme 覆蓋
+  const card = theme?.card || "#F4ECD8";
+  const ink = theme?.ink || "#2A2420";
+  const muted = theme?.muted || "#A89270";
+  const accent = theme?.accent || "#C73E2E";
 
   const safeName = (username || "shushu").trim() || "shushu";
   const displayName = safeName.toUpperCase();
@@ -109,6 +110,7 @@ function buildCacheKey(data) {
     data.lifetimeCoins ?? "",
     data.cardNo || "",
     data.tier || "",
+    data.theme?.accent || "",
   ].join("|");
 }
 

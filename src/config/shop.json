@@ -1,0 +1,103 @@
+{
+  "shop": {
+    "enabled": true,
+    "currency": "金幣",
+    "themes": {
+      "default": {
+        "name": "經典紅",
+        "card": "#F4ECD8",
+        "ink": "#2A2420",
+        "muted": "#A89270",
+        "accent": "#C73E2E"
+      },
+      "sunset": {
+        "name": "日落",
+        "card": "#FFF1E6",
+        "ink": "#3B2417",
+        "muted": "#C8997A",
+        "accent": "#E76F51"
+      },
+      "ocean": {
+        "name": "海洋",
+        "card": "#E8F4F8",
+        "ink": "#0E2A3A",
+        "muted": "#7CA3B8",
+        "accent": "#2A9D8F"
+      },
+      "forest": {
+        "name": "森林",
+        "card": "#EEF2E6",
+        "ink": "#1F2C1A",
+        "muted": "#7E9468",
+        "accent": "#4A7C32"
+      },
+      "galaxy": {
+        "name": "星河",
+        "card": "#1A1330",
+        "ink": "#E8E0FF",
+        "muted": "#7A6BB0",
+        "accent": "#B388FF"
+      },
+      "cherry": {
+        "name": "櫻花",
+        "card": "#FFEEF3",
+        "ink": "#3A1A2A",
+        "muted": "#D49AAF",
+        "accent": "#FF6B9D"
+      },
+      "cyberpunk": {
+        "name": "賽博龐克",
+        "card": "#0A0014",
+        "ink": "#FFF200",
+        "muted": "#FF00C8",
+        "accent": "#00FFE5"
+      },
+      "gold": {
+        "name": "黃金尊爵",
+        "card": "#FAF3DC",
+        "ink": "#2B1A00",
+        "muted": "#B89B5E",
+        "accent": "#D4AF37"
+      },
+      "minimal": {
+        "name": "極簡黑",
+        "card": "#F5F5F5",
+        "ink": "#1A1A1A",
+        "muted": "#888888",
+        "accent": "#333333"
+      }
+    },
+    "items": [
+      { "id": "color_red", "category": "顏色身份組", "type": "role_color", "name": "紅色尊爵", "description": "30 天紅色身份組，凸顯你的存在感", "price": 1500, "durationDays": 30, "payload": { "hex": "#E74C3C", "roleName": "🎨 紅色尊爵" } },
+      { "id": "color_orange", "category": "顏色身份組", "type": "role_color", "name": "落日橘", "description": "30 天暖色系身份組", "price": 1500, "durationDays": 30, "payload": { "hex": "#E67E22", "roleName": "🎨 落日橘" } },
+      { "id": "color_gold", "category": "顏色身份組", "type": "role_color", "name": "黃金", "description": "30 天閃耀金色身份組", "price": 2000, "durationDays": 30, "payload": { "hex": "#F1C40F", "roleName": "🎨 黃金" } },
+      { "id": "color_green", "category": "顏色身份組", "type": "role_color", "name": "翡翠綠", "description": "30 天翠綠身份組", "price": 1500, "durationDays": 30, "payload": { "hex": "#2ECC71", "roleName": "🎨 翡翠綠" } },
+      { "id": "color_teal", "category": "顏色身份組", "type": "role_color", "name": "蒂芬妮綠", "description": "30 天清新青綠身份組", "price": 1500, "durationDays": 30, "payload": { "hex": "#1ABC9C", "roleName": "🎨 蒂芬妮綠" } },
+      { "id": "color_blue", "category": "顏色身份組", "type": "role_color", "name": "海洋藍", "description": "30 天深海藍身份組", "price": 1500, "durationDays": 30, "payload": { "hex": "#3498DB", "roleName": "🎨 海洋藍" } },
+      { "id": "color_purple", "category": "顏色身份組", "type": "role_color", "name": "神秘紫", "description": "30 天皇家紫身份組", "price": 1500, "durationDays": 30, "payload": { "hex": "#9B59B6", "roleName": "🎨 神秘紫" } },
+      { "id": "color_pink", "category": "顏色身份組", "type": "role_color", "name": "櫻花粉", "description": "30 天柔嫩粉色身份組", "price": 1800, "durationDays": 30, "payload": { "hex": "#FF79C6", "roleName": "🎨 櫻花粉" } },
+      { "id": "color_silver", "category": "顏色身份組", "type": "role_color", "name": "月光銀", "description": "30 天銀灰色身份組", "price": 1800, "durationDays": 30, "payload": { "hex": "#BDC3C7", "roleName": "🎨 月光銀" } },
+      { "id": "color_premium", "category": "顏色身份組", "type": "role_color", "name": "極光金", "description": "30 天頂級金色（含特殊光澤標記）", "price": 5000, "durationDays": 30, "payload": { "hex": "#FFD700", "roleName": "✨ 極光金" } },
+
+      { "id": "boost_xp_1h", "category": "加成藥水", "type": "xp_boost", "name": "XP 藥水（1.5×／1 小時）", "description": "1 小時內所有 XP 來源 ×1.5", "price": 600, "payload": { "multiplier": 1.5, "durationMinutes": 60 } },
+      { "id": "boost_xp_1d", "category": "加成藥水", "type": "xp_boost", "name": "XP 藥水（1.5×／1 日）", "description": "24 小時內所有 XP 來源 ×1.5", "price": 4000, "payload": { "multiplier": 1.5, "durationMinutes": 1440 } },
+      { "id": "boost_xp_double", "category": "加成藥水", "type": "xp_boost", "name": "XP 雙倍藥水（1 小時）", "description": "1 小時內 XP ×2，難得的暴衝機會", "price": 1500, "payload": { "multiplier": 2.0, "durationMinutes": 60 } },
+      { "id": "boost_coin_1h", "category": "加成藥水", "type": "coin_boost", "name": "金幣藥水（1.5×／1 小時）", "description": "1 小時內所有金幣來源 ×1.5", "price": 800, "payload": { "multiplier": 1.5, "durationMinutes": 60 } },
+      { "id": "boost_coin_1d", "category": "加成藥水", "type": "coin_boost", "name": "金幣藥水（1.5×／1 日）", "description": "24 小時內所有金幣來源 ×1.5", "price": 5000, "payload": { "multiplier": 1.5, "durationMinutes": 1440 } },
+
+      { "id": "theme_sunset", "category": "錢包主題", "type": "wallet_theme", "name": "日落主題", "description": "永久解鎖：橘紅色錢包卡背景", "price": 8000, "payload": { "themeId": "sunset" } },
+      { "id": "theme_ocean", "category": "錢包主題", "type": "wallet_theme", "name": "海洋主題", "description": "永久解鎖：海藍配色錢包卡", "price": 8000, "payload": { "themeId": "ocean" } },
+      { "id": "theme_forest", "category": "錢包主題", "type": "wallet_theme", "name": "森林主題", "description": "永久解鎖：自然綠色錢包卡", "price": 8000, "payload": { "themeId": "forest" } },
+      { "id": "theme_cherry", "category": "錢包主題", "type": "wallet_theme", "name": "櫻花主題", "description": "永久解鎖：粉嫩配色錢包卡", "price": 8000, "payload": { "themeId": "cherry" } },
+      { "id": "theme_minimal", "category": "錢包主題", "type": "wallet_theme", "name": "極簡黑", "description": "永久解鎖：灰階極簡風錢包卡", "price": 5000, "payload": { "themeId": "minimal" } },
+      { "id": "theme_galaxy", "category": "錢包主題", "type": "wallet_theme", "name": "星河主題", "description": "永久解鎖：深紫銀河風錢包卡", "price": 12000, "payload": { "themeId": "galaxy" } },
+      { "id": "theme_cyberpunk", "category": "錢包主題", "type": "wallet_theme", "name": "賽博龐克", "description": "永久解鎖：霓虹電子風錢包卡", "price": 15000, "payload": { "themeId": "cyberpunk" } },
+      { "id": "theme_gold", "category": "錢包主題", "type": "wallet_theme", "name": "黃金尊爵主題", "description": "永久解鎖：頂級金色錢包卡", "price": 20000, "payload": { "themeId": "gold" } },
+
+      { "id": "title_custom", "category": "自訂稱號", "type": "custom_title", "name": "自訂稱號（30 天）", "description": "在錢包卡與升等公告顯示自訂稱號 30 天", "price": 10000, "durationDays": 30, "payload": {} },
+
+      { "id": "boost_xp_double_1d", "category": "加成藥水", "type": "xp_boost", "name": "XP 雙倍藥水（1 日）", "description": "24 小時內 XP ×2（高額消耗）", "price": 12000, "payload": { "multiplier": 2.0, "durationMinutes": 1440 } },
+      { "id": "boost_coin_double_1h", "category": "加成藥水", "type": "coin_boost", "name": "金幣雙倍藥水（1 小時）", "description": "1 小時內金幣 ×2", "price": 2500, "payload": { "multiplier": 2.0, "durationMinutes": 60 } }
+    ]
+  }
+}

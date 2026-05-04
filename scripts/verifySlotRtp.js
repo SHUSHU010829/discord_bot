@@ -5,8 +5,8 @@ const { spin } = require("../src/features/casino/slot/slotMachine");
 
 const TRIALS = 100000;
 const BET = 100;
-const TARGET_MIN = 88.0;
-const TARGET_MAX = 92.0;
+const TARGET_MIN = 82.0;
+const TARGET_MAX = 86.0;
 
 function simulate(trials, bet) {
   let totalBet = 0;

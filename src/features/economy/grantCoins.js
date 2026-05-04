@@ -6,9 +6,11 @@ const {
   getCoinServerBoostBonus,
 } = require("./coinMultiplier");
 const { getTodayCoinsBySources } = require("./dailyCoinCap");
+const { getActiveBuffMultiplier } = require("../shop/activeBuff");
 
 const MSG_VOICE_SOURCES = ["message", "voice"];
 const CASINO_SOURCES = ["bet", "payout"];
+const SINK_SOURCES = ["shop_buy", "auction_bid", "wealth_tax"];
 
 module.exports = async (client, opts) => {
   if (!coinSystem?.enabled) return null;
@@ -21,10 +23,20 @@ module.exports = async (client, opts) => {
 
   let amount = Math.floor(opts.amount || 0);
   if (amount === 0 && opts.source !== "admin") return null;
-  if (amount < 0 && opts.source !== "admin" && !CASINO_SOURCES.includes(opts.source)) return null;
+  if (
+    amount < 0 &&
+    opts.source !== "admin" &&
+    !CASINO_SOURCES.includes(opts.source) &&
+    !SINK_SOURCES.includes(opts.source)
+  ) {
+    return null;
+  }
 
-  // 倍率（admin / casino 不套用）
-  const skipMultipliers = opts.source === "admin" || CASINO_SOURCES.includes(opts.source);
+  // 倍率（admin / casino / sink 都不套用）
+  const skipMultipliers =
+    opts.source === "admin" ||
+    CASINO_SOURCES.includes(opts.source) ||
+    SINK_SOURCES.includes(opts.source);
   const twitchInfo = skipMultipliers
     ? { multiplier: 1, name: null }
     : getCoinTwitchSubBonus(opts.member, opts.source);
@@ -32,7 +44,16 @@ module.exports = async (client, opts) => {
     ? { multiplier: 1, name: null }
     : getCoinServerBoostBonus(opts.member, opts.source);
   const baseAmount = amount;
-  const totalMultiplier = twitchInfo.multiplier * boostInfo.multiplier;
+  const stackingMode = coinSystem?.bonusStackingMode === "max" ? "max" : "multiply";
+  const baseMultiplier =
+    stackingMode === "max"
+      ? Math.max(twitchInfo.multiplier, boostInfo.multiplier)
+      : twitchInfo.multiplier * boostInfo.multiplier;
+  // 商店金幣加成 buff（只在正向獲得時生效，purchase/casino bet 不 buff）
+  const buffMultiplier = skipMultipliers || amount <= 0 || opts.source === "shop_buy"
+    ? 1
+    : await getActiveBuffMultiplier(client, opts.userId, opts.guildId, "coin_boost").catch(() => 1);
+  const totalMultiplier = baseMultiplier * buffMultiplier;
   if (totalMultiplier > 1 && amount > 0) {
     amount = Math.floor(amount * totalMultiplier);
   }

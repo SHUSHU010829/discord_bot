@@ -1,6 +1,6 @@
 // 拉霸（吃角子老虎）賠率表。
 // 6 種符號（含 JACKPOT）+ 三連線/兩連線賠率。
-// 設計目標 RTP ≈ 88-92%；實測值請見 scripts/verifySlotRtp.js。
+// 設計目標 RTP ≈ 82-86%（控通膨後）；實測值請見 scripts/verifySlotRtp.js。
 
 const SYMBOLS = [
   { id: "cherry", emoji: "🍒", weight: 35 },
@@ -13,12 +13,12 @@ const SYMBOLS = [
 
 // 三連線倍率（純獎金倍率，不含本金）
 const TRIPLE_PAYOUTS = {
-  cherry: 3,
+  cherry: 2,
   lemon: 5,
-  watermelon: 15,
-  bell: 30,
-  star: 80,
-  seven: 500, // JACKPOT
+  watermelon: 14,
+  bell: 28,
+  star: 75,
+  seven: 450, // JACKPOT
 };
 
 const JACKPOT_SYMBOL = "seven";

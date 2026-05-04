@@ -82,22 +82,25 @@
       "baseCoins": 30,
       "streakBonusPerDay": 5,
       "streakBonusCapDays": 10,
-      "streak7Multiplier": 2.0,
-      "streak30Multiplier": 3.0,
+      "streak7Multiplier": 1.5,
+      "streak30Multiplier": 2.0,
       "resetTimezone": "Asia/Taipei"
     },
     "levelUp": {
-      "coinsPerLevel": 5,
+      "coinsPerLevel": 3,
+      "softCapLevel": 50,
+      "softCapDivisor": 2,
       "milestones": {
-        "5": 50,
-        "10": 150,
-        "20": 400,
-        "30": 1000,
-        "50": 2500,
-        "75": 5000,
-        "100": 15000
+        "5": 15,
+        "10": 45,
+        "20": 120,
+        "30": 300,
+        "50": 750,
+        "75": 1500,
+        "100": 4500
       }
     },
+    "bonusStackingMode": "max",
     "twitchSubBonus": {
       "enabled": true,
       "appliesTo": ["message", "voice", "daily"],
@@ -113,6 +116,19 @@
       "roleId": "1181220255733907599",
       "name": "伺服器加成",
       "multiplier": 1.3
+    },
+    "adminGrant": {
+      "dailyCapPerAdmin": 500000,
+      "auditLogChannelId": ""
+    },
+    "wealthTax": {
+      "enabled": true,
+      "threshold": 50000,
+      "rate": 0.01,
+      "cronSchedule": "0 4 * * 1",
+      "timezone": "Asia/Taipei",
+      "reportChannelId": "",
+      "minDeduction": 1
     }
   },
 

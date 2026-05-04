@@ -9,6 +9,7 @@ const syncLevelRoles = require("./levelRoles");
 const announceLevelUp = require("./levelUpAnnouncer");
 const checkBadges = require("./badgeChecker");
 const grantCoins = require("../economy/grantCoins");
+const { getActiveBuffMultiplier } = require("../shop/activeBuff");
 
 module.exports = async (client, opts) => {
   if (!client.userLevelsCollection) return null;
@@ -29,8 +30,14 @@ module.exports = async (client, opts) => {
     ? { multiplier: 1, name: null }
     : getServerBoostBonus(opts.member, opts.source);
   const baseAmount = opts.amount;
+  const buffMultiplier = skipMultipliers
+    ? 1
+    : await getActiveBuffMultiplier(client, opts.userId, opts.guildId, "xp_boost").catch(() => 1);
   const totalMultiplier =
-    eventInfo.multiplier * twitchInfo.multiplier * boostInfo.multiplier;
+    eventInfo.multiplier *
+    twitchInfo.multiplier *
+    boostInfo.multiplier *
+    buffMultiplier;
   if (totalMultiplier > 1) {
     opts.amount = Math.floor(opts.amount * totalMultiplier);
   }
@@ -125,15 +132,23 @@ module.exports = async (client, opts) => {
     // 升級金幣獎勵（每升一級 → level × coinsPerLevel；觸到 milestone → 額外發放）
     if (coinSystem?.enabled && client.userCoinsCollection) {
       const coinsPerLevel = coinSystem.levelUp?.coinsPerLevel ?? 0;
+      const softCapLevel = coinSystem.levelUp?.softCapLevel ?? 0;
+      const softCapDivisor = coinSystem.levelUp?.softCapDivisor ?? 1;
       const milestones = coinSystem.levelUp?.milestones || {};
       for (let lv = beforeLevel + 1; lv <= afterLevel; lv += 1) {
         if (coinsPerLevel > 0) {
+          let coinReward = lv * coinsPerLevel;
+          if (softCapLevel > 0 && lv > softCapLevel && softCapDivisor > 1) {
+            const baseAtCap = softCapLevel * coinsPerLevel;
+            const overflow = (lv - softCapLevel) * coinsPerLevel;
+            coinReward = baseAtCap + Math.floor(overflow / softCapDivisor);
+          }
           grantCoins(client, {
             userId: opts.userId,
             guildId: opts.guildId,
             username: opts.username,
             avatarHash: opts.avatarHash,
-            amount: lv * coinsPerLevel,
+            amount: coinReward,
             source: "levelup",
             meta: { level: lv },
             member: opts.member,
