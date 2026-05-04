@@ -69,7 +69,7 @@ function buildMarkup(data) {
         <!-- BALANCE 標籤 + 點點分隔線 -->
         <div style="display:flex;width:100%;align-items:center;margin-top:36px;">
           <div style="display:flex;font-family:'SpaceMono';font-size:14px;letter-spacing:6px;color:${muted};">— &nbsp;BALANCE&nbsp; —</div>
-          <div style="display:flex;flex:1;height:0;border-top:2px dotted ${muted};margin-left:18px;"></div>
+          <div style="display:flex;flex:1;height:0;border-top:2px dashed ${muted};margin-left:18px;"></div>
         </div>
 
         <!-- 大數字 + CREDITS -->
@@ -79,7 +79,7 @@ function buildMarkup(data) {
         </div>
 
         <!-- 下方點點分隔線 -->
-        <div style="display:flex;width:100%;height:0;margin-top:18px;border-top:2px dotted ${muted};"></div>
+        <div style="display:flex;width:100%;height:0;margin-top:18px;border-top:2px dashed ${muted};"></div>
 
         <!-- Footer：LIFETIME（左）・@USERNAME（右） -->
         <div style="display:flex;width:100%;justify-content:space-between;align-items:center;margin-top:auto;">
