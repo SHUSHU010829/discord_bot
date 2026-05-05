@@ -123,7 +123,7 @@ function buildTableLines(state) {
     lines.push(
       `等候開桌中 ・ 需 ${state.minPlayers}-${state.maxPlayers} 人 ・ 開桌者按 **開始** 開局`
     );
-    lines.push("-# 用 `/撲克 加入` 進桌、按下方按鈕互動");
+    lines.push("-# 點下方「🪑 加入」入座，開桌者按「🃏 開始」開局");
   }
 
   return lines.join("\n");
