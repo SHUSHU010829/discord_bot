@@ -4,10 +4,12 @@ const {
   TextInputBuilder,
   TextInputStyle,
   ActionRowBuilder,
+  AttachmentBuilder,
 } = require('discord.js');
 
 const grantCoins = require('../../features/economy/grantCoins');
 const { BET_TYPES, validateInsideBet, isOutside } = require('../../features/casino/roulette/numbers');
+const generateRouletteGif = require('../../utils/generateRouletteGif');
 const { spinWheel, settle, totalWagered } = require('../../features/casino/roulette/engine');
 const { buildBettingRows, buildStatusContent } = require('../../commands/casino/roulette');
 
@@ -222,18 +224,37 @@ module.exports = async (client, interaction) => {
         })
         .join('\n');
 
-      const netResult = settlement.totalWin - wagered; // 純利（不含未押退款）
+      const netResult = settlement.totalWin - wagered;
       const netStr = netResult >= 0
         ? `+${netResult.toLocaleString()}`
         : netResult.toLocaleString();
 
+      const textContent =
+        `🎰 **開出：${result}** ${resultEmoji(result)}\n\n` +
+        `${winLines}\n\n` +
+        `淨利：**${netStr}** credits　` +
+        (refund > 0 ? `退回未押：**${refund.toLocaleString()}**　` : '') +
+        `餘額：**${balanceAfter.toLocaleString()}**`;
+
+      // 生成 GIF（失敗不影響派彩，降級為純文字）
+      let gifAttachment = null;
+      try {
+        const gifBuf = await generateRouletteGif({
+          result,
+          bets: game.bets,
+          settlement,
+          username: game.username,
+          totalBudget: game.totalBudget,
+          balanceAfter,
+        });
+        gifAttachment = new AttachmentBuilder(gifBuf, { name: 'roulette.gif' });
+      } catch (gifErr) {
+        console.log(`[ROULETTE] GIF 生成失敗（純文字降級）: ${gifErr.message}`.yellow);
+      }
+
       await interaction.editReply({
-        content:
-          `🎰 **開出：${result}** ${resultEmoji(result)}\n\n` +
-          `${winLines}\n\n` +
-          `淨利：**${netStr}** credits　` +
-          (refund > 0 ? `退回未押：**${refund.toLocaleString()}**　` : '') +
-          `餘額：**${balanceAfter.toLocaleString()}**`,
+        content: textContent,
+        files: gifAttachment ? [gifAttachment] : [],
         components: [],
       });
       return;
