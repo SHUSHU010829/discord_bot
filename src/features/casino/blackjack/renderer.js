@@ -104,8 +104,12 @@ function renderText(state, { username, balance } = {}) {
     ? `Bet: ${state.bet.toLocaleString()} ×2 = **${stake.toLocaleString()}**`
     : `Bet: **${state.bet.toLocaleString()}**`;
 
+  const deckLabel = state.deckCount && state.deckCount > 1
+    ? ` ・ ${state.deckCount} 副牌`
+    : "";
+
   const lines = [
-    `🃏 **BLACKJACK** ・ ${stakeLabel}${handle ? ` ・ ${handle}` : ""}`,
+    `🃏 **BLACKJACK** ・ ${stakeLabel}${deckLabel}${handle ? ` ・ ${handle}` : ""}`,
     "─────────────────────",
     dealerLine,
     playerLine,

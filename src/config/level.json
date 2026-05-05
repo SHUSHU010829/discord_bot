@@ -129,6 +129,25 @@
       "timezone": "Asia/Taipei",
       "reportChannelId": "",
       "minDeduction": 1
+    },
+    "transfer": {
+      "enabled": true,
+      "minAmount": 10,
+      "maxAmount": 50000,
+      "dailyCapPerSender": 20000,
+      "feeRate": 0.02
+    },
+    "deposit": {
+      "enabled": true,
+      "minAmount": 100,
+      "maxAmount": 100000,
+      "maxActivePerUser": 5,
+      "earlyWithdrawPenaltyRate": 0.1,
+      "terms": [
+        { "days": 7,  "rate": 0.02 },
+        { "days": 14, "rate": 0.05 },
+        { "days": 30, "rate": 0.12 }
+      ]
     }
   },
 

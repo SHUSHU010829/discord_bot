@@ -74,6 +74,15 @@ module.exports = async (client) => {
     const lotterySubscriptionsCollection = database.collection("LotterySubscriptions");
     const lotteryWheelsCollection = database.collection("LotteryWheels");
 
+    // 拉霸 jackpot 累積彩池（每 guild 一筆）
+    const jackpotPoolCollection = database.collection("JackpotPool");
+
+    // 玩家轉帳每日額度（記每日轉出總額）
+    const coinTransfersCollection = database.collection("CoinTransfers");
+
+    // 定期存款
+    const coinDepositsCollection = database.collection("CoinDeposits");
+
     client.database = database;
     client.collection = collection;
     client.gaslightCollection = gaslightCollection;
@@ -102,6 +111,9 @@ module.exports = async (client) => {
     client.lotteryTicketsCollection = lotteryTicketsCollection;
     client.lotterySubscriptionsCollection = lotterySubscriptionsCollection;
     client.lotteryWheelsCollection = lotteryWheelsCollection;
+    client.jackpotPoolCollection = jackpotPoolCollection;
+    client.coinTransfersCollection = coinTransfersCollection;
+    client.coinDepositsCollection = coinDepositsCollection;
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
 
     // 自動修補沒有 category / drawCount 的舊資料（idempotent，沒事就不動）

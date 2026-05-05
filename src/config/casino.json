@@ -10,7 +10,13 @@
       "minBet": 5,
       "maxBet": 500,
       "dailyBetLimit": 5000,
-      "dailyLossProtection": 2000
+      "dailyLossProtection": 2000,
+      "jackpotPool": {
+        "enabled": true,
+        "contributionRate": 0.03,
+        "seedAmount": 5000,
+        "announceChannelId": null
+      }
     },
     "blackjack": {
       "enabled": true,

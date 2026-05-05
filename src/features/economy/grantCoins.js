@@ -10,7 +10,8 @@ const { getActiveBuffMultiplier } = require("../shop/activeBuff");
 
 const MSG_VOICE_SOURCES = ["message", "voice"];
 const CASINO_SOURCES = ["bet", "payout"];
-const SINK_SOURCES = ["shop_buy", "auction_bid", "wealth_tax"];
+const SINK_SOURCES = ["shop_buy", "auction_bid", "wealth_tax", "transfer_out", "deposit_lock"];
+const PEER_SOURCES = ["transfer_in", "transfer_out", "deposit_lock", "deposit_release"];
 
 module.exports = async (client, opts) => {
   if (!coinSystem?.enabled) return null;
@@ -32,11 +33,12 @@ module.exports = async (client, opts) => {
     return null;
   }
 
-  // 倍率（admin / casino / sink 都不套用）
+  // 倍率（admin / casino / sink / peer-transfer 都不套用）
   const skipMultipliers =
     opts.source === "admin" ||
     CASINO_SOURCES.includes(opts.source) ||
-    SINK_SOURCES.includes(opts.source);
+    SINK_SOURCES.includes(opts.source) ||
+    PEER_SOURCES.includes(opts.source);
   const twitchInfo = skipMultipliers
     ? { multiplier: 1, name: null }
     : getCoinTwitchSubBonus(opts.member, opts.source);

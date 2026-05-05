@@ -2,9 +2,49 @@ require("colors");
 
 const cron = require("node-cron");
 const { EmbedBuilder } = require("discord.js");
+const { DateTime } = require("luxon");
 
 const { coinSystem } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
+
+async function fetchCasinoWeekly(client, guildId) {
+  if (!client?.coinTransactionsCollection) return null;
+  const tz = coinSystem?.daily?.resetTimezone || "Asia/Taipei";
+  const since = DateTime.now().setZone(tz).minus({ days: 7 }).toISODate();
+  try {
+    const rows = await client.coinTransactionsCollection
+      .aggregate([
+        {
+          $match: {
+            ...(guildId ? { guildId } : {}),
+            source: { $in: ["bet", "payout"] },
+            date: { $gte: since },
+          },
+        },
+        {
+          $group: {
+            _id: "$userId",
+            netProfit: { $sum: "$amount" },
+            wagered: {
+              $sum: {
+                $cond: [{ $eq: ["$source", "bet"] }, { $abs: "$amount" }, 0],
+              },
+            },
+          },
+        },
+      ])
+      .toArray();
+    if (!rows.length) return { winners: [], losers: [] };
+    const sorted = [...rows].sort((a, b) => b.netProfit - a.netProfit);
+    return {
+      winners: sorted.slice(0, 3).filter((r) => r.netProfit > 0),
+      losers: sorted.slice(-3).reverse().filter((r) => r.netProfit < 0),
+    };
+  } catch (e) {
+    console.log(`[WTAX] casino weekly fetch failed: ${e}`.yellow);
+    return null;
+  }
+}
 
 // 每週掃 totalCoins > threshold 的帳戶，扣 rate% 作為財富稅。
 // 預設：每週一 04:00 (Asia/Taipei)，threshold 50,000，rate 1%。
@@ -92,6 +132,36 @@ async function postReport(client, cfg, summary) {
       )
       .join("\n");
     embed.addFields({ name: "本次扣最多 Top 5", value: top });
+  }
+
+  // 賭場週報彩蛋：本週賭場賺最多 / 賠最多 Top 3
+  const guildId = channel.guild?.id;
+  const casino = await fetchCasinoWeekly(client, guildId);
+  if (casino) {
+    if (casino.winners.length > 0) {
+      const lines = casino.winners
+        .map(
+          (r, i) =>
+            `${i + 1}. <@${r._id}> 賺 **+${r.netProfit.toLocaleString()}**（下注 ${r.wagered.toLocaleString()}）`,
+        )
+        .join("\n");
+      embed.addFields({ name: "🎰 本週賭場大贏家 Top 3", value: lines });
+    }
+    if (casino.losers.length > 0) {
+      const lines = casino.losers
+        .map(
+          (r, i) =>
+            `${i + 1}. <@${r._id}> 賠 **${r.netProfit.toLocaleString()}**（下注 ${r.wagered.toLocaleString()}）`,
+        )
+        .join("\n");
+      embed.addFields({ name: "💸 本週賭場大輸家 Top 3", value: lines });
+    }
+    if (casino.winners.length === 0 && casino.losers.length === 0) {
+      embed.addFields({
+        name: "🎰 本週賭場",
+        value: "本週沒人有顯著輸贏，整個賭場很平靜～",
+      });
+    }
   }
 
   embed.setTimestamp(new Date());

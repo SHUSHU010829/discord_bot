@@ -7,11 +7,14 @@
 const SUITS = ["S", "H", "D", "C"];
 const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K"];
 
-function buildDeck() {
+function buildDeck(count = 1) {
+  const decks = Math.max(1, Math.floor(count));
   const deck = [];
-  for (const r of RANKS) {
-    for (const s of SUITS) {
-      deck.push(`${r}${s}`);
+  for (let n = 0; n < decks; n += 1) {
+    for (const r of RANKS) {
+      for (const s of SUITS) {
+        deck.push(`${r}${s}`);
+      }
     }
   }
   return deck;
@@ -26,8 +29,8 @@ function shuffleInPlace(deck) {
   return deck;
 }
 
-function freshShuffledDeck() {
-  return shuffleInPlace(buildDeck());
+function freshShuffledDeck(count = 1) {
+  return shuffleInPlace(buildDeck(count));
 }
 
 // 從 deck 抽一張：不 mutate 原 array，回傳剩餘 deck（給 immutable state）。

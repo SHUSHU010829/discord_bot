@@ -9,6 +9,12 @@ const { DateTime } = require("luxon");
 const { coinSystem, casino } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
 const { spin } = require("../../features/casino/slot/slotMachine");
+const {
+  contribute: contributeJackpot,
+  bustPool: bustJackpot,
+  getPool: getJackpotPool,
+  getCfg: getJackpotCfg,
+} = require("../../features/casino/slot/jackpotPool");
 const generateSlotCard = require("../../utils/generateSlotCard");
 
 function getSlotConfig() {
@@ -131,18 +137,38 @@ module.exports = {
         return interaction.editReply("🔧 下注失敗，請稍後再試。");
       }
 
+      // 累積彩池：先把這筆下注的 3% 灌進池
+      const jackpotCfg = getJackpotCfg();
+      const jackpotEnabled = jackpotCfg?.enabled !== false;
+      if (jackpotEnabled) {
+        await contributeJackpot(client, guildId, bet).catch((e) =>
+          console.log(`[SLOT] jackpot contribute failed: ${e}`.yellow)
+        );
+      }
+
       // 跑抽獎
       const result = spin({ bet });
       let balanceAfter = betResult.doc?.totalCoins ?? balance - bet;
+      let jackpotBust = 0;
 
-      // 派彩
-      if (result.payout > 0) {
+      // 中 jackpot：把整池額外送給玩家、並重置回 seed
+      if (jackpotEnabled && result.matchType === "jackpot") {
+        jackpotBust = await bustJackpot(client, guildId).catch((e) => {
+          console.log(`[SLOT] jackpot bust failed: ${e}`.red);
+          return 0;
+        });
+      }
+
+      const totalPayout = result.payout + jackpotBust;
+
+      // 派彩（base + jackpot bust 一起發）
+      if (totalPayout > 0) {
         const payoutResult = await grantCoins(client, {
           userId,
           guildId,
           username,
           avatarHash: interaction.user.avatar,
-          amount: result.payout,
+          amount: totalPayout,
           source: "payout",
           member,
           meta: {
@@ -150,11 +176,20 @@ module.exports = {
             matchType: result.matchType,
             matchKey: result.matchKey,
             multiplier: result.multiplier,
+            basePayout: result.payout,
+            jackpotBust,
             bet,
             roundId,
           },
         });
-        balanceAfter = payoutResult?.doc?.totalCoins ?? balanceAfter + result.payout;
+        balanceAfter = payoutResult?.doc?.totalCoins ?? balanceAfter + totalPayout;
+      }
+
+      // 取得目前 pool 顯示在卡片上
+      let jackpotPool = null;
+      if (jackpotEnabled) {
+        const poolDoc = await getJackpotPool(client, guildId).catch(() => null);
+        jackpotPool = poolDoc?.amount ?? null;
       }
 
       // 出圖
@@ -165,20 +200,31 @@ module.exports = {
         matchType: result.matchType,
         matchedSymbol: result.matchedSymbol,
         bet,
-        payout: result.payout,
+        payout: totalPayout,
         multiplier: result.multiplier,
         balance: balanceAfter,
+        jackpotPool,
+        jackpotBust,
       });
 
       const attachment = new AttachmentBuilder(buf, {
         name: `slot-${roundId}.png`,
       });
 
+      const jackpotLine =
+        result.matchType === "jackpot" && jackpotBust > 0
+          ? `\n💥 **爆池啦！** 你獨得 jackpot pool **+${jackpotBust.toLocaleString()}** credits！（基礎賠率 ${result.payout.toLocaleString()} + 累積池 ${jackpotBust.toLocaleString()}）`
+          : "";
+      const poolLine =
+        jackpotEnabled && jackpotPool != null
+          ? `\n💰 目前 Jackpot Pool：**${jackpotPool.toLocaleString()}** credits`
+          : "";
+
       const headline =
         result.matchType === "jackpot"
-          ? `🎉 **JACKPOT！** ＋${result.payout.toLocaleString()} credits！`
-          : result.payout > 0
-          ? `${describeMatch(result.matchType)} ＋${result.payout.toLocaleString()} credits`
+          ? `🎉 **JACKPOT！** ＋${totalPayout.toLocaleString()} credits！`
+          : totalPayout > 0
+          ? `${describeMatch(result.matchType)} ＋${totalPayout.toLocaleString()} credits`
           : `💸 沒中，下次再來！`;
 
       const bankruptLine =
@@ -187,9 +233,22 @@ module.exports = {
           : "";
 
       await interaction.editReply({
-        content: `${headline}\n・下注：**${bet.toLocaleString()}**　・餘額：**${balanceAfter.toLocaleString()}**${bankruptLine}`,
+        content: `${headline}${jackpotLine}\n・下注：**${bet.toLocaleString()}**　・餘額：**${balanceAfter.toLocaleString()}**${poolLine}${bankruptLine}`,
         files: [attachment],
       });
+
+      // 爆池公告
+      const announceChannelId = jackpotCfg?.announceChannelId;
+      if (jackpotBust > 0 && announceChannelId) {
+        try {
+          const ch = await client.channels.fetch(announceChannelId).catch(() => null);
+          if (ch?.isTextBased?.()) {
+            ch.send(
+              `💥💥💥 **拉霸 JACKPOT 爆池！** <@${userId}> 中了 **+${jackpotBust.toLocaleString()}** credits 累積彩池（七七七！）`
+            ).catch(() => {});
+          }
+        } catch (_) { /* ignore */ }
+      }
     } catch (error) {
       console.log(`[ERROR] /拉霸:\n${error}\n${error.stack}`.red);
       await interaction

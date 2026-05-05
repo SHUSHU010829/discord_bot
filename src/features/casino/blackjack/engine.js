@@ -27,8 +27,8 @@ const FIVE_CARD_THRESHOLD = 5;
 // 過五關賠率倍數（拿回的總額 = 注額 × 此倍數）。3 = 2:1 賠率（本金 + 2 倍贏額）
 const FIVE_CARD_PAYOUT_MULTIPLIER = 3;
 
-function startGame({ bet }) {
-  let deck = freshShuffledDeck();
+function startGame({ bet, deckCount = 1 }) {
+  let deck = freshShuffledDeck(deckCount);
   const playerHand = [];
   const dealerHand = [];
 
@@ -41,6 +41,7 @@ function startGame({ bet }) {
   const state = {
     bet,
     doubled: false,
+    deckCount: Math.max(1, Math.floor(deckCount)),
     status: "playing",
     deck,
     playerHand,

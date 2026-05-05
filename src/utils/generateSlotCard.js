@@ -105,6 +105,29 @@ function buildMarkup(data) {
   const handle = `@${(username || "shushu").toUpperCase()}`;
   const headline = buildHeadline(matchType, payout);
 
+  const jackpotPool = data.jackpotPool;
+  const jackpotBust = data.jackpotBust || 0;
+  const jackpotBanner = jackpotPool != null
+    ? (() => {
+        const isBust = matchType === "jackpot" && jackpotBust > 0;
+        const bannerBg = isBust ? PALETTE.gold : PALETTE.reelBg;
+        const bannerInk = isBust ? PALETTE.ink : PALETTE.ink;
+        const labelText = isBust ? "JACKPOT BUSTED!" : "JACKPOT POOL";
+        const amountText = isBust
+          ? `+${jackpotBust.toLocaleString()}`
+          : jackpotPool.toLocaleString();
+        return `
+          <div style="display:flex;width:100%;justify-content:space-between;align-items:center;margin-top:14px;padding:10px 18px;background:${bannerBg};border:2px solid ${PALETTE.ink};box-sizing:border-box;">
+            <div style="display:flex;align-items:center;">
+              <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:22px;line-height:1;margin-right:10px;">💰</div>
+              <div style="display:flex;font-family:'SpaceMono';font-size:14px;letter-spacing:5px;color:${bannerInk};line-height:1;padding-right:5px;">${labelText}</div>
+            </div>
+            <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:30px;color:${bannerInk};letter-spacing:2px;line-height:1;">${amountText}</div>
+          </div>
+        `;
+      })()
+    : "";
+
   const reelHighlight = (idx) => {
     if (!won || !matchedSymbol) return false;
     if (matchType === "jackpot" || matchType === "triple") return true;
@@ -149,7 +172,9 @@ function buildMarkup(data) {
 
         <div style="display:flex;width:100%;height:0;margin-top:18px;border-top:2px dashed ${PALETTE.muted};"></div>
 
-        <div style="display:flex;width:100%;justify-content:center;align-items:center;margin-top:32px;">
+        ${jackpotBanner}
+
+        <div style="display:flex;width:100%;justify-content:center;align-items:center;margin-top:24px;">
           ${reelHtml}
         </div>
 
@@ -182,6 +207,8 @@ function buildCacheKey(data) {
     data.payout ?? "",
     data.multiplier ?? "",
     data.balance ?? "",
+    data.jackpotPool ?? "",
+    data.jackpotBust ?? "",
   ].join("|");
 }
 
