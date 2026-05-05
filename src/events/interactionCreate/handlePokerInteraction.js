@@ -13,6 +13,7 @@ const {
   startNextHand,
   closeTable,
   refreshTableMessage,
+  resendTableMessage,
   applyPlayerAction,
   persistEngineState,
   announceHandStart,
@@ -53,6 +54,14 @@ async function handleButton(client, interaction) {
   // 查看手牌：所有狀態都允許
   if (action === "hand") {
     return interaction.reply(renderEphemeralHand(doc, interaction.user.id));
+  }
+
+  // 重貼桌面：把舊訊息刪掉重發一張
+  if (action === "resend") {
+    await interaction.deferReply({ ephemeral: true });
+    const msg = await resendTableMessage(client, doc);
+    if (!msg) return interaction.editReply("🔧 重貼失敗，可能執行緒被封存或權限不足。");
+    return interaction.editReply("🔄 桌面已重貼，往下找新訊息。");
   }
 
   // 加入：waiting 才行

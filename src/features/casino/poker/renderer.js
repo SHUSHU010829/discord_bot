@@ -149,7 +149,12 @@ function buildActionButtons(state, viewerId) {
         .setCustomId(`pk_start_${gameId}`)
         .setLabel("開始")
         .setEmoji("🃏")
-        .setStyle(ButtonStyle.Success)
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(`pk_resend_${gameId}`)
+        .setLabel("重貼桌面")
+        .setEmoji("🔄")
+        .setStyle(ButtonStyle.Secondary)
     );
     rows.push(row);
     return rows;
@@ -201,6 +206,11 @@ function buildActionButtons(state, viewerId) {
         .setCustomId(`pk_leave_${gameId}`)
         .setLabel("離桌")
         .setEmoji("👋")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(`pk_resend_${gameId}`)
+        .setLabel("重貼桌面")
+        .setEmoji("🔄")
         .setStyle(ButtonStyle.Secondary)
     );
     rows.push(row2);
@@ -226,6 +236,11 @@ function buildActionButtons(state, viewerId) {
         .setCustomId(`pk_hand_${gameId}`)
         .setLabel("查看手牌")
         .setEmoji("🂠")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(`pk_resend_${gameId}`)
+        .setLabel("重貼桌面")
+        .setEmoji("🔄")
         .setStyle(ButtonStyle.Secondary)
     );
     rows.push(row);

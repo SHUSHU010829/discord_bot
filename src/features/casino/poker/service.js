@@ -103,55 +103,189 @@ async function postThreadAnnouncement(client, doc, content, mentionUserIds = [])
   }
 }
 
+function formatCardEmoji(c) {
+  if (!c) return "[ ?? ]";
+  const SUIT = { S: "♠", H: "♥", D: "♦", C: "♣" };
+  const RANK = { A: "A", T: "10", J: "J", Q: "Q", K: "K" };
+  return `[${RANK[c[0]] || c[0]}${SUIT[c[1]]}]`;
+}
+
 async function announceHandStart(client, doc) {
+  console.log(
+    `[POKER] announceHandStart gameId=${doc.gameId} thread=${doc.threadId} hand=${doc.handNumber}`.cyan
+  );
+  // 1) 開局橫幅
+  await postThreadAnnouncement(
+    client,
+    doc,
+    `═══════════════════\n🃏 **第 ${doc.handNumber} 局開始！** 洗牌發牌中...\n═══════════════════`,
+    []
+  );
+  // 2) 莊位
   const dealer = doc.players[doc.buttonIdx];
+  if (dealer) {
+    await postThreadAnnouncement(
+      client,
+      doc,
+      `🟢 **莊位（Dealer）**：<@${dealer.userId}>`,
+      [dealer.userId]
+    );
+  }
+  // 3) 盲注
   const sb = doc.players[doc.sbIdx];
   const bb = doc.players[doc.bbIdx];
-  const actor = doc.players[doc.toActIdx];
-  const lines = [
-    `🃏 **第 ${doc.handNumber} 局開始！**`,
-    dealer && `🟢 莊位（D）：<@${dealer.userId}>`,
-    sb && `🪙 小盲：<@${sb.userId}>（${doc.smallBlind.toLocaleString()}）`,
-    bb && `🪙 大盲：<@${bb.userId}>（${doc.bigBlind.toLocaleString()}）`,
-    actor && `⏳ **輪到 <@${actor.userId}> 行動** ・ 按「🂠 查看手牌」看你的底牌`,
-  ].filter(Boolean);
-  const mentions = [actor?.userId, dealer?.userId, sb?.userId, bb?.userId];
-  console.log(
-    `[POKER] announceHandStart gameId=${doc.gameId} thread=${doc.threadId} mentions=${mentions.filter(Boolean).join(",")}`.cyan
+  if (sb && bb) {
+    const lines = [
+      `🪙 小盲：<@${sb.userId}> 下了 **${doc.smallBlind.toLocaleString()}**`,
+      `🪙 大盲：<@${bb.userId}> 下了 **${doc.bigBlind.toLocaleString()}**`,
+    ];
+    await postThreadAnnouncement(
+      client,
+      doc,
+      lines.join("\n"),
+      [sb.userId, bb.userId]
+    );
+  }
+  // 4) 發底牌提示
+  await postThreadAnnouncement(
+    client,
+    doc,
+    `🂠 已發 2 張底牌給每位玩家 ・ 點桌面「🂠 查看手牌」按鈕看自己的牌（私訊只給你）`,
+    []
   );
-  await postThreadAnnouncement(client, doc, lines.join("\n"), mentions);
+  // 5) 第一個行動
+  await announceTurnChange(client, doc);
 }
 
 async function announceTurnChange(client, doc) {
   if (doc.status !== "playing") return;
   const actor = doc.players[doc.toActIdx];
   if (!actor) return;
+  const ts = doc.actionDeadline
+    ? Math.floor(new Date(doc.actionDeadline).getTime() / 1000)
+    : null;
+  const toCall = Math.max(0, (doc.currentBet || 0) - (actor.bet || 0));
+  const hint =
+    toCall === 0
+      ? `沒人下注，可按「✓ 過牌」或「💰 加注」`
+      : `需跟 **${toCall.toLocaleString()}**，可按「跟 ${toCall.toLocaleString()}」「💰 加注」「🔥 All-In」或「🚫 棄牌」`;
   await postThreadAnnouncement(
     client,
     doc,
-    `⏳ 輪到 <@${actor.userId}> 行動（${(doc.actionDeadline ? `<t:${Math.floor(new Date(doc.actionDeadline).getTime() / 1000)}:R>` : "60s")} 內未動將自動處理）`,
+    `⏳ **輪到 <@${actor.userId}> 行動**${ts ? ` ・ <t:${ts}:R> 倒數` : ""}\n-# ${hint}`,
     [actor.userId]
   );
 }
 
 async function announcePhaseChange(client, doc) {
   if (doc.status !== "playing") return;
-  const map = { flop: "翻牌（Flop）", turn: "轉牌（Turn）", river: "河牌（River）" };
+  const map = {
+    flop: "翻牌（Flop） 🌟",
+    turn: "轉牌（Turn） 🔁",
+    river: "河牌（River） 🌊",
+  };
   const label = map[doc.phase];
   if (!label) return;
-  const cards = (doc.community || [])
-    .map((c) => {
-      const SUIT = { S: "♠", H: "♥", D: "♦", C: "♣" };
-      const RANK = { A: "A", T: "10", J: "J", Q: "Q", K: "K" };
-      return `[${RANK[c[0]] || c[0]}${SUIT[c[1]]}]`;
-    })
-    .join(" ");
+  const cards = (doc.community || []).map(formatCardEmoji).join(" ");
   await postThreadAnnouncement(
     client,
     doc,
-    `🎴 **${label}** ・ 公牌：${cards}`,
+    `═══════════════════\n🎴 **${label}**\n公牌：${cards}\n═══════════════════`,
     []
   );
+}
+
+async function announceAction(client, doc, beforeDoc, idx, action, opts = {}) {
+  const me = doc.players[idx];
+  const beforeMe = beforeDoc.players[idx] || { totalBet: 0 };
+  const paid = (me.totalBet || 0) - (beforeMe.totalBet || 0);
+  let line = null;
+  if (action === "fold") line = `👋 **${me.username}** 棄牌（fold）`;
+  else if (action === "check") line = `✓ **${me.username}** 過牌（check）`;
+  else if (action === "call")
+    line = `🪙 **${me.username}** 跟注 **${paid.toLocaleString()}**（本輪總 ${me.bet.toLocaleString()}）`;
+  else if (action === "raise")
+    line = `💰 **${me.username}** 加注到 **${me.bet.toLocaleString()}**（推 ${paid.toLocaleString()}）`;
+  else if (action === "allin")
+    line = `🔥🔥🔥 **${me.username}** All-In！推 **${paid.toLocaleString()}** 上桌（剩餘 ${me.chips.toLocaleString()}）`;
+  if (line) await postThreadAnnouncement(client, doc, line, []);
+}
+
+async function announceSettlement(client, doc) {
+  if (!doc.settle) return;
+  // 1) 結算橫幅
+  await postThreadAnnouncement(
+    client,
+    doc,
+    `═══════════════════\n🎉 **本局結算 (Hand ${doc.handNumber})**\n═══════════════════`,
+    []
+  );
+  // 2) 攤牌（如有）
+  if (doc.settle.showdown && doc.settle.scores) {
+    const handLines = [];
+    for (const s of doc.settle.scores) {
+      const player = doc.players.find((p) => p.userId === s.userId);
+      if (!player) continue;
+      const cards = (s.holeCards || []).map(formatCardEmoji).join(" ");
+      const cat = s.score
+        ? require("./hand").categoryLabel(s.score)
+        : "";
+      handLines.push(
+        `🂠 <@${player.userId}>：${cards}${cat ? ` ・ **${cat}**` : ""}`
+      );
+    }
+    if (handLines.length) {
+      await postThreadAnnouncement(client, doc, handLines.join("\n"), []);
+    }
+  } else {
+    await postThreadAnnouncement(
+      client,
+      doc,
+      `（其他玩家全部棄牌，免攤牌）`,
+      []
+    );
+  }
+  // 3) 派彩（每池一行）
+  for (const pot of doc.settle.winners || []) {
+    const splitText = pot.splits
+      .map((s) => `<@${s.userId}> +**${s.amount.toLocaleString()}**`)
+      .join(" ・ ");
+    await postThreadAnnouncement(
+      client,
+      doc,
+      `🏆 底池 ${pot.amount.toLocaleString()} → ${splitText}`,
+      pot.splits.map((s) => s.userId)
+    );
+  }
+  // 4) 下一步提示
+  await postThreadAnnouncement(
+    client,
+    doc,
+    `-# 開桌者按 **🔁 下一局** 繼續，或 **🛑 解散牌桌** 結束（剩餘籌碼會退回錢包）`,
+    []
+  );
+}
+
+// 把舊桌面訊息刪掉、重新發一張新的（給「重貼桌面」按鈕用）
+async function resendTableMessage(client, doc) {
+  const thread = await client.channels.fetch(doc.threadId).catch(() => null);
+  if (!thread) return null;
+  // 試著刪舊訊息
+  if (doc.messageId) {
+    const old = await thread.messages.fetch(doc.messageId).catch(() => null);
+    if (old) await old.delete().catch(() => {});
+  }
+  const payload = await renderTableMessage(doc);
+  const msg = await thread.send(payload).catch((e) => {
+    console.log(`[POKER] resend send failed: ${e.message}`.red);
+    return null;
+  });
+  if (!msg) return null;
+  await client.pokerGamesCollection.updateOne(
+    { _id: doc._id },
+    { $set: { messageId: msg.id, updatedAt: new Date() } }
+  );
+  return msg;
 }
 
 async function createTable(client, interaction, { maxPlayers, blind }) {
@@ -524,20 +658,24 @@ async function applyPlayerAction(client, doc, userId, action, opts = {}) {
   if (doc.toActIdx !== idx) return { error: "現在還沒輪到你。" };
 
   const beforePhase = doc.phase;
-  const beforeToAct = doc.toActIdx;
+  const beforeStatus = doc.status;
   const result = engine.applyAction(doc, idx, action, opts);
   if (result.error) return { error: result.error };
   await persistEngineState(client, doc, result.state);
   const updated = await client.pokerGamesCollection.findOne({ _id: doc._id });
 
-  // 公告：街道換 / 換人行動
+  // 1) 動作公告
+  await announceAction(client, updated, doc, idx, action, opts);
+  // 2) 街道換 / 結算 / 換人
   if (updated.status === "playing") {
     if (updated.phase !== beforePhase) {
       await announcePhaseChange(client, updated);
     }
-    if (updated.toActIdx !== beforeToAct && updated.toActIdx >= 0) {
+    if (updated.toActIdx >= 0) {
       await announceTurnChange(client, updated);
     }
+  } else if (updated.status === "settled" && beforeStatus !== "settled") {
+    await announceSettlement(client, updated);
   }
   return { doc: updated, settled: updated.status === "settled" };
 }
@@ -551,21 +689,29 @@ async function autoActOnTimeout(client, doc) {
   if (!player || player.folded || player.busted || player.allIn) return null;
   const toCall = Math.max(0, (doc.currentBet || 0) - (player.bet || 0));
   const action = toCall === 0 ? "check" : "fold";
+  const beforePhase = doc.phase;
+  const beforeStatus = doc.status;
   const r = engine.applyAction(doc, idx, action);
   if (r.error) return null;
   await persistEngineState(client, doc, r.state);
   const updated = await client.pokerGamesCollection.findOne({ _id: doc._id });
   await refreshTableMessage(client, updated);
-  // 公告（非阻塞）
-  try {
-    const thread = await client.channels.fetch(doc.threadId).catch(() => null);
-    if (thread) {
-      await thread.send(
-        `⏰ **${player.username}** 行動逾時，自動 ${action === "fold" ? "棄牌" : "過牌"}。`
-      ).catch(() => {});
+  // 公告：逾時 + 動作 + 後續
+  await postThreadAnnouncement(
+    client,
+    updated,
+    `⏰ **${player.username}** 行動逾時，自動 ${action === "fold" ? "棄牌" : "過牌"}`,
+    []
+  );
+  if (updated.status === "playing") {
+    if (updated.phase !== beforePhase) {
+      await announcePhaseChange(client, updated);
     }
-  } catch (_) {
-    /* noop */
+    if (updated.toActIdx >= 0) {
+      await announceTurnChange(client, updated);
+    }
+  } else if (updated.status === "settled" && beforeStatus !== "settled") {
+    await announceSettlement(client, updated);
   }
   return updated;
 }
@@ -577,6 +723,7 @@ module.exports = {
   findActiveGameInChannel,
   findUserActiveGame,
   refreshTableMessage,
+  resendTableMessage,
   createTable,
   joinTable,
   closeTable,
@@ -589,5 +736,7 @@ module.exports = {
   announceHandStart,
   announcePhaseChange,
   announceTurnChange,
+  announceAction,
+  announceSettlement,
   postThreadAnnouncement,
 };
