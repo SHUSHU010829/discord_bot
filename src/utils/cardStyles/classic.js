@@ -91,7 +91,7 @@ function level(data) {
   const badgeHtml = badgesArr
     .map(
       (b) => `
-        <div style="display:flex;width:60px;height:60px;background:${COLORS.subtle};border:2px solid ${COLORS.ink};box-sizing:border-box;justify-content:center;align-items:center;font-family:'NotoSansTC';font-weight:900;font-size:28px;line-height:1;">${htmlEscape(b.emoji || "🏅")}</div>
+        <div style="display:flex;width:60px;height:60px;background:${COLORS.subtle};border:2px solid ${COLORS.ink};box-sizing:border-box;justify-content:center;align-items:center;font-family:'NotoSansTC';font-weight:500;font-size:28px;line-height:1;">${htmlEscape(b.emoji || "🏅")}</div>
       `,
     )
     .join("");
@@ -154,7 +154,10 @@ function level(data) {
           <div style="display:flex;flex-direction:column;align-items:center;">
             <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:6px;color:${COLORS.muted};">LEVEL</div>
             <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:96px;color:${accent};line-height:1;letter-spacing:-2px;margin-top:-2px;">${data.level || 0}</div>
-            <div style="display:flex;margin-top:2px;padding:4px 14px;background:${accent};color:${COLORS.card};font-family:'NotoSansTC';font-weight:900;font-size:15px;letter-spacing:5px;">${htmlEscape(`${tier.emoji || ""} ${tier.label || ""}`)}</div>
+            <div style="display:flex;align-items:center;margin-top:2px;padding:4px 14px;background:${accent};">
+              ${tier.emoji ? `<div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:15px;line-height:1;margin-right:5px;">${htmlEscape(tier.emoji)}</div>` : ""}
+              <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:15px;color:${COLORS.card};letter-spacing:5px;">${htmlEscape(tier.label || "")}</div>
+            </div>
           </div>
         </div>
 
