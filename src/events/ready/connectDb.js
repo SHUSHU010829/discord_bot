@@ -63,6 +63,9 @@ module.exports = async (client) => {
     // 輪盤對局狀態
     const rouletteGamesCollection = database.collection("RouletteGames");
 
+    // 德州撲克牌桌狀態（多人，channel-scoped）
+    const pokerGamesCollection = database.collection("PokerGames");
+
     // 商店系統 collections
     const userInventoryCollection = database.collection("UserInventory");
     const shopTransactionsCollection = database.collection("ShopTransactions");
@@ -110,6 +113,7 @@ module.exports = async (client) => {
     client.blackjackGamesCollection = blackjackGamesCollection;
     client.hiloGamesCollection = hiloGamesCollection;
     client.rouletteGamesCollection = rouletteGamesCollection;
+    client.pokerGamesCollection = pokerGamesCollection;
     client.twitchScoreFlushesCollection = twitchScoreFlushesCollection;
     client.twitchLiveStateCollection = twitchLiveStateCollection;
     client.userInventoryCollection = userInventoryCollection;
@@ -277,6 +281,24 @@ module.exports = async (client) => {
       await rouletteGamesCollection.createIndex(
         { updatedAt: 1 },
         { expireAfterSeconds: 30 * 24 * 60 * 60, name: "roulette_ttl_30d" }
+      );
+
+      // 德州撲克牌桌索引：channel-scoped，同頻道同時只能有一桌等候/進行
+      await pokerGamesCollection.createIndex(
+        { gameId: 1 },
+        { unique: true, name: "uniq_poker_gameId" }
+      );
+      await pokerGamesCollection.createIndex(
+        { channelId: 1, status: 1 },
+        { name: "poker_channel_status" }
+      );
+      await pokerGamesCollection.createIndex(
+        { "players.userId": 1, status: 1 },
+        { name: "poker_player_status" }
+      );
+      await pokerGamesCollection.createIndex(
+        { updatedAt: 1 },
+        { expireAfterSeconds: 30 * 24 * 60 * 60, name: "poker_ttl_30d" }
       );
 
       // 商店：背包索引（同人同 guild 同 itemId 可有多筆，因為到期時間/裝備狀態不同）

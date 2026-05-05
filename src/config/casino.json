@@ -42,6 +42,18 @@
       "houseEdge": 0.05,
       "maxRounds": 10
     },
+    "poker": {
+      "enabled": true,
+      "minBlind": 10,
+      "maxBlind": 500,
+      "minPlayers": 2,
+      "maxPlayers": 8,
+      "buyInMultiplier": 50,
+      "joinTimeoutSeconds": 300,
+      "actionTimeoutSeconds": 60,
+      "gameTtlSeconds": 900,
+      "dailyBuyInLimit": 50000
+    },
     "lottery": {
       "enabled": true,
       "announceChannelId": "1174352640210124877",
