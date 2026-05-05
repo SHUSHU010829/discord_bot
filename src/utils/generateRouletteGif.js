@@ -375,6 +375,12 @@ async function generateRouletteGif({ result, bets, settlement, username, totalBu
   const STILL_FRAMES  = 5;
   const TOTAL_FRAMES  = SPIN_FRAMES + SETTLE_FRAMES + STILL_FRAMES;
 
+  // Yield event loop every N frames so queued Discord interactions
+  // (button clicks, etc.) can be processed before their 3-second token
+  // window expires. Without this, canvas CPU work blocks the event loop
+  // for ~7s, causing "Unknown interaction" (10062) errors.
+  const YIELD_EVERY = 4;
+
   const encoder = new GIFEncoder(W, H, 'neuquant', true, TOTAL_FRAMES);
   encoder.setDelay(50);   // 20 fps
   encoder.setRepeat(0);   // play once, then stop
@@ -395,6 +401,16 @@ async function generateRouletteGif({ result, bets, settlement, username, totalBu
 
   const shared = { bets, settlement, result, username, totalBudget, balanceAfter };
 
+  // Add a frame and yield the event loop every YIELD_EVERY frames
+  let frameCount = 0;
+  async function addFrame() {
+    encoder.addFrame(ctx);
+    frameCount++;
+    if (frameCount % YIELD_EVERY === 0) {
+      await new Promise(resolve => setImmediate(resolve));
+    }
+  }
+
   // ── Phase 1: Spinning ────────────────────────────────────
   for (let f = 0; f < SPIN_FRAMES; f++) {
     const e = easeOut3(f / SPIN_FRAMES);
@@ -403,7 +419,7 @@ async function generateRouletteGif({ result, bets, settlement, username, totalBu
     drawWheel(ctx, e * finalWheelAngle);
     drawBall(ctx, e * spinEndBallAngle, R_TRACK);
     drawInfoPanel(ctx, { phase: 'spinning', ...shared });
-    encoder.addFrame(ctx);
+    await addFrame();
   }
 
   // ── Phase 2: Ball settles into pocket ───────────────────
@@ -416,7 +432,7 @@ async function generateRouletteGif({ result, bets, settlement, username, totalBu
     drawWheel(ctx, finalWheelAngle);
     drawBall(ctx, ballAngle, ballR);
     drawInfoPanel(ctx, { phase: 'spinning', ...shared });
-    encoder.addFrame(ctx);
+    await addFrame();
   }
 
   // ── Phase 3: Static result display ──────────────────────
@@ -425,7 +441,7 @@ async function generateRouletteGif({ result, bets, settlement, username, totalBu
     drawWheel(ctx, finalWheelAngle);
     drawBall(ctx, trueBallTarget, R_POCKET);
     drawInfoPanel(ctx, { phase: 'result', ...shared });
-    encoder.addFrame(ctx);
+    await addFrame();
   }
 
   encoder.finish();
