@@ -9,10 +9,15 @@ const {
   closeTable,
   refreshTableMessage,
   persistEngineState,
+  announceHandStart,
+  postThreadAnnouncement,
 } = require("../../features/casino/poker/service");
 const grantCoins = require("../../features/economy/grantCoins");
 const engine = require("../../features/casino/poker/engine");
 const { renderEphemeralHand } = require("../../features/casino/poker/renderer");
+
+// 抑制未使用警告
+void grantCoins;
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -41,6 +46,14 @@ module.exports = {
         await interaction.deferReply({ ephemeral: true });
         const r = await joinTable(client, interaction);
         if (r.error) return interaction.editReply(r.error);
+        const username =
+          interaction.member?.displayName || interaction.user.username;
+        await postThreadAnnouncement(
+          client,
+          r.doc,
+          `🪑 **${username}** 入座了（${r.doc.players.length}/${r.doc.maxPlayers} 人）`,
+          []
+        );
         return interaction.editReply(
           `🪑 已入座，已扣進桌費 **${r.doc.buyIn.toLocaleString()}** credits。`
         );
@@ -131,7 +144,9 @@ module.exports = {
           return interaction.editReply("現在不能開新局。");
         }
         if (doc.status === "waiting" && doc.players.length < doc.minPlayers) {
-          return interaction.editReply(`人數不足，至少需 ${doc.minPlayers} 人。`);
+          return interaction.editReply(
+            `🚫 人數不足，至少需 ${doc.minPlayers} 人，目前 ${doc.players.length} 人。`
+          );
         }
 
         if (doc.status === "waiting") {
@@ -146,6 +161,7 @@ module.exports = {
         }
         const refreshed = await client.pokerGamesCollection.findOne({ _id: doc._id });
         await refreshTableMessage(client, refreshed);
+        await announceHandStart(client, refreshed);
         return interaction.editReply(`🃏 第 ${refreshed.handNumber} 局開始！`);
       }
     } catch (err) {

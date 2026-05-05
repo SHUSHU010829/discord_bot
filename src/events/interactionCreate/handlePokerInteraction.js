@@ -15,9 +15,14 @@ const {
   refreshTableMessage,
   applyPlayerAction,
   persistEngineState,
+  announceHandStart,
+  postThreadAnnouncement,
 } = require("../../features/casino/poker/service");
 const engine = require("../../features/casino/poker/engine");
 const { renderEphemeralHand } = require("../../features/casino/poker/renderer");
+
+// 抑制未使用警告
+void findActiveGameInChannel;
 
 function parseId(customId, prefix) {
   if (!customId.startsWith(prefix)) return null;
@@ -69,16 +74,18 @@ async function handleButton(client, interaction) {
       return interaction.reply({ content: "現在不能開新局。", ephemeral: true });
     }
     if (doc.players.length < doc.minPlayers) {
-      return interaction.reply({
-        content: `人數不足，至少需 ${doc.minPlayers} 人。`,
-        ephemeral: true,
+      await interaction.reply({
+        content: `🚫 人數不足，至少需 ${doc.minPlayers} 人，目前 ${doc.players.length} 人。請先用 \`/撲克 加入\` 邀請其他人入座。`,
+        ephemeral: false,
       });
+      return true;
     }
     await interaction.deferUpdate();
     const next = engine.startHand(doc);
     await persistEngineState(client, doc, next);
     const updated = await fetchByGameId(client, gameId);
     await refreshTableMessage(client, updated);
+    await announceHandStart(client, updated);
     return true;
   }
 
@@ -98,6 +105,7 @@ async function handleButton(client, interaction) {
     }
     const updated = await fetchByGameId(client, gameId);
     await refreshTableMessage(client, updated);
+    await announceHandStart(client, updated);
     return true;
   }
 

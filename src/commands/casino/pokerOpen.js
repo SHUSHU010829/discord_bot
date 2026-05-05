@@ -37,7 +37,7 @@ module.exports = {
     .toJSON(),
 
   run: async (client, interaction) => {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply();
     try {
       const sub = interaction.options.getSubcommand();
       if (sub !== "開桌") {
@@ -50,8 +50,12 @@ module.exports = {
       if (result.error) return interaction.editReply(result.error);
 
       const buyIn = result.doc.buyIn.toLocaleString();
+      const cfg = getCfg();
+      const ttlMin = Math.round((cfg.gameTtlSeconds || 900) / 60);
       return interaction.editReply(
-        `🃏 牌桌已建立 → ${result.thread}\n進桌費 **${buyIn}** credits 已扣，其他人到 ${result.thread} 用 \`/撲克 加入\` 入座。`
+        `🃏 **${interaction.member?.displayName || interaction.user.username}** 開了一桌德州撲克 → ${result.thread}\n` +
+          `進桌費 **${buyIn}** credits ・ 大盲 **${blind}** ・ 上限 **${maxPlayers}** 人 ・ 倒數 **${ttlMin}** 分鐘\n` +
+          `其他人到 ${result.thread} 用 \`/撲克 加入\` 或按「🪑 加入」入座，開桌者按「🃏 開始」開局！`
       );
     } catch (err) {
       console.log(`[ERROR] /德州撲克 開桌:\n${err}\n${err.stack}`.red);
