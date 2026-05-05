@@ -68,7 +68,6 @@ module.exports = {
         .setDescription("下注 credits")
         .setRequired(true)
         .setMinValue(getSlotConfig().minBet ?? 5)
-        .setMaxValue(getSlotConfig().maxBet ?? 500)
     )
     .toJSON(),
 
@@ -89,13 +88,12 @@ module.exports = {
       }
 
       const minBet = cfg.minBet ?? 5;
-      const maxBet = cfg.maxBet ?? 500;
       const dailyBetLimit = cfg.dailyBetLimit ?? 5000;
 
       const bet = interaction.options.getInteger("下注");
-      if (!Number.isInteger(bet) || bet < minBet || bet > maxBet) {
+      if (!Number.isInteger(bet) || bet < minBet) {
         return interaction.editReply(
-          `下注金額需介於 ${minBet.toLocaleString()} 與 ${maxBet.toLocaleString()} 之間。`
+          `下注金額至少需 ${minBet.toLocaleString()} credits。`
         );
       }
 

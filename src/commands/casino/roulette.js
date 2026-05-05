@@ -122,7 +122,6 @@ module.exports = {
         .setDescription('投入籌碼總額')
         .setRequired(true)
         .setMinValue(getCfg().minBetPerSlot ?? 30)
-        .setMaxValue(getCfg().maxTotalBudget ?? 2000)
     )
     .toJSON(),
 

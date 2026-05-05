@@ -31,7 +31,6 @@ module.exports = {
             .setDescription("大盲注金額（小盲為一半）")
             .setRequired(true)
             .setMinValue(getCfg().minBlind ?? 10)
-            .setMaxValue(getCfg().maxBlind ?? 500)
         )
     )
     .toJSON(),

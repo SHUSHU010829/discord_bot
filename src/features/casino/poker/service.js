@@ -89,13 +89,12 @@ async function createTable(client, interaction, { maxPlayers, blind }) {
   if (cfg.enabled === false) return { error: "🔧 德州撲克暫時關閉中！" };
 
   const minBlind = cfg.minBlind ?? 10;
-  const maxBlind = cfg.maxBlind ?? 500;
   const minPlayers = cfg.minPlayers ?? 2;
   const maxPlayersCap = cfg.maxPlayers ?? 8;
 
-  if (blind < minBlind || blind > maxBlind) {
+  if (blind < minBlind) {
     return {
-      error: `盲注需介於 ${minBlind.toLocaleString()} ~ ${maxBlind.toLocaleString()}。`,
+      error: `盲注至少需 ${minBlind.toLocaleString()}。`,
     };
   }
   if (maxPlayers < minPlayers || maxPlayers > maxPlayersCap) {
