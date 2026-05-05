@@ -9,6 +9,7 @@ const {
   closeTable,
   refreshTableMessage,
   persistEngineState,
+  applyPlayerAction,
   announceHandStart,
   postThreadAnnouncement,
 } = require("../../features/casino/poker/service");
@@ -35,6 +36,30 @@ module.exports = {
     )
     .addSubcommand((sub) =>
       sub.setName("狀態").setDescription("查看你的手牌（私訊只給你）")
+    )
+    .addSubcommand((sub) =>
+      sub.setName("棄牌").setDescription("棄牌（fold）— 也可按桌面按鈕")
+    )
+    .addSubcommand((sub) =>
+      sub.setName("過牌").setDescription("過牌（check）— 本輪沒人下注時")
+    )
+    .addSubcommand((sub) =>
+      sub.setName("跟注").setDescription("跟注（call）— 補到 currentBet")
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("加注")
+        .setDescription("加注（raise to）— 把本輪總額拉到輸入金額")
+        .addIntegerOption((opt) =>
+          opt
+            .setName("總額")
+            .setDescription("要把本輪總下注拉到多少（不是再加多少）")
+            .setRequired(true)
+            .setMinValue(1)
+        )
+    )
+    .addSubcommand((sub) =>
+      sub.setName("全下").setDescription("All-In — 推光剩下的籌碼")
     )
     .toJSON(),
 
@@ -131,6 +156,61 @@ module.exports = {
         }
 
         return interaction.editReply("此狀態無法離桌。");
+      }
+
+      if (["棄牌", "過牌", "跟注", "加注", "全下"].includes(sub)) {
+        await interaction.deferReply({ ephemeral: true });
+        const doc = await findActiveGameInChannel(client, interaction.channelId);
+        if (!doc) return interaction.editReply("🃏 這裡沒有撲克桌。");
+        if (doc.status !== "playing") {
+          return interaction.editReply("🃏 牌局尚未開打。");
+        }
+        const idx = doc.players.findIndex((p) => p.userId === interaction.user.id);
+        if (idx < 0) return interaction.editReply("你不在這張桌上。");
+        if (doc.toActIdx !== idx) return interaction.editReply("🕒 還沒輪到你。");
+
+        const me = doc.players[idx];
+        const toCall = Math.max(0, (doc.currentBet || 0) - (me.bet || 0));
+        let action;
+        let opts = {};
+        if (sub === "棄牌") action = "fold";
+        else if (sub === "過牌") {
+          if (toCall > 0) {
+            return interaction.editReply(
+              `🚫 現在無法過牌，需跟注 ${toCall.toLocaleString()}（用 \`/撲克 跟注\` 或 \`/撲克 棄牌\`）。`
+            );
+          }
+          action = "check";
+        } else if (sub === "跟注") {
+          if (toCall === 0) {
+            return interaction.editReply(
+              "🚫 本輪沒人下注，不需要跟，使用 `/撲克 過牌`。"
+            );
+          }
+          action = "call";
+        } else if (sub === "加注") {
+          const raiseTo = interaction.options.getInteger("總額");
+          const minRaiseTo = Math.max(
+            (doc.currentBet || 0) + (doc.minRaise || doc.bigBlind),
+            doc.bigBlind
+          );
+          const maxRaiseTo = me.bet + me.chips;
+          if (raiseTo < minRaiseTo || raiseTo > maxRaiseTo) {
+            return interaction.editReply(
+              `🚫 加注總額需介於 **${minRaiseTo.toLocaleString()}–${maxRaiseTo.toLocaleString()}** 之間（你目前已下 ${me.bet.toLocaleString()}，剩 ${me.chips.toLocaleString()}）。`
+            );
+          }
+          action = "raise";
+          opts = { raiseTo };
+        } else if (sub === "全下") {
+          action = "allin";
+        }
+
+        const r = await applyPlayerAction(client, doc, interaction.user.id, action, opts);
+        if (r.error) return interaction.editReply(`❌ ${r.error}`);
+        const updated = await client.pokerGamesCollection.findOne({ _id: doc._id });
+        await refreshTableMessage(client, updated);
+        return interaction.editReply(`✅ 已執行：${sub}`);
       }
 
       if (sub === "開始") {
