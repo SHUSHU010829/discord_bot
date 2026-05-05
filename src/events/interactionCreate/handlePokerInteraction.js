@@ -95,7 +95,7 @@ async function handleButton(client, interaction) {
     }
     if (doc.players.length < doc.minPlayers) {
       await interaction.reply({
-        content: `🚫 人數不足，至少需 ${doc.minPlayers} 人，目前 ${doc.players.length} 人。請先用 \`/撲克 加入\` 邀請其他人入座。`,
+        content: `🚫 人數不足，至少需 ${doc.minPlayers} 人，目前 ${doc.players.length} 人。請先邀請其他人按「🪑 加入」入座。`,
         ephemeral: false,
       });
       return true;
