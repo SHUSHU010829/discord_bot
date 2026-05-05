@@ -496,12 +496,18 @@ async function closeTable(client, doc, { reason = "closed" } = {}) {
   if (!doc) return;
   const guildId = doc.guildId;
   for (const p of doc.players) {
-    if (p.chips > 0) {
+    // 等候中 / 結算後：p.chips 已是該玩家全部餘籌（結算後派彩進 chips、totalBet 不重置但已派完）
+    // 牌局進行中：p.chips 不含已下進池的 totalBet，要把池內金額也退回，否則玩家損失
+    let refund = p.chips || 0;
+    if (doc.status === "playing") {
+      refund += p.totalBet || 0;
+    }
+    if (refund > 0) {
       await grantCoins(client, {
         userId: p.userId,
         guildId,
         username: p.username,
-        amount: p.chips,
+        amount: refund,
         source: "payout",
         meta: { game: "poker", result: reason, gameId: doc.gameId },
       });
@@ -517,7 +523,7 @@ async function closeTable(client, doc, { reason = "closed" } = {}) {
       },
     }
   );
-  // archive thread
+  // archive thread（若 thread 已被刪掉，client.channels.fetch 會 null，silent skip）
   try {
     const thread = await client.channels.fetch(doc.threadId).catch(() => null);
     if (thread && thread.isThread()) {
