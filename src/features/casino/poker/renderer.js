@@ -75,7 +75,9 @@ function buildTableLines(state) {
       const ts = Math.floor(new Date(state.actionDeadline).getTime() / 1000);
       const actor = state.players[state.toActIdx];
       if (actor) {
-        lines.push(`⏳ <@${actor.userId}> 行動中 ・ 倒數 <t:${ts}:R>`);
+        lines.push(
+          `⏳ **輪到 <@${actor.userId}> 行動** ・ <t:${ts}:R> 倒數 ・ 逾時自動處理`
+        );
       }
     }
   } else {
@@ -245,12 +247,16 @@ async function renderTableMessage(state, { viewerId } = {}) {
         name: `poker-${state.gameId}-h${state.handNumber || 0}-${state.phase || "wait"}.png`,
       }),
     ];
-    // 圖卡涵蓋公牌 / 籌碼 / 玩家。保留行動倒數那行做手機通知預覽。
+    // 圖卡涵蓋公牌 / 籌碼 / 玩家；文字內容只留：行動倒數（最重要）+ 標題 + 攤牌結果
     const lines = content.split("\n");
-    const headline = lines.slice(0, 2).join("\n");
+    const headline = lines[0]; // 🃏 德州撲克 ・ 第 N 局 ・ Phase
     const action = lines.find((l) => l.startsWith("⏳"));
     const settleLines = lines.filter((l) => l.startsWith("🏆"));
-    content = [headline, action, ...settleLines].filter(Boolean).join("\n");
+    const blocks = [];
+    if (action) blocks.push(action);
+    blocks.push(headline);
+    blocks.push(...settleLines);
+    content = blocks.filter(Boolean).join("\n");
   } catch (e) {
     console.log(`[WARN] poker card render failed, falling back to text: ${e.message}`);
   }

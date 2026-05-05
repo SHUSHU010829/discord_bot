@@ -69,15 +69,86 @@ function actionDeadlineNow() {
 async function refreshTableMessage(client, doc, { viewerId } = {}) {
   try {
     const channel = await client.channels.fetch(doc.threadId).catch(() => null);
-    if (!channel) return;
+    if (!channel) {
+      console.log(`[POKER] refresh: thread ${doc.threadId} not found`.yellow);
+      return;
+    }
     const msg = await channel.messages.fetch(doc.messageId).catch(() => null);
-    if (!msg) return;
+    if (!msg) {
+      console.log(
+        `[POKER] refresh: message ${doc.messageId} not in ${doc.threadId}`.yellow
+      );
+      return;
+    }
     const payload = await renderTableMessage(doc, { viewerId });
-    // 清掉舊 attachments，每次重新貼一張新圖
-    await msg.edit({ ...payload, attachments: [] }).catch(() => {});
-  } catch (_) {
-    /* noop */
+    await msg.edit({ ...payload, attachments: [] }).catch((e) => {
+      console.log(`[POKER] refresh edit failed: ${e.message}`.red);
+    });
+  } catch (e) {
+    console.log(`[POKER] refreshTableMessage error: ${e.message}`.red);
   }
+}
+
+// 在 thread 內公告（會 ping 指定使用者，讓他們收到通知）
+async function postThreadAnnouncement(client, doc, content, mentionUserIds = []) {
+  try {
+    const thread = await client.channels.fetch(doc.threadId).catch(() => null);
+    if (!thread) return;
+    await thread.send({
+      content,
+      allowedMentions: { users: mentionUserIds.filter(Boolean) },
+    });
+  } catch (e) {
+    console.log(`[POKER] announcement failed: ${e.message}`.red);
+  }
+}
+
+async function announceHandStart(client, doc) {
+  const dealer = doc.players[doc.buttonIdx];
+  const sb = doc.players[doc.sbIdx];
+  const bb = doc.players[doc.bbIdx];
+  const actor = doc.players[doc.toActIdx];
+  const lines = [
+    `🃏 **第 ${doc.handNumber} 局開始！**`,
+    dealer && `🟢 莊位（D）：<@${dealer.userId}>`,
+    sb && `🪙 小盲：<@${sb.userId}>（${doc.smallBlind.toLocaleString()}）`,
+    bb && `🪙 大盲：<@${bb.userId}>（${doc.bigBlind.toLocaleString()}）`,
+    actor && `⏳ **輪到 <@${actor.userId}> 行動** ・ 按「🂠 查看手牌」看你的底牌`,
+  ].filter(Boolean);
+  const mentions = [actor?.userId, dealer?.userId, sb?.userId, bb?.userId];
+  await postThreadAnnouncement(client, doc, lines.join("\n"), mentions);
+}
+
+async function announceTurnChange(client, doc) {
+  if (doc.status !== "playing") return;
+  const actor = doc.players[doc.toActIdx];
+  if (!actor) return;
+  await postThreadAnnouncement(
+    client,
+    doc,
+    `⏳ 輪到 <@${actor.userId}> 行動（${(doc.actionDeadline ? `<t:${Math.floor(new Date(doc.actionDeadline).getTime() / 1000)}:R>` : "60s")} 內未動將自動處理）`,
+    [actor.userId]
+  );
+}
+
+async function announcePhaseChange(client, doc) {
+  if (doc.status !== "playing") return;
+  const map = { flop: "翻牌（Flop）", turn: "轉牌（Turn）", river: "河牌（River）" };
+  const label = map[doc.phase];
+  if (!label) return;
+  const cards = (doc.community || [])
+    .map((c) => {
+      const SUIT = { S: "♠", H: "♥", D: "♦", C: "♣" };
+      const RANK = { A: "A", T: "10", J: "J", Q: "Q", K: "K" };
+      return `[${RANK[c[0]] || c[0]}${SUIT[c[1]]}]`;
+    })
+    .join(" ");
+  await postThreadAnnouncement(
+    client,
+    doc,
+    `🎴 **${label}** ・ 公牌：${cards}`,
+    []
+  );
 }
 
 async function createTable(client, interaction, { maxPlayers, blind }) {
@@ -448,11 +519,22 @@ async function applyPlayerAction(client, doc, userId, action, opts = {}) {
   if (idx < 0) return { error: "你不在這張桌上。" };
   if (doc.toActIdx !== idx) return { error: "現在還沒輪到你。" };
 
-  // engine 先把 doc 當作 state 處理（多餘欄位 engine 不在意）
+  const beforePhase = doc.phase;
+  const beforeToAct = doc.toActIdx;
   const result = engine.applyAction(doc, idx, action, opts);
   if (result.error) return { error: result.error };
   await persistEngineState(client, doc, result.state);
   const updated = await client.pokerGamesCollection.findOne({ _id: doc._id });
+
+  // 公告：街道換 / 換人行動
+  if (updated.status === "playing") {
+    if (updated.phase !== beforePhase) {
+      await announcePhaseChange(client, updated);
+    }
+    if (updated.toActIdx !== beforeToAct && updated.toActIdx >= 0) {
+      await announceTurnChange(client, updated);
+    }
+  }
   return { doc: updated, settled: updated.status === "settled" };
 }
 
@@ -500,4 +582,8 @@ module.exports = {
   persistEngineState,
   autoActOnTimeout,
   actionDeadlineNow,
+  announceHandStart,
+  announcePhaseChange,
+  announceTurnChange,
+  postThreadAnnouncement,
 };
