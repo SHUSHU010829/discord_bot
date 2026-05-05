@@ -4,8 +4,12 @@
     "currency": "金幣",
     "themes": {
       "default": {
-        "name": "廟宇籤詩",
-        "styleId": "temple"
+        "name": "經典紅",
+        "styleId": "classic"
+      },
+      "classic": {
+        "name": "經典紅",
+        "styleId": "classic"
       },
       "temple": {
         "name": "廟宇籤詩",
