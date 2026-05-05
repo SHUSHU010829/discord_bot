@@ -24,7 +24,8 @@
   - [加密貨幣 / 匯率 / 天氣](#9-加密貨幣--匯率--天氣)
   - [抽籤、統計與其他指令](#10-抽籤統計與其他指令)
   - [等級系統與每日簽到](#11-等級系統與每日簽到)
-  - [Twitter / Threads 連結修正](#12-twitter--threads-連結修正)
+  - [金幣經濟、賭場與商店](#12-金幣經濟賭場與商店)
+  - [Twitter / Threads 連結修正](#13-twitter--threads-連結修正)
 - [維運腳本](#維運腳本)
 - [外部 API](#外部-api)
 - [維護建議](#維護建議)
@@ -69,13 +70,16 @@ src/
 ├── handlers/eventHandler.js
 ├── commands/               # Slash Commands（按功能分子目錄）
 │   ├── ask/                # 詢問星座運勢、占卜
+│   ├── casino/             # /二十一點、/hilo、/拉霸、/樂透買、/賭場排行、/我的賭場紀錄…
 │   ├── currency/           # 加密貨幣、匯率
-│   ├── draw/               # 抽籤、樂透、抽一個
-│   ├── economy/            # /錢包、/骰寶、/give-coins
+│   ├── draw/               # 抽籤、抽一個（樂透模擬）
+│   ├── economy/            # /錢包、/轉帳、/存款、/骰寶、/give-coins
 │   ├── food/               # 食物/飲料 CRUD、/吃什麼
 │   ├── general/            # /help
+│   ├── level/              # /每日簽到、/等級卡、/徽章圖鑑、/稱號…
 │   ├── post/               # 整人小工具（瓦斯燈）
 │   ├── roles/              # /setup-roles
+│   ├── shop/               # /商店、/背包（credits 商店、buff、卡面）
 │   ├── stats/              # /stats、/leaderboard
 │   ├── ticket/             # /setup-ticket、/proposal、/close-ticket、/setup-suggestion
 │   └── weather/            # /weather
@@ -87,8 +91,14 @@ src/
 │   ├── guildMemberAdd/Remove
 │   └── validations/        # Slash Command 前置驗證、Autocomplete
 ├── features/
+│   ├── casino/             # blackjack / hilo / sicbo / slot / lottery 引擎
+│   ├── economy/            # grantCoins、買賣紀錄、轉帳手續費、定期存款
+│   ├── leveling/           # XP 計算、徽章、稱號、升等公告
+│   ├── shop/               # 商品結算、buff 倍率、role 顏色發放
 │   ├── steamDeals/         # 小黑盒 RSS → Steam API → Embed → 推播
-│   └── freeGames/          # 喜加一抓取與發送
+│   ├── freeGames/          # 喜加一抓取與發送
+│   ├── twitch/             # Twitch 開台通知
+│   └── voting/             # 投票結算、Ticket 公投
 ├── utils/                  # 共用函式（卡片產生、農民曆、autocomplete…）
 ├── data/                   # 持久化 JSON（身份組、建議、票務面板）
 ├── constants/              # 食物分類等靜態常數
@@ -356,12 +366,12 @@ embed.js → 發送 Embed
 | 指令 | 說明 |
 | --- | --- |
 | `/choose-one` | 在多個選項中隨機抽一個 |
-| `/lotto` | 模擬樂透開獎 |
+| `/lotto` | 模擬樂透開獎（純好玩，不扣 credits；真正的樂透請看 §12） |
 | `/straws` | 抽籤（吉凶） |
 | `/ask` | 占卜 / 星座運勢 |
 | `/stats`、`/leaderboard` | 訊息與語音時長統計（由 `messageStats.js`、`voiceStats.js` 累積） |
 | `/gaslight`、`/increase-gaslight` | 整人小工具 |
-| `/help` | 查看指令說明 |
+| `/help` | 查看指令說明（自動掃 `commands/**`，可帶 `指令:<名稱>` 直接跳） |
 
 ---
 
@@ -455,7 +465,91 @@ embed.js → 發送 Embed
 
 ---
 
-### 12. Twitter / Threads 連結修正
+### 12. 金幣經濟、賭場與商店
+
+**目的**：把社群活躍度（聊天 / 語音 / 簽到）轉成可消費的 `credits`，再用賭場、商店、轉帳、定存把這些 credits 重新分配回社群，形成「賺 → 花 → 互動」的循環。
+
+#### 12.1 credits 經濟基礎
+
+- `features/economy/grantCoins.js` 是所有金幣異動的唯一入口：發言、語音、簽到、表情、賭場下注 / 派彩、商店、轉帳、定存全部走它。
+- 每筆異動都寫一筆 `coinTransactions` 紀錄（含 `source`、`meta.game`、`date`），方便對帳與每日上限計算。
+- 套用倍率時自動讀 Twitch Tier、Server Boost、商店金幣 buff（疊加策略可在 `coinSystem.bonusStackingMode` 切換 `multiply` / `max`）。
+- 金錢相關指令：
+
+| 指令 | 用途 |
+| --- | --- |
+| `/錢包` | 查當前 credits、生命總值、來源分布、生效中 buff |
+| `/轉帳 對象 金額 [備註]` | 把金幣轉給其他玩家（會收手續費，每日有上限） |
+| `/存款 開戶 金額 天數` | 開定期存款，到期領回本金 + 利息 |
+| `/存款 查詢` | 查所有未到期 / 已到期的存單 |
+| `/存款 提款 存單` | 領回到期存款（未到期會被扣違約金） |
+| `/give-coins user amount [reason]` 🔒 | 管理員：發放或扣除 credits（會記在交易紀錄） |
+
+#### 12.2 賭場遊戲
+
+賭場類遊戲共用同一套節流 / 對帳機制：每款遊戲在 `casino/<game>` 區塊獨立設 `minBet`、`maxBet`、`dailyBetLimit`，下注走 `source: "bet"`、派彩走 `source: "payout"`，所以 `/我的賭場紀錄` 與 `/賭場排行` 才能算 RTP。
+
+| 指令 | 玩法 | 主要設定 |
+| --- | --- | --- |
+| `/拉霸 spin bet` | 五輪滾筒老虎機，含 jackpot 累積彩池（每筆下注 3% 注入彩池），中 jackpot 時 announce 到 `slot.jackpotPool.announceChannelId` | `casino.slot` |
+| `/骰寶 bet kind 金額` | 三顆骰子，可同時押 3 注。支援 大 / 小 / 單骰 / 對子 / 圍骰（特定 ×180、任意 ×30）/ 總點數（4 或 17 ×60、5 或 16 ×30…） | `casino.sicbo` |
+| `/二十一點 下注 [副數]` | 跟莊家比 21 點。莊家 ≥17 必停（含 soft 17）、Blackjack 賠 3:2、過五關（5 張未爆）2:1、可 Hit / Stand / Double。可選 1 / 4 / 6 / 8 副牌 | `casino.blackjack` |
+| `/hilo 下注` | 猜下一張比底牌 HI / LO / SAME，倍率依剩餘牌堆即時計算（含 5% 房費）；連對倍率累積，至少贏 1 把後可隨時收手；達 `maxRounds` 強制結算 | `casino.hilo` |
+| `/賭場排行 [type] [period]` | 賭場淨輸贏排行榜（依遊戲、依時段） | — |
+| `/我的賭場紀錄` | 自己的下注、派彩、RTP、各遊戲分項統計 | — |
+
+> **共同行為**：每位玩家同 `guildId` 同時只能進行一局 `/二十一點` 或 `/hilo`，避免按鈕局多開互踩。中途離場（按鈕局 5 分鐘無互動）由每分鐘的 cleanup cron 自動處理：21 點直接退本金；HI-LO 沒贏過退本金、有贏過自動 cash out。
+
+#### 12.3 樂透
+
+獨立子系統，由 cron 定期開獎與寄發訂閱票，不算進其他賭場 RTP。
+
+| 指令 | 用途 |
+| --- | --- |
+| `/樂透資訊` | 查當期獎池、開獎時間、剩餘時間 |
+| `/樂透買 玩法 [張數] [號碼]` | 買單張或多張票，可自選號碼或隨機 |
+| `/樂透包牌 玩法 號碼` | 選 7 個以上號碼自動展開所有 6 取 N 組合 |
+| `/樂透訂閱 玩法 期數 每期張數 [號碼]` | 訂閱未來 N 期自動買同組號碼 |
+| `/樂透訂閱列表` | 查 / 取消自己的訂閱 |
+| `/樂透歷史 [筆數]` | 自己最近的中獎紀錄 |
+| `/lotteryadmin …` 🔒 | 開發者：強制開獎、補建期、跑訂閱扣款、補發提醒 |
+
+**獎池與排程**設定在 `casino.lottery`：
+- `drawCron` 預設每週日 21:00 開獎、`subscriptionCron` 每週日 20:30 結算訂閱、`reminderCron` 每小時檢查是否要寄期中提醒
+- 支援多種玩法（預設 `6_49`、`3_20`），各自有獨立票價、系統種子金、wheeling 限制
+- 跨過 `poolMilestones` 門檻時可選擇推播到 `poolMilestoneChannelId`
+
+#### 12.4 商店與背包
+
+| 指令 | 用途 |
+| --- | --- |
+| `/商店 瀏覽 [category]` | 列出商品（顏色身份組 / 加成藥水 / 卡面風格 / 自訂稱號…） |
+| `/商店 購買 item` | 購買商品；身份組類會自動建立並指派 `🎨 xxx` 角色 |
+| `/背包` | 查看擁有道具與生效中 buff（含到期時間） |
+| `/背包 裝備 inventory_id` | 裝備卡面風格 / 顏色身份組 |
+| `/背包 設定稱號 text` | 設定 24 字內自訂稱號（需先持有「自訂稱號」道具，30 天有效） |
+
+**商品類型**（`src/config/shop.json`）：
+- `role_color`：30 天顏色身份組（`#E74C3C` 紅色尊爵、`#FFD700` 極光金…）；需要 bot 有 ManageRoles 權限，會 cache 已建立的 role 在 `ShopRoleCache` 避免重複
+- `xp_boost` / `coin_boost`：限時 XP / 金幣倍率藥水（1 小時 ×1.5 ~ 1 天 ×2.0）
+- `wallet_theme`：永久解鎖錢包卡面（廟宇籤詩、故障藝術、蒸汽波、北歐極簡、皮革撲克、全息投影、街頭塗鴉…）
+- `custom_title`：30 天自訂稱號，會顯示在錢包與升等公告
+
+#### 12.5 MongoDB collections 速覽
+
+| Collection | 內容 |
+| --- | --- |
+| `UserCoins` | 每位玩家在每個 guild 的當前 credits、來源累計、lifetime 統計 |
+| `CoinTransactions` | 每筆金錢異動（90 天 TTL；對帳與每日上限都靠它） |
+| `BlackjackGames` / `HiloGames` | in-flight + 已結算對局（30 天 TTL；由各自的 cleanup cron 退中途離場局） |
+| `JackpotPool` | 每 guild 一筆累積彩池 |
+| `LotteryDraws` / `LotteryTickets` / `LotterySubscriptions` / `LotteryWheels` | 樂透開獎期、票券、訂閱、包牌組 |
+| `UserInventory` / `ShopTransactions` / `ShopRoleCache` | 商店背包、購買紀錄、顏色身份組快取 |
+| `CoinTransfers` / `CoinDeposits` | 每日轉出額度、定期存款單 |
+
+---
+
+### 13. Twitter / Threads 連結修正
 
 `events/messageCreate/threadsLinkHandler.js` 會自動偵測訊息中的 Twitter / Threads 連結，回覆可正確顯示嵌入內容的 fxtwitter / fixthreads 版本，方便手機瀏覽。
 
