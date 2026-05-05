@@ -20,7 +20,10 @@ const {
   postThreadAnnouncement,
 } = require("../../features/casino/poker/service");
 const engine = require("../../features/casino/poker/engine");
-const { renderEphemeralHand } = require("../../features/casino/poker/renderer");
+const {
+  renderEphemeralHand,
+  renderHelp,
+} = require("../../features/casino/poker/renderer");
 
 // 抑制未使用警告
 void findActiveGameInChannel;
@@ -41,9 +44,23 @@ async function handleButton(client, interaction) {
   if (!interaction.customId?.startsWith("pk_")) return false;
   if (!client.pokerGamesCollection) return true;
 
-  const parsed = parseId(interaction.customId, "pk_");
-  if (!parsed) return true;
-  const { action, gameId } = parsed;
+  // pk_raiseto_<amount>_<gameId> 特殊處理（含兩個 _ 分隔）
+  let action;
+  let gameId;
+  let raiseToAmount = null;
+  if (interaction.customId.startsWith("pk_raiseto_")) {
+    const rest = interaction.customId.slice("pk_raiseto_".length);
+    const splitIdx = rest.indexOf("_");
+    if (splitIdx < 0) return true;
+    raiseToAmount = parseInt(rest.slice(0, splitIdx), 10);
+    gameId = rest.slice(splitIdx + 1);
+    action = "raiseto";
+  } else {
+    const parsed = parseId(interaction.customId, "pk_");
+    if (!parsed) return true;
+    action = parsed.action;
+    gameId = parsed.gameId;
+  }
 
   const doc = await fetchByGameId(client, gameId);
   if (!doc) {
@@ -51,9 +68,51 @@ async function handleButton(client, interaction) {
     return true;
   }
 
+  // 玩法說明：所有狀態都允許
+  if (action === "help") {
+    return interaction.reply(renderHelp());
+  }
+
   // 查看手牌：所有狀態都允許
   if (action === "hand") {
     return interaction.reply(renderEphemeralHand(doc, interaction.user.id));
+  }
+
+  // 快速加注：pk_raiseto_<amount>_<gameId>
+  if (action === "raiseto") {
+    if (doc.status !== "playing") {
+      return interaction.reply({ content: "現在不需要行動。", ephemeral: true });
+    }
+    const idx = doc.players.findIndex((p) => p.userId === interaction.user.id);
+    if (idx < 0) {
+      return interaction.reply({ content: "你不在這桌上。", ephemeral: true });
+    }
+    if (doc.toActIdx !== idx) {
+      return interaction.reply({ content: "🕒 還沒輪到你。", ephemeral: true });
+    }
+    if (!Number.isFinite(raiseToAmount) || raiseToAmount <= 0) {
+      return interaction.reply({ content: "❌ 加注金額無效。", ephemeral: true });
+    }
+    await interaction.deferUpdate();
+    const r = await applyPlayerAction(
+      client,
+      doc,
+      interaction.user.id,
+      "raise",
+      { raiseTo: raiseToAmount }
+    );
+    if (r.error) {
+      try {
+        await interaction.followUp({
+          content: `❌ 加注失敗：${r.error}`,
+          ephemeral: true,
+        });
+      } catch (_) {}
+      return true;
+    }
+    const updated = await fetchByGameId(client, gameId);
+    await refreshTableMessage(client, updated);
+    return true;
   }
 
   // 重貼桌面：把舊訊息刪掉重發一張

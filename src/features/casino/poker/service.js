@@ -257,7 +257,84 @@ async function announceSettlement(client, doc) {
       pot.splits.map((s) => s.userId)
     );
   }
-  // 4) 下一步提示
+
+  // 4) 各家本局淨輸贏（before → after）
+  const stackLines = [];
+  for (const p of doc.players) {
+    const won = (doc.settle.winners || []).reduce((sum, pot) => {
+      const s = pot.splits.find((x) => x.userId === p.userId);
+      return sum + (s?.amount || 0);
+    }, 0);
+    const delta = won - (p.totalBet || 0);
+    if (delta === 0 && p.totalBet === 0) continue; // 沒參與
+    const before = (p.chips || 0) - delta;
+    const sign = delta > 0 ? "+" : "";
+    const tag =
+      delta > 0 ? "📈" : delta < 0 ? "📉" : "➖";
+    stackLines.push(
+      `${tag} **${p.username}**：${before.toLocaleString()} → ${p.chips.toLocaleString()}（${sign}${delta.toLocaleString()}）`
+    );
+  }
+  if (stackLines.length) {
+    await postThreadAnnouncement(
+      client,
+      doc,
+      `📊 **本局籌碼變動**\n${stackLines.join("\n")}`,
+      []
+    );
+  }
+
+  // 5) 下一局預告（誰會 button、誰會出局/離桌）
+  const nextSurvivors = doc.players.filter(
+    (p) => !p.busted && !p.leaving && (p.chips || 0) > 0
+  );
+  const bustedNames = doc.players
+    .filter((p) => p.busted || (p.chips || 0) <= 0)
+    .map((p) => `<@${p.userId}>`);
+  const leavingNames = doc.players
+    .filter((p) => p.leaving && !p.busted && (p.chips || 0) > 0)
+    .map((p) => `<@${p.userId}>`);
+  const previewLines = [];
+  if (nextSurvivors.length >= (doc.minPlayers || 2)) {
+    // 推算下一局 button：current button 之後的第一個 survivor
+    const ids = doc.players.map((p) => p.userId);
+    const start = (doc.buttonIdx ?? -1);
+    let nextBtnUser = null;
+    for (let step = 1; step <= ids.length; step += 1) {
+      const i = (start + step) % ids.length;
+      const cand = doc.players[i];
+      if (cand && nextSurvivors.find((x) => x.userId === cand.userId)) {
+        nextBtnUser = cand;
+        break;
+      }
+    }
+    if (nextBtnUser) {
+      previewLines.push(`🟢 下一局莊位：<@${nextBtnUser.userId}>`);
+    }
+    previewLines.push(
+      `🪑 在場：${nextSurvivors.map((p) => `<@${p.userId}>`).join(" ・ ")}`
+    );
+  } else {
+    previewLines.push(
+      `⚠️ 在場玩家不足（需 ${doc.minPlayers || 2} 人），下一局將解散`
+    );
+  }
+  if (bustedNames.length) {
+    previewLines.push(`💀 出局：${bustedNames.join(" ・ ")}（籌碼歸零）`);
+  }
+  if (leavingNames.length) {
+    previewLines.push(`👋 將離桌：${leavingNames.join(" ・ ")}（下一局開始時退回）`);
+  }
+  if (previewLines.length) {
+    await postThreadAnnouncement(
+      client,
+      doc,
+      previewLines.join("\n"),
+      []
+    );
+  }
+
+  // 6) 下一步提示
   await postThreadAnnouncement(
     client,
     doc,
@@ -649,6 +726,8 @@ async function persistEngineState(client, doc, next) {
         handNumber: next.handNumber || doc.handNumber,
         settle: next.settle || null,
         actionDeadline: isActiveTurn ? actionDeadlineNow() : null,
+        // 換人或新發牌 → 重置 warning 旗標
+        actionWarningFired: false,
         updatedAt: new Date(),
         expiresAt: ttlExpiresAt(),
       },

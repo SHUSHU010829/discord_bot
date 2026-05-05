@@ -9,7 +9,7 @@ const {
 } = require("discord.js");
 
 const { legalActions, totalPot } = require("./engine");
-const { categoryLabel } = require("./hand");
+const { categoryLabel, evaluate7 } = require("./hand");
 const generatePokerCard = require("../../../utils/generatePokerCard");
 
 const SUIT_EMOJI = { S: "♠", H: "♥", D: "♦", C: "♣" };
@@ -129,6 +129,39 @@ function buildTableLines(state) {
   return lines.join("\n");
 }
 
+// 計算 quick-raise 預設金額（½池 / 池 / 2×池）。
+// 回傳 [{ label, raiseTo }, ...]，已 clamp 到 [minRaiseTo, maxRaiseTo]。
+// 若全部都被 clamp 到同一個值（=可加注空間太小），回傳空陣列代表不顯示快加注。
+function computeQuickRaises(state, actor) {
+  if (!actor) return [];
+  const pot = totalPot(state);
+  const toCall = Math.max(0, (state.currentBet || 0) - (actor.bet || 0));
+  const potIfCalled = pot + toCall;
+  const minRaiseTo = Math.max(
+    (state.currentBet || 0) + (state.minRaise || state.bigBlind),
+    state.bigBlind
+  );
+  const maxRaiseTo = (actor.bet || 0) + (actor.chips || 0);
+  if (maxRaiseTo <= minRaiseTo) return [];
+
+  const presets = [
+    { label: "½池", multiplier: 0.5 },
+    { label: "池", multiplier: 1 },
+    { label: "2×池", multiplier: 2 },
+  ];
+
+  return presets
+    .map((p) => {
+      let raiseTo = (state.currentBet || 0) + Math.round(potIfCalled * p.multiplier);
+      // 至少 min raise；超過全推就 = all-in
+      if (raiseTo < minRaiseTo) raiseTo = minRaiseTo;
+      if (raiseTo > maxRaiseTo) raiseTo = maxRaiseTo;
+      return { label: p.label, raiseTo };
+    })
+    // 同樣金額會出現幾顆按鈕，去重
+    .filter((p, i, arr) => arr.findIndex((x) => x.raiseTo === p.raiseTo) === i);
+}
+
 function buildActionButtons(state, viewerId) {
   const rows = [];
   const gameId = state.gameId;
@@ -154,6 +187,11 @@ function buildActionButtons(state, viewerId) {
         .setCustomId(`pk_resend_${gameId}`)
         .setLabel("重貼桌面")
         .setEmoji("🔄")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(`pk_help_${gameId}`)
+        .setLabel("玩法說明")
+        .setEmoji("❓")
         .setStyle(ButtonStyle.Secondary)
     );
     rows.push(row);
@@ -201,7 +239,23 @@ function buildActionButtons(state, viewerId) {
     );
     rows.push(row1);
 
-    const row2 = new ActionRowBuilder().addComponents(
+    // 第 2 列：½池 / 池 / 2×池 快速加注（計算後才放入）
+    const quicks = computeQuickRaises(state, actor);
+    if (quicks.length && acts.includes("raise")) {
+      const quickRow = new ActionRowBuilder();
+      for (const q of quicks) {
+        quickRow.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`pk_raiseto_${q.raiseTo}_${gameId}`)
+            .setLabel(`${q.label} (${q.raiseTo.toLocaleString()})`)
+            .setEmoji("💰")
+            .setStyle(ButtonStyle.Success)
+        );
+      }
+      rows.push(quickRow);
+    }
+
+    const row3 = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`pk_leave_${gameId}`)
         .setLabel("離桌")
@@ -211,9 +265,14 @@ function buildActionButtons(state, viewerId) {
         .setCustomId(`pk_resend_${gameId}`)
         .setLabel("重貼桌面")
         .setEmoji("🔄")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(`pk_help_${gameId}`)
+        .setLabel("玩法說明")
+        .setEmoji("❓")
         .setStyle(ButtonStyle.Secondary)
     );
-    rows.push(row2);
+    rows.push(row3);
 
     // 抑制未使用警告
     void isMyTurn;
@@ -241,6 +300,11 @@ function buildActionButtons(state, viewerId) {
         .setCustomId(`pk_resend_${gameId}`)
         .setLabel("重貼桌面")
         .setEmoji("🔄")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(`pk_help_${gameId}`)
+        .setLabel("玩法說明")
+        .setEmoji("❓")
         .setStyle(ButtonStyle.Secondary)
     );
     rows.push(row);
@@ -278,6 +342,31 @@ async function renderTableMessage(state, { viewerId } = {}) {
   return { content, components, files, allowedMentions };
 }
 
+// 起手評估（pre-flop 沒公牌時提供簡易提示）。
+function preflopHint(holeCards) {
+  if (!holeCards || holeCards.length < 2) return null;
+  const [a, b] = holeCards;
+  const r1 = a[0];
+  const r2 = b[0];
+  const s1 = a[1];
+  const s2 = b[1];
+  const tags = [];
+  if (r1 === r2) tags.push(`對 **${r1 === "T" ? "10" : r1}**`);
+  if (s1 === s2 && r1 !== r2) tags.push("同花潛力");
+  // 連張（只看 rank 距離 1 或 12=A2）
+  const order = "23456789TJQKA";
+  const i1 = order.indexOf(r1);
+  const i2 = order.indexOf(r2);
+  if (i1 >= 0 && i2 >= 0 && r1 !== r2) {
+    const gap = Math.abs(i1 - i2);
+    if (gap === 1 || gap === 12) tags.push("順子潛力");
+  }
+  // 高張
+  if ((r1 === "A" || r2 === "A") && r1 !== r2) tags.push("含 A");
+  if (tags.length === 0) return "起手較弱";
+  return tags.join(" ・ ");
+}
+
 function renderEphemeralHand(state, userId) {
   const p = state.players.find((pp) => pp.userId === userId);
   if (!p) {
@@ -292,16 +381,71 @@ function renderEphemeralHand(state, userId) {
     `🂠 **你的手牌（第 ${state.handNumber} 局）**`,
     `底牌：${hand}`,
     `公牌：${community}`,
-    `籌碼：**${p.chips.toLocaleString()}** ・ 本輪 ${p.bet.toLocaleString()} ・ 本局已投 ${p.totalBet.toLocaleString()}`,
   ];
+
+  // 牌力提示
+  const community5 = state.community || [];
+  if (community5.length >= 3) {
+    try {
+      const score = evaluate7([...p.holeCards, ...community5]);
+      const cat = categoryLabel(score);
+      lines.push(`🎯 目前最強：**${cat}**（用底牌 + ${community5.length} 張公牌組成）`);
+    } catch (_) {
+      /* noop */
+    }
+  } else {
+    const hint = preflopHint(p.holeCards);
+    if (hint) lines.push(`🎯 起手判斷：${hint}`);
+  }
+
+  lines.push(
+    `籌碼：**${p.chips.toLocaleString()}** ・ 本輪 ${p.bet.toLocaleString()} ・ 本局已投 ${p.totalBet.toLocaleString()}`
+  );
   if (p.folded) lines.push("（你已棄牌）");
   if (p.allIn) lines.push("（你已 All-In）");
+  return { content: lines.join("\n"), ephemeral: true };
+}
+
+function renderHelp() {
+  const lines = [
+    "**❓ 德州撲克新手懶人包**",
+    "",
+    "**🎯 目標**：用 2 張底牌 + 5 張公牌中任選湊出最強 5 張牌。",
+    "",
+    "**🃏 流程**：",
+    "1. 每人發 2 張**底牌**（只有自己看得到）",
+    "2. **Pre-Flop**：依順序行動",
+    "3. **Flop** 翻 3 張公牌 → 第二輪行動",
+    "4. **Turn** 翻 1 張 → 第三輪行動",
+    "5. **River** 翻 1 張 → 最後一輪",
+    "6. **攤牌**：剩下沒棄的玩家比牌，最大者拿底池",
+    "",
+    "**🎮 行動按鈕**：",
+    "• 🚫 **棄牌**：不玩這局，已下的注都拿不回",
+    "• ✓ **過牌**：本輪沒人下注時，免費傳給下家",
+    "• 🪙 **跟 N**：補到當前注額繼續玩",
+    "• 💰 **加注**：把本輪總注拉高（modal 自填或快加注按鈕）",
+    "• 💰 **½池 / 池 / 2×池**：常見加注幅度，一鍵下",
+    "• 🔥 **All-In**：推光所有籌碼（拼一把）",
+    "• 🂠 **查看手牌**：私訊看自己底牌 + 牌力提示",
+    "• 🔄 **重貼桌面**：訊息被淹沒時把桌面拉到最下",
+    "",
+    "**💡 牌型大小（小→大）**：",
+    "高牌 < 一對 < 兩對 < 三條 < 順子 < 同花 < 葫蘆 < 四條 < 同花順",
+    "",
+    "**🪙 進桌 / 籌碼**：",
+    "• 進桌費 = 大盲 × 50（例：盲 50 → 進 2500 credits）",
+    "• 籌碼輸光自動出局；中途離桌會在本局結算後退回剩餘",
+    "",
+    "**⏰ 倒數**：每回合 60 秒，逾時自動處理（沒人下注 → 過牌；有人下注 → 棄牌）",
+  ];
   return { content: lines.join("\n"), ephemeral: true };
 }
 
 module.exports = {
   renderTableMessage,
   renderEphemeralHand,
+  renderHelp,
   formatCard,
   formatCardLine,
 };

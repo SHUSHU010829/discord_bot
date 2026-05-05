@@ -6,6 +6,7 @@ const { casino } = require("../../config");
 const {
   closeTable,
   autoActOnTimeout,
+  postThreadAnnouncement,
 } = require("../../features/casino/poker/service");
 
 let consecutiveErrors = 0;
@@ -36,6 +37,39 @@ async function sweepTables(client) {
 async function sweepActions(client) {
   if (!client.pokerGamesCollection) return;
   const now = new Date();
+
+  // 1) 倒數剩 ≤15 秒 → 發提醒（每位玩家每回合只發一次）
+  const warnAt = new Date(now.getTime() + 15 * 1000);
+  const warnCursor = client.pokerGamesCollection.find({
+    status: "playing",
+    actionWarningFired: { $ne: true },
+    actionDeadline: { $lt: warnAt, $gt: now },
+  });
+  while (await warnCursor.hasNext()) {
+    const doc = await warnCursor.next();
+    try {
+      const actor = doc.players[doc.toActIdx];
+      if (actor) {
+        const ts = doc.actionDeadline
+          ? Math.floor(new Date(doc.actionDeadline).getTime() / 1000)
+          : null;
+        await postThreadAnnouncement(
+          client,
+          doc,
+          `⏰ <@${actor.userId}> **剩 15 秒**${ts ? ` ・ <t:${ts}:R> 過期` : ""}\n-# 不動就會自動處理（沒人下注 → 過牌；有人下注 → 棄牌）`,
+          [actor.userId]
+        );
+      }
+      await client.pokerGamesCollection.updateOne(
+        { _id: doc._id },
+        { $set: { actionWarningFired: true } }
+      );
+    } catch (e) {
+      console.log(`[POKER] 倒數提醒失敗 gameId=${doc.gameId}: ${e.message}`.red);
+    }
+  }
+
+  // 2) 已過期 → auto-fold/check
   const cursor = client.pokerGamesCollection.find({
     status: "playing",
     actionDeadline: { $lt: now, $ne: null },
