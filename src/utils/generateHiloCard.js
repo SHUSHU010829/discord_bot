@@ -107,14 +107,24 @@ function buildResultLabel(state) {
   }
 }
 
+function renderCheckSvg(size, color) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M20 52 L42 74 L82 28" fill="none" stroke="${color}" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+function renderCrossSvg(size, color) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M22 22 L78 78 M78 22 L22 78" fill="none" stroke="${color}" stroke-width="14" stroke-linecap="round"/></svg>`;
+}
+
 function renderHistoryStrip(history) {
   if (!history || history.length === 0) return "";
   // 只顯示最後 6 把，避免畫面爆掉
   const tail = history.slice(-6);
   const items = tail
     .map((h) => {
-      const ok = h.correct ? "✓" : "✗";
       const okColor = h.correct ? PALETTE.teal : PALETTE.red;
+      const okSvg = h.correct
+        ? renderCheckSvg(20, okColor)
+        : renderCrossSvg(20, okColor);
       const cardLabel = h.drawn
         ? `${RANK_LABEL[h.drawn[0]]}${
             { S: "♠", H: "♥", D: "♦", C: "♣" }[h.drawn[1]]
@@ -125,7 +135,7 @@ function renderHistoryStrip(history) {
         <div style="display:flex;flex-direction:column;align-items:center;margin:0 6px;">
           <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:2px;color:${PALETTE.muted};line-height:1;padding-right:2px;">${guessLabel}</div>
           <div style="display:flex;align-items:center;justify-content:center;width:46px;height:46px;background:${PALETTE.cardWhite};border:2px solid ${PALETTE.ink};margin-top:4px;font-family:'NotoSansTC';font-weight:900;font-size:18px;color:${PALETTE.ink};line-height:1;">${cardLabel}</div>
-          <div style="display:flex;font-family:'SpaceMono';font-size:18px;font-weight:400;color:${okColor};line-height:1;margin-top:4px;padding-right:1px;">${ok}</div>
+          <div style="display:flex;margin-top:6px;">${okSvg}</div>
         </div>
       `;
     })
@@ -152,19 +162,33 @@ function buildMarkup(data) {
   const showNext = !isPlaying && last && last.drawn;
   const nextCard = showNext ? renderCard(last.drawn, "lg") : renderHiddenCard("lg");
 
+  // 用 SVG 畫上下箭頭，避免 ⬆⬇ 在 NotoSansTC / SpaceMono 都沒 glyph 變豆腐
+  const upArrow = `<svg width="14" height="14" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M50 14 L86 56 L66 56 L66 88 L34 88 L34 56 L14 56 Z" fill="${PALETTE.teal}"/></svg>`;
+  const downArrow = `<svg width="14" height="14" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M50 86 L86 44 L66 44 L66 12 L34 12 L34 44 L14 44 Z" fill="${PALETTE.red}"/></svg>`;
+  const eqMark = `<svg width="14" height="14" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect x="14" y="34" width="72" height="12" fill="${PALETTE.gold}"/><rect x="14" y="56" width="72" height="12" fill="${PALETTE.gold}"/></svg>`;
+
   const oddsBlock = isPlaying
     ? `
       <div style="display:flex;flex-direction:row;align-items:center;justify-content:center;width:100%;margin-top:18px;">
         <div style="display:flex;flex-direction:column;align-items:center;margin:0 16px;padding:8px 22px;background:${PALETTE.cardWhite};border:2px solid ${PALETTE.ink};">
-          <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:4px;color:${PALETTE.muted};line-height:1;padding-right:3px;">HI ⬆</div>
+          <div style="display:flex;align-items:center;line-height:1;">
+            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:4px;color:${PALETTE.muted};line-height:1;padding-right:6px;">HI</div>
+            <div style="display:flex;">${upArrow}</div>
+          </div>
           <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${PALETTE.teal};line-height:1;margin-top:6px;">${fmtMul(odds.multipliers.hi)}</div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:center;margin:0 16px;padding:8px 22px;background:${PALETTE.cardWhite};border:2px solid ${PALETTE.ink};">
-          <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:4px;color:${PALETTE.muted};line-height:1;padding-right:3px;">SAME =</div>
+          <div style="display:flex;align-items:center;line-height:1;">
+            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:4px;color:${PALETTE.muted};line-height:1;padding-right:6px;">SAME</div>
+            <div style="display:flex;">${eqMark}</div>
+          </div>
           <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${PALETTE.gold};line-height:1;margin-top:6px;">${fmtMul(odds.multipliers.same)}</div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:center;margin:0 16px;padding:8px 22px;background:${PALETTE.cardWhite};border:2px solid ${PALETTE.ink};">
-          <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:4px;color:${PALETTE.muted};line-height:1;padding-right:3px;">LO ⬇</div>
+          <div style="display:flex;align-items:center;line-height:1;">
+            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:4px;color:${PALETTE.muted};line-height:1;padding-right:6px;">LO</div>
+            <div style="display:flex;">${downArrow}</div>
+          </div>
           <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${PALETTE.red};line-height:1;margin-top:6px;">${fmtMul(odds.multipliers.lo)}</div>
         </div>
       </div>
