@@ -1,7 +1,6 @@
 require("colors");
 const crypto = require("crypto");
 const { SlashCommandBuilder } = require("discord.js");
-const { DateTime } = require("luxon");
 
 const { coinSystem, casino } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
@@ -10,27 +9,6 @@ const { renderMessage } = require("../../features/casino/blackjack/renderer");
 
 function getBjConfig() {
   return casino?.blackjack || {};
-}
-
-async function getTodayBetTotal(client, userId, guildId) {
-  if (!client.coinTransactionsCollection) return 0;
-  const tz = coinSystem?.daily?.resetTimezone || "Asia/Taipei";
-  const today = DateTime.now().setZone(tz).toISODate();
-  const agg = await client.coinTransactionsCollection
-    .aggregate([
-      {
-        $match: {
-          userId,
-          guildId,
-          source: "bet",
-          "meta.game": "blackjack",
-          date: today,
-        },
-      },
-      { $group: { _id: null, total: { $sum: "$amount" } } },
-    ])
-    .toArray();
-  return Math.abs(agg[0]?.total || 0);
 }
 
 module.exports = {
@@ -80,7 +58,6 @@ module.exports = {
       }
 
       const minBet = cfg.minBet ?? 10;
-      const dailyBetLimit = cfg.dailyBetLimit ?? 10000;
       const ttlSec = cfg.gameTtlSeconds ?? 300;
 
       const bet = interaction.options.getInteger("下注");
@@ -119,14 +96,6 @@ module.exports = {
       if (balance < bet) {
         return interaction.editReply(
           `💰 餘額不足！目前 **${balance.toLocaleString()}** credits，無法下注 ${bet.toLocaleString()}。`
-        );
-      }
-
-      const todayBet = await getTodayBetTotal(client, userId, guildId);
-      if (todayBet + bet > dailyBetLimit) {
-        const remain = Math.max(0, dailyBetLimit - todayBet);
-        return interaction.editReply(
-          `📈 今日 21 點下注已達上限。今日已下注 **${todayBet.toLocaleString()}** / ${dailyBetLimit.toLocaleString()}，剩 **${remain.toLocaleString()}**。`
         );
       }
 

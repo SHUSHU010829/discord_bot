@@ -1,6 +1,5 @@
 require('colors');
 const crypto = require('crypto');
-const { DateTime } = require('luxon');
 const {
   SlashCommandBuilder,
   ActionRowBuilder,
@@ -19,27 +18,6 @@ function getCfg() {
 
 function unitAmount(remaining) {
   return Math.floor(remaining / 3);
-}
-
-async function getTodayBetTotal(client, userId, guildId) {
-  if (!client.coinTransactionsCollection) return 0;
-  const tz = coinSystem?.daily?.resetTimezone || 'Asia/Taipei';
-  const today = DateTime.now().setZone(tz).toISODate();
-  const agg = await client.coinTransactionsCollection
-    .aggregate([
-      {
-        $match: {
-          userId,
-          guildId,
-          source: 'bet',
-          'meta.game': 'roulette',
-          date: today,
-        },
-      },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
-    ])
-    .toArray();
-  return Math.abs(agg[0]?.total || 0);
 }
 
 /** 外圍及操作按鈕列 */
@@ -138,7 +116,6 @@ module.exports = {
       const userId = interaction.user.id;
       const guildId = interaction.guildId;
       const totalBudget = interaction.options.getInteger('金額');
-      const dailyBetLimit = cfg.dailyBetLimit ?? 20000;
       const timeoutSec = cfg.bettingTimeoutSeconds ?? 90;
       const username = interaction.member?.displayName || interaction.user.username;
 
@@ -156,15 +133,6 @@ module.exports = {
       if (balance < totalBudget) {
         return interaction.editReply(
           `💰 餘額不足！目前 **${balance.toLocaleString()}** credits，需要 **${totalBudget.toLocaleString()}**。`
-        );
-      }
-
-      // 每日下注上限（獨立計算，不跟其他遊戲合計）
-      const todayBet = await getTodayBetTotal(client, userId, guildId);
-      if (todayBet + totalBudget > dailyBetLimit) {
-        const remain = Math.max(0, dailyBetLimit - todayBet);
-        return interaction.editReply(
-          `📈 今日輪盤下注已達上限。今日已下注 **${todayBet.toLocaleString()}** / ${dailyBetLimit.toLocaleString()}，剩 **${remain.toLocaleString()}**。`
         );
       }
 

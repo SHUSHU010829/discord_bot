@@ -4,20 +4,17 @@
       "enabled": true,
       "minBetPerSlot": 30,
       "maxTotalBudget": 2000,
-      "dailyBetLimit": 20000,
       "bettingTimeoutSeconds": 90,
       "gameTtlSeconds": 300
     },
     "sicbo": {
       "minBet": 10,
-      "maxBet": 1000,
-      "dailyBetLimit": 50000
+      "maxBet": 1000
     },
     "slot": {
       "enabled": true,
       "minBet": 5,
       "maxBet": 500,
-      "dailyBetLimit": 5000,
       "dailyLossProtection": 2000,
       "jackpotPool": {
         "enabled": true,
@@ -30,14 +27,12 @@
       "enabled": true,
       "minBet": 10,
       "maxBet": 1000,
-      "dailyBetLimit": 10000,
       "gameTtlSeconds": 300
     },
     "hilo": {
       "enabled": true,
       "minBet": 10,
       "maxBet": 1000,
-      "dailyBetLimit": 10000,
       "gameTtlSeconds": 300,
       "houseEdge": 0.05,
       "maxRounds": 10

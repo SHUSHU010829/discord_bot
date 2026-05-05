@@ -4,8 +4,6 @@ const {
   SlashCommandBuilder,
   AttachmentBuilder,
 } = require("discord.js");
-const { DateTime } = require("luxon");
-
 const { coinSystem, casino } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
 const { rollThree } = require("../../features/casino/sicbo/dice");
@@ -28,27 +26,6 @@ const BET_CHOICES = [
 ];
 
 const MAX_BETS = 3;
-
-async function getTodayBetTotal(client, userId, guildId) {
-  if (!client.coinTransactionsCollection) return 0;
-  const tz = coinSystem?.daily?.resetTimezone || "Asia/Taipei";
-  const today = DateTime.now().setZone(tz).toISODate();
-  const agg = await client.coinTransactionsCollection
-    .aggregate([
-      {
-        $match: {
-          userId,
-          guildId,
-          source: "bet",
-          "meta.game": "sicbo",
-          date: today,
-        },
-      },
-      { $group: { _id: null, total: { $sum: "$amount" } } },
-    ])
-    .toArray();
-  return Math.abs(agg[0]?.total || 0);
-}
 
 function buildBetOptionGroup(builder, idx) {
   const required = idx === 1;
@@ -148,15 +125,6 @@ module.exports = {
       if (balance < totalBet) {
         return interaction.editReply(
           `💰 餘額不足！目前 **${balance.toLocaleString()}** credits，無法下注 ${totalBet.toLocaleString()}（${bets.length} 注合計）。`
-        );
-      }
-
-      const dailyLimit = casino?.sicbo?.dailyBetLimit ?? 50000;
-      const todayBet = await getTodayBetTotal(client, userId, guildId);
-      if (todayBet + totalBet > dailyLimit) {
-        const remain = Math.max(0, dailyLimit - todayBet);
-        return interaction.editReply(
-          `📈 今日骰寶下注已達上限。今日已下注 **${todayBet.toLocaleString()}** / ${dailyLimit.toLocaleString()}，剩 **${remain.toLocaleString()}**。`
         );
       }
 
