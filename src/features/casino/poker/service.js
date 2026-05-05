@@ -116,6 +116,9 @@ async function announceHandStart(client, doc) {
     actor && `⏳ **輪到 <@${actor.userId}> 行動** ・ 按「🂠 查看手牌」看你的底牌`,
   ].filter(Boolean);
   const mentions = [actor?.userId, dealer?.userId, sb?.userId, bb?.userId];
+  console.log(
+    `[POKER] announceHandStart gameId=${doc.gameId} thread=${doc.threadId} mentions=${mentions.filter(Boolean).join(",")}`.cyan
+  );
   await postThreadAnnouncement(client, doc, lines.join("\n"), mentions);
 }
 

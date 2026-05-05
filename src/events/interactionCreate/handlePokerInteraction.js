@@ -60,6 +60,14 @@ async function handleButton(client, interaction) {
     await interaction.deferReply({ ephemeral: true });
     const r = await joinTable(client, interaction);
     if (r.error) return interaction.editReply(r.error);
+    const username =
+      interaction.member?.displayName || interaction.user.username;
+    await postThreadAnnouncement(
+      client,
+      r.doc,
+      `🪑 **${username}** 入座了（${r.doc.players.length}/${r.doc.maxPlayers} 人）`,
+      []
+    );
     return interaction.editReply(
       `🪑 已入座，已扣進桌費 **${r.doc.buyIn.toLocaleString()}** credits。`
     );
@@ -67,6 +75,9 @@ async function handleButton(client, interaction) {
 
   // 開始下一局（waiting → preflop）
   if (action === "start") {
+    console.log(
+      `[POKER] start clicked by user=${interaction.user.id} gameId=${gameId} status=${doc.status} players=${doc.players.length}/${doc.minPlayers}`.cyan
+    );
     if (doc.creatorId !== interaction.user.id) {
       return interaction.reply({ content: "🚫 只有開桌者能開局。", ephemeral: true });
     }
@@ -84,6 +95,9 @@ async function handleButton(client, interaction) {
     const next = engine.startHand(doc);
     await persistEngineState(client, doc, next);
     const updated = await fetchByGameId(client, gameId);
+    console.log(
+      `[POKER] hand started gameId=${gameId} hand=${updated.handNumber} phase=${updated.phase} toAct=${updated.toActIdx}`.cyan
+    );
     await refreshTableMessage(client, updated);
     await announceHandStart(client, updated);
     return true;
