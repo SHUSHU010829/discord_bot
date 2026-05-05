@@ -67,7 +67,6 @@ function buildBetOptionGroup(builder, idx) {
         .setDescription(idx === 1 ? "下注 credits" : `第 ${idx} 注的金額`)
         .setRequired(required)
         .setMinValue(casino?.sicbo?.minBet ?? 10)
-        .setMaxValue(casino?.sicbo?.maxBet ?? 1000)
     )
     .addIntegerOption((opt) =>
       opt

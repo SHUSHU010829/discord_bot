@@ -44,7 +44,6 @@ module.exports = {
         .setDescription("下注 credits")
         .setRequired(true)
         .setMinValue(getBjConfig().minBet ?? 10)
-        .setMaxValue(getBjConfig().maxBet ?? 1000)
     )
     .addIntegerOption((opt) =>
       opt
@@ -81,7 +80,6 @@ module.exports = {
       }
 
       const minBet = cfg.minBet ?? 10;
-      const maxBet = cfg.maxBet ?? 1000;
       const dailyBetLimit = cfg.dailyBetLimit ?? 10000;
       const ttlSec = cfg.gameTtlSeconds ?? 300;
 
@@ -89,9 +87,9 @@ module.exports = {
       const deckCountRaw = interaction.options.getInteger("副數");
       const allowedDeckCounts = cfg.allowedDeckCounts || [1, 4, 6, 8];
       const deckCount = allowedDeckCounts.includes(deckCountRaw) ? deckCountRaw : 1;
-      if (!Number.isInteger(bet) || bet < minBet || bet > maxBet) {
+      if (!Number.isInteger(bet) || bet < minBet) {
         return interaction.editReply(
-          `下注金額需介於 ${minBet.toLocaleString()} 與 ${maxBet.toLocaleString()} 之間。`
+          `下注金額至少需 ${minBet.toLocaleString()} credits。`
         );
       }
 
