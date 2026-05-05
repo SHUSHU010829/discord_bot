@@ -66,8 +66,15 @@ function renderCard(card, opts = {}) {
   const w = opts.width || 96;
   const h = opts.height || 138;
   if (!card) {
+    const placeholderText = opts.placeholderText || "";
     return `
-      <div style="display:flex;width:${w}px;height:${h}px;background:${PALETTE.empty};border:2px dashed ${PALETTE.muted};box-sizing:border-box;margin:0 6px;"></div>
+      <div style="display:flex;width:${w}px;height:${h}px;background:${PALETTE.empty};border:2px dashed ${PALETTE.muted};box-sizing:border-box;margin:0 6px;align-items:center;justify-content:center;">
+        ${
+          placeholderText
+            ? `<div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:14px;color:${PALETTE.muted};letter-spacing:2px;">${placeholderText}</div>`
+            : ""
+        }
+      </div>
     `;
   }
   const rank = card[0];
@@ -80,6 +87,25 @@ function renderCard(card, opts = {}) {
     <div style="display:flex;width:${w}px;height:${h}px;background:${PALETTE.cardWhite};border:3px solid ${PALETTE.ink};box-sizing:border-box;margin:0 6px;flex-direction:column;justify-content:center;align-items:center;padding:8px 0;">
       <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:${rankSize}px;color:${color};line-height:1;letter-spacing:-2px;">${label}</div>
       <div style="display:flex;margin-top:10px;">${suitSvg}</div>
+    </div>
+  `;
+}
+
+// 玩家小卡（用於 showdown 顯示底牌）
+function renderMiniCard(card) {
+  const w = 38;
+  const h = 54;
+  if (!card) return "";
+  const rank = card[0];
+  const suit = card[1];
+  const label = RANK_LABEL[rank] || rank;
+  const color = isRedSuit(suit) ? PALETTE.red : PALETTE.ink;
+  const suitSvg = renderSuitSvg(suit, 20, color);
+  const rankSize = label.length > 1 ? 16 : 20;
+  return `
+    <div style="display:flex;width:${w}px;height:${h}px;background:${PALETTE.cardWhite};border:2px solid ${PALETTE.ink};box-sizing:border-box;margin:0 2px;flex-direction:column;justify-content:center;align-items:center;">
+      <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:${rankSize}px;color:${color};line-height:1;">${label}</div>
+      <div style="display:flex;margin-top:2px;">${suitSvg}</div>
     </div>
   `;
 }
@@ -119,8 +145,14 @@ function badgeFor(p, idx, state, settledScores) {
 
 function buildMarkup(state) {
   const community = state.community || [];
+  const placeholders = ["翻", "牌", "等", "待", "中"];
+  const isPreflop = state.phase === "preflop" || state.phase === null;
   const communityRow = [0, 1, 2, 3, 4]
-    .map((i) => renderCard(community[i] || null))
+    .map((i) =>
+      renderCard(community[i] || null, {
+        placeholderText: isPreflop && state.status === "playing" ? placeholders[i] : "",
+      })
+    )
     .join("");
 
   const pot = totalPot(state);
@@ -143,11 +175,22 @@ function buildMarkup(state) {
           return sum + (s?.amount || 0);
         }, 0)
       : 0;
+    // showdown 時把未棄牌玩家的底牌畫出來（小卡）
+    const showHoles =
+      state.status === "settled" &&
+      state.settle?.showdown &&
+      !p.folded &&
+      Array.isArray(p.holeCards) &&
+      p.holeCards.length === 2;
+    const holesHtml = showHoles
+      ? `<div style="display:flex;margin-left:auto;align-items:center;">${renderMiniCard(p.holeCards[0])}${renderMiniCard(p.holeCards[1])}</div>`
+      : "";
     return `
       <div style="display:flex;flex-direction:column;width:300px;height:96px;background:${PALETTE.cardWhite};border:2px solid ${PALETTE.ink};box-sizing:border-box;padding:10px 14px;margin:6px;">
         <div style="display:flex;align-items:center;">
           <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:18px;color:${nameColor};letter-spacing:1px;line-height:1.2;padding-right:4px;">@${p.username || "player"}</div>
           ${badgeFor(p, idx, state, settledScores)}
+          ${holesHtml}
         </div>
         <div style="display:flex;align-items:flex-end;margin-top:8px;">
           <div style="display:flex;font-family:'SpaceMono';font-size:11px;letter-spacing:3px;color:${PALETTE.muted};line-height:1;padding-right:3px;">CHIPS</div>
