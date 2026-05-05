@@ -35,13 +35,14 @@ function buildMarkup(data) {
   const rows = topXp.length
     ? topXp
         .map((t, i) => {
-          const medal = ["🥇", "🥈", "🥉"][i] || `${i + 1}.`;
+          const emojiMedal = ["🥇", "🥈", "🥉"][i];
+          const textRank = emojiMedal ? "" : `${i + 1}.`;
           const name = t.username || `<@${t.userId}>`;
           return `
             <div style="display:flex;width:100%;justify-content:space-between;align-items:center;padding:10px 14px;background:${subtle};border:2px solid ${ink};box-sizing:border-box;margin-bottom:8px;">
-              <div style="display:flex;align-items:center;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${ink};">
-                <div style="display:flex;width:42px;">${medal}</div>
-                <div style="display:flex;">${name}</div>
+              <div style="display:flex;align-items:center;">
+                <div style="display:flex;width:42px;font-family:'NotoSansTC';font-weight:500;font-size:24px;line-height:1;">${emojiMedal || textRank}</div>
+                <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:24px;color:${ink};">${name}</div>
               </div>
               <div style="display:flex;font-family:'SpaceMono';font-size:22px;color:${accent};">+${t.xp.toLocaleString()} XP</div>
             </div>
@@ -56,7 +57,10 @@ function buildMarkup(data) {
 
         <div style="display:flex;flex-direction:column;align-items:flex-start;">
           <div style="display:flex;font-family:'SpaceMono';font-size:14px;letter-spacing:6px;color:${muted};">WEEKLY LEVEL REPORT</div>
-          <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:54px;color:${ink};margin-top:8px;line-height:1;">📈 本週等級週報</div>
+          <div style="display:flex;align-items:center;margin-top:8px;">
+            <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:54px;line-height:1;margin-right:14px;">📈</div>
+            <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:54px;color:${ink};line-height:1;">本週等級週報</div>
+          </div>
           <div style="display:flex;font-family:'SpaceMono';font-size:16px;color:${muted};margin-top:10px;">${weekRangeLabel}</div>
         </div>
 
@@ -76,7 +80,10 @@ function buildMarkup(data) {
         </div>
 
         <div style="display:flex;flex-direction:column;width:100%;margin-top:28px;">
-          <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:28px;color:${ink};margin-bottom:14px;">🏆 本週 XP TOP 10</div>
+          <div style="display:flex;align-items:center;margin-bottom:14px;">
+            <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:28px;line-height:1;margin-right:10px;">🏆</div>
+            <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:28px;color:${ink};">本週 XP TOP 10</div>
+          </div>
           <div style="display:flex;flex-direction:column;width:100%;">
             ${rows}
           </div>

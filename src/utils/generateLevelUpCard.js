@@ -78,7 +78,10 @@ function buildMarkup({ username, avatarDataUri, beforeLevel, afterLevel, totalXp
           </div>
 
           <div style="display:flex;margin-top:16px;align-items:center;justify-content:space-between;">
-            <div style="display:flex;padding:6px 14px;background:${accent};color:${card};font-family:'NotoSansTC';font-weight:900;font-size:16px;letter-spacing:5px;">${tier.emoji} ${tier.label}</div>
+            <div style="display:flex;align-items:center;padding:6px 14px;background:${accent};">
+              <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:16px;line-height:1;margin-right:6px;">${tier.emoji}</div>
+              <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:16px;color:${card};letter-spacing:5px;">${tier.label}</div>
+            </div>
             <div style="display:flex;font-family:'SpaceMono';font-size:16px;color:${ink};">${totalXp.toLocaleString()} XP</div>
           </div>
         </div>
