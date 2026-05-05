@@ -97,9 +97,14 @@ module.exports = {
     .setDMPermission(false)
     .addIntegerOption(opt =>
       opt.setName('金額')
-        .setDescription('投入籌碼總額')
-        .setRequired(true)
+        .setDescription('投入籌碼總額（勾選梭哈時可省略）')
+        .setRequired(false)
         .setMinValue(getCfg().minBetPerSlot ?? 30)
+    )
+    .addBooleanOption(opt =>
+      opt.setName('梭哈')
+        .setDescription('一次押上目前全部餘額')
+        .setRequired(false)
     )
     .toJSON(),
 
@@ -115,9 +120,17 @@ module.exports = {
 
       const userId = interaction.user.id;
       const guildId = interaction.guildId;
-      const totalBudget = interaction.options.getInteger('金額');
+      const budgetInput = interaction.options.getInteger('金額');
+      const allIn = interaction.options.getBoolean('梭哈') === true;
+      const minBudget = cfg.minBetPerSlot ?? 30;
       const timeoutSec = cfg.bettingTimeoutSeconds ?? 90;
       const username = interaction.member?.displayName || interaction.user.username;
+
+      if (!allIn && (!Number.isInteger(budgetInput) || budgetInput < minBudget)) {
+        return interaction.editReply(
+          `投入籌碼總額至少需 ${minBudget.toLocaleString()} credits（或勾選梭哈）。`
+        );
+      }
 
       // 同時只能有一局 betting 中
       const existing = await client.rouletteGamesCollection.findOne({
@@ -130,6 +143,12 @@ module.exports = {
       // 餘額檢查
       const userDoc = await client.userCoinsCollection.findOne({ userId, guildId });
       const balance = userDoc?.totalCoins || 0;
+      const totalBudget = allIn ? balance : budgetInput;
+      if (allIn && balance < minBudget) {
+        return interaction.editReply(
+          `💰 餘額不足以梭哈！目前 **${balance.toLocaleString()}** credits，至少需 ${minBudget.toLocaleString()}。`
+        );
+      }
       if (balance < totalBudget) {
         return interaction.editReply(
           `💰 餘額不足！目前 **${balance.toLocaleString()}** credits，需要 **${totalBudget.toLocaleString()}**。`
