@@ -19,10 +19,12 @@
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
     "axios": "^1.6.7",
+    "canvas": "^3.2.3",
     "colors": "^1.4.0",
     "discord.js": "^14.18.0",
     "dotenv": "^16.4.3",
     "express": "^4.21.2",
+    "gif-encoder-2": "^1.0.5",
     "luxon": "^3.4.4",
     "mongodb": "^6.3.0",
     "node-cron": "^3.0.3",

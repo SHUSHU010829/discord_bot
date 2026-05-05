@@ -60,6 +60,9 @@ module.exports = async (client) => {
     // HI-LO 對局狀態
     const hiloGamesCollection = database.collection("HiloGames");
 
+    // 輪盤對局狀態
+    const rouletteGamesCollection = database.collection("RouletteGames");
+
     // 商店系統 collections
     const userInventoryCollection = database.collection("UserInventory");
     const shopTransactionsCollection = database.collection("ShopTransactions");
@@ -106,6 +109,7 @@ module.exports = async (client) => {
     client.coinTransactionsCollection = coinTransactionsCollection;
     client.blackjackGamesCollection = blackjackGamesCollection;
     client.hiloGamesCollection = hiloGamesCollection;
+    client.rouletteGamesCollection = rouletteGamesCollection;
     client.twitchScoreFlushesCollection = twitchScoreFlushesCollection;
     client.twitchLiveStateCollection = twitchLiveStateCollection;
     client.userInventoryCollection = userInventoryCollection;
@@ -259,6 +263,20 @@ module.exports = async (client) => {
       await hiloGamesCollection.createIndex(
         { updatedAt: 1 },
         { expireAfterSeconds: 30 * 24 * 60 * 60, name: "hl_ttl_30d" }
+      );
+
+      // 輪盤對局索引：邏輯與 21 點相同，每位玩家同 guild 同時只能有一局 betting
+      await rouletteGamesCollection.createIndex(
+        { gameId: 1 },
+        { unique: true, name: "uniq_roulette_gameId" }
+      );
+      await rouletteGamesCollection.createIndex(
+        { userId: 1, guildId: 1, status: 1 },
+        { name: "roulette_user_guild_status" }
+      );
+      await rouletteGamesCollection.createIndex(
+        { updatedAt: 1 },
+        { expireAfterSeconds: 30 * 24 * 60 * 60, name: "roulette_ttl_30d" }
       );
 
       // 商店：背包索引（同人同 guild 同 itemId 可有多筆，因為到期時間/裝備狀態不同）
