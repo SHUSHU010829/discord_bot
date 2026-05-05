@@ -3,12 +3,14 @@
 
 const {
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
 } = require("discord.js");
 
 const { legalActions, totalPot } = require("./engine");
 const { categoryLabel } = require("./hand");
+const generatePokerCard = require("../../../utils/generatePokerCard");
 
 const SUIT_EMOJI = { S: "♠", H: "♥", D: "♦", C: "♣" };
 const RANK_LABEL = {
@@ -69,6 +71,13 @@ function buildTableLines(state) {
     lines.push(
       `底池：**${pot.toLocaleString()}** credits ・ 本輪需跟：**${(state.currentBet || 0).toLocaleString()}**`
     );
+    if (state.status === "playing" && state.actionDeadline) {
+      const ts = Math.floor(new Date(state.actionDeadline).getTime() / 1000);
+      const actor = state.players[state.toActIdx];
+      if (actor) {
+        lines.push(`⏳ <@${actor.userId}> 行動中 ・ 倒數 <t:${ts}:R>`);
+      }
+    }
   } else {
     lines.push("公牌：[尚未發牌]");
   }
@@ -223,13 +232,29 @@ function buildActionButtons(state, viewerId) {
   return rows;
 }
 
-function renderTableMessage(state, { viewerId } = {}) {
-  return {
-    content: buildTableLines(state),
-    components:
-      state.status === "abandoned" ? [] : buildActionButtons(state, viewerId),
-    allowedMentions: { parse: [] },
-  };
+async function renderTableMessage(state, { viewerId } = {}) {
+  const components =
+    state.status === "abandoned" ? [] : buildActionButtons(state, viewerId);
+  const allowedMentions = { parse: [] };
+  let content = buildTableLines(state);
+  let files = [];
+  try {
+    const buf = await generatePokerCard(state);
+    files = [
+      new AttachmentBuilder(buf, {
+        name: `poker-${state.gameId}-h${state.handNumber || 0}-${state.phase || "wait"}.png`,
+      }),
+    ];
+    // 圖卡涵蓋公牌 / 籌碼 / 玩家。保留行動倒數那行做手機通知預覽。
+    const lines = content.split("\n");
+    const headline = lines.slice(0, 2).join("\n");
+    const action = lines.find((l) => l.startsWith("⏳"));
+    const settleLines = lines.filter((l) => l.startsWith("🏆"));
+    content = [headline, action, ...settleLines].filter(Boolean).join("\n");
+  } catch (e) {
+    console.log(`[WARN] poker card render failed, falling back to text: ${e.message}`);
+  }
+  return { content, components, files, allowedMentions };
 }
 
 function renderEphemeralHand(state, userId) {

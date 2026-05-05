@@ -61,14 +61,20 @@ function ttlExpiresAt() {
   return new Date(Date.now() + sec * 1000);
 }
 
+function actionDeadlineNow() {
+  const sec = getCfg().actionTimeoutSeconds || 60;
+  return new Date(Date.now() + sec * 1000);
+}
+
 async function refreshTableMessage(client, doc, { viewerId } = {}) {
   try {
     const channel = await client.channels.fetch(doc.threadId).catch(() => null);
     if (!channel) return;
     const msg = await channel.messages.fetch(doc.messageId).catch(() => null);
     if (!msg) return;
-    const payload = renderTableMessage(doc, { viewerId });
-    await msg.edit(payload).catch(() => {});
+    const payload = await renderTableMessage(doc, { viewerId });
+    // 清掉舊 attachments，每次重新貼一張新圖
+    await msg.edit({ ...payload, attachments: [] }).catch(() => {});
   } catch (_) {
     /* noop */
   }
@@ -193,7 +199,7 @@ async function createTable(client, interaction, { maxPlayers, blind }) {
     expiresAt: ttlExpiresAt(),
   };
 
-  const payload = renderTableMessage(doc);
+  const payload = await renderTableMessage(doc);
   let msg;
   try {
     msg = await thread.send(payload);
@@ -405,6 +411,10 @@ async function startNextHand(client, doc) {
 
 // engine 跑完之後把所有變動欄位寫回 mongo
 async function persistEngineState(client, doc, next) {
+  const isActiveTurn =
+    next.status === "playing" &&
+    typeof next.toActIdx === "number" &&
+    next.toActIdx >= 0;
   await client.pokerGamesCollection.updateOne(
     { _id: doc._id },
     {
@@ -424,6 +434,7 @@ async function persistEngineState(client, doc, next) {
         pot: next.pot || 0,
         handNumber: next.handNumber || doc.handNumber,
         settle: next.settle || null,
+        actionDeadline: isActiveTurn ? actionDeadlineNow() : null,
         updatedAt: new Date(),
         expiresAt: ttlExpiresAt(),
       },
@@ -446,6 +457,34 @@ async function applyPlayerAction(client, doc, userId, action, opts = {}) {
   return { doc: updated, settled: updated.status === "settled" };
 }
 
+// 行動逾時：把 toActIdx 玩家自動 fold（若可 check 則自動 check，免費就過）
+async function autoActOnTimeout(client, doc) {
+  if (doc.status !== "playing") return null;
+  const idx = doc.toActIdx;
+  if (typeof idx !== "number" || idx < 0) return null;
+  const player = doc.players[idx];
+  if (!player || player.folded || player.busted || player.allIn) return null;
+  const toCall = Math.max(0, (doc.currentBet || 0) - (player.bet || 0));
+  const action = toCall === 0 ? "check" : "fold";
+  const r = engine.applyAction(doc, idx, action);
+  if (r.error) return null;
+  await persistEngineState(client, doc, r.state);
+  const updated = await client.pokerGamesCollection.findOne({ _id: doc._id });
+  await refreshTableMessage(client, updated);
+  // 公告（非阻塞）
+  try {
+    const thread = await client.channels.fetch(doc.threadId).catch(() => null);
+    if (thread) {
+      await thread.send(
+        `⏰ **${player.username}** 行動逾時，自動 ${action === "fold" ? "棄牌" : "過牌"}。`
+      ).catch(() => {});
+    }
+  } catch (_) {
+    /* noop */
+  }
+  return updated;
+}
+
 module.exports = {
   getCfg,
   blindsFromBig,
@@ -460,4 +499,6 @@ module.exports = {
   startNextHand,
   applyPlayerAction,
   persistEngineState,
+  autoActOnTimeout,
+  actionDeadlineNow,
 };

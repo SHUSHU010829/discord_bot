@@ -15,6 +15,9 @@ const GAME_LABELS = {
   slot: "🎰 拉霸",
   sicbo: "🎲 骰寶",
   blackjack: "🃏 21 點",
+  hilo: "🔼 HI-LO",
+  roulette: "🎡 輪盤",
+  poker: "🃏 德州撲克",
   lottery: "🎟️ 樂透",
   unknown: "❓ 未分類",
 };

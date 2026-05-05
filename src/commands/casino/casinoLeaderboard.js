@@ -196,7 +196,7 @@ function buildContainer({ meta, period, rows, range }) {
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `-# 統計期間：${getPeriodText(period)}（${rangeText}）・ <t:${Math.floor(Date.now() / 1000)}:R>\n` +
-          `-# 統計範圍：拉霸、21 點、骰寶、樂透（交易紀錄最多保留 90 天）`,
+          `-# 統計範圍：拉霸、21 點、HI-LO、輪盤、骰寶、德州撲克、樂透（交易紀錄最多保留 90 天）`,
       ),
     );
 
