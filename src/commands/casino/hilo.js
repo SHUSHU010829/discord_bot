@@ -19,9 +19,15 @@ module.exports = {
     .addIntegerOption((opt) =>
       opt
         .setName("下注")
-        .setDescription("下注 credits")
-        .setRequired(true)
+        .setDescription("下注 credits（勾選梭哈時可省略）")
+        .setRequired(false)
         .setMinValue(getHiloConfig().minBet ?? 10)
+    )
+    .addBooleanOption((opt) =>
+      opt
+        .setName("梭哈")
+        .setDescription("一次押上目前全部餘額")
+        .setRequired(false)
     )
     .toJSON(),
 
@@ -50,10 +56,11 @@ module.exports = {
       const houseEdge = cfg.houseEdge ?? 0.05;
       const maxRounds = cfg.maxRounds ?? 10;
 
-      const bet = interaction.options.getInteger("下注");
-      if (!Number.isInteger(bet) || bet < minBet) {
+      const betInput = interaction.options.getInteger("下注");
+      const allIn = interaction.options.getBoolean("梭哈") === true;
+      if (!allIn && (!Number.isInteger(betInput) || betInput < minBet)) {
         return interaction.editReply(
-          `下注金額至少需 ${minBet.toLocaleString()} credits。`
+          `下注金額至少需 ${minBet.toLocaleString()} credits（或勾選梭哈）。`
         );
       }
 
@@ -80,6 +87,12 @@ module.exports = {
         guildId,
       });
       const balance = before?.totalCoins || 0;
+      const bet = allIn ? balance : betInput;
+      if (allIn && balance < minBet) {
+        return interaction.editReply(
+          `💰 餘額不足以梭哈！目前 **${balance.toLocaleString()}** credits，至少需 ${minBet.toLocaleString()}。`
+        );
+      }
       if (balance < bet) {
         return interaction.editReply(
           `💰 餘額不足！目前 **${balance.toLocaleString()}** credits，無法下注 ${bet.toLocaleString()}。`

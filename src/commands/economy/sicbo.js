@@ -28,20 +28,20 @@ const BET_CHOICES = [
 const MAX_BETS = 3;
 
 function buildBetOptionGroup(builder, idx) {
-  const required = idx === 1;
+  const required = false;
   const suffix = idx === 1 ? "" : String(idx);
   builder
     .addStringOption((opt) =>
       opt
         .setName(`押法${suffix}`)
-        .setDescription(idx === 1 ? "選擇下注類型" : `第 ${idx} 注的押法（選填）`)
+        .setDescription(idx === 1 ? "選擇下注類型（梭哈時必填）" : `第 ${idx} 注的押法（選填）`)
         .setRequired(required)
         .addChoices(...BET_CHOICES)
     )
     .addIntegerOption((opt) =>
       opt
         .setName(`金額${suffix}`)
-        .setDescription(idx === 1 ? "下注 credits" : `第 ${idx} 注的金額`)
+        .setDescription(idx === 1 ? "下注 credits（勾選梭哈時可省略）" : `第 ${idx} 注的金額`)
         .setRequired(required)
         .setMinValue(casino?.sicbo?.minBet ?? 10)
     )
@@ -61,6 +61,12 @@ const builder = new SlashCommandBuilder()
   .setDescription("擲三顆骰子賭運氣 🎲（最多同時押 3 注）")
   .setDMPermission(false);
 for (let i = 1; i <= MAX_BETS; i += 1) buildBetOptionGroup(builder, i);
+builder.addBooleanOption((opt) =>
+  opt
+    .setName("梭哈")
+    .setDescription("一次押上目前全部餘額（僅適用第 1 注）")
+    .setRequired(false)
+);
 
 module.exports = {
   data: builder.toJSON(),
@@ -76,16 +82,38 @@ module.exports = {
         return interaction.editReply("🔧 金幣系統尚未啟動，請聯絡舒舒！");
       }
 
+      const allIn = interaction.options.getBoolean("梭哈") === true;
+      const minBet = casino?.sicbo?.minBet ?? 10;
+      const userId = interaction.user.id;
+      const guildId = interaction.guildId;
+      const username = interaction.member?.displayName || interaction.user.username;
+      const member = interaction.member;
+
+      const before = await client.userCoinsCollection.findOne({ userId, guildId });
+      const balance = before?.totalCoins || 0;
+
       // 解析 1~3 注
       const bets = [];
       for (let i = 1; i <= MAX_BETS; i += 1) {
         const suffix = i === 1 ? "" : String(i);
         const type = interaction.options.getString(`押法${suffix}`);
-        const amount = interaction.options.getInteger(`金額${suffix}`);
+        const amountInput = interaction.options.getInteger(`金額${suffix}`);
         const valueRaw = interaction.options.getInteger(`數值${suffix}`);
         if (!type) continue;
+        if (allIn && i > 1) {
+          return interaction.editReply("梭哈時只能押第 1 注，請移除第 2／3 注。");
+        }
+        let amount = amountInput;
+        if (allIn && i === 1) {
+          amount = balance;
+        }
         if (amount === null || amount === undefined) {
           return interaction.editReply(`第 ${i} 注少了金額！`);
+        }
+        if (amount < minBet) {
+          return interaction.editReply(
+            `第 ${i} 注金額至少需 ${minBet.toLocaleString()} credits${allIn ? "（梭哈餘額不足）" : ""}。`
+          );
         }
         const needsValue = NEEDS_VALUE.includes(type);
         if (needsValue && valueRaw === null) {
@@ -115,13 +143,7 @@ module.exports = {
       }
 
       const totalBet = bets.reduce((s, b) => s + b.amount, 0);
-      const userId = interaction.user.id;
-      const guildId = interaction.guildId;
-      const username = interaction.member?.displayName || interaction.user.username;
-      const member = interaction.member;
 
-      const before = await client.userCoinsCollection.findOne({ userId, guildId });
-      const balance = before?.totalCoins || 0;
       if (balance < totalBet) {
         return interaction.editReply(
           `💰 餘額不足！目前 **${balance.toLocaleString()}** credits，無法下注 ${totalBet.toLocaleString()}（${bets.length} 注合計）。`
