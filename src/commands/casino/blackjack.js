@@ -46,6 +46,18 @@ module.exports = {
         .setMinValue(getBjConfig().minBet ?? 10)
         .setMaxValue(getBjConfig().maxBet ?? 1000)
     )
+    .addIntegerOption((opt) =>
+      opt
+        .setName("副數")
+        .setDescription("使用幾副牌（預設 1，多副牌更接近真實賭場）")
+        .setRequired(false)
+        .addChoices(
+          { name: "1 副（預設）", value: 1 },
+          { name: "4 副", value: 4 },
+          { name: "6 副", value: 6 },
+          { name: "8 副", value: 8 },
+        )
+    )
     .toJSON(),
 
   run: async (client, interaction) => {
@@ -74,6 +86,9 @@ module.exports = {
       const ttlSec = cfg.gameTtlSeconds ?? 300;
 
       const bet = interaction.options.getInteger("下注");
+      const deckCountRaw = interaction.options.getInteger("副數");
+      const allowedDeckCounts = cfg.allowedDeckCounts || [1, 4, 6, 8];
+      const deckCount = allowedDeckCounts.includes(deckCountRaw) ? deckCountRaw : 1;
       if (!Number.isInteger(bet) || bet < minBet || bet > maxBet) {
         return interaction.editReply(
           `下注金額需介於 ${minBet.toLocaleString()} 與 ${maxBet.toLocaleString()} 之間。`
@@ -136,7 +151,7 @@ module.exports = {
       let balanceAfter = betResult.doc?.totalCoins ?? balance - bet;
 
       // 開局
-      const initial = startGame({ bet });
+      const initial = startGame({ bet, deckCount });
       const now = new Date();
       const doc = {
         gameId,
@@ -144,6 +159,7 @@ module.exports = {
         guildId,
         username,
         bet: initial.bet,
+        deckCount: initial.deckCount,
         doubled: initial.doubled,
         status: initial.status,
         deck: initial.deck,

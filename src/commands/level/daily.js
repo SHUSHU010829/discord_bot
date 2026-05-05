@@ -20,7 +20,13 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("每日簽到")
     .setDescription("每日簽到領 XP 🗓️")
-    .setDMPermission(false),
+    .setDMPermission(false)
+    .addBooleanOption((opt) =>
+      opt
+        .setName("押倍")
+        .setDescription("把今天的金幣翻倍，但隔天沒簽到 streak 直接歸零（不能用補簽卡）")
+        .setRequired(false)
+    ),
 
   run: async (client, interaction) => {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -62,27 +68,40 @@ module.exports = {
         guildId,
       });
 
+      const doubleOrNothing = interaction.options.getBoolean("押倍") === true;
+
       // 連勝計算
       const prevStreak = userDoc?.streak || 0;
       const prevFreezes = userDoc?.streakFreezes || 0;
       const maxStock = cfg.maxStreakFreezeStock ?? 3;
       const unlockEvery = cfg.streakFreezeUnlockEvery ?? 30;
+      // 昨天有沒有押倍？（押倍 = 隔天沒簽就一律歸零，不准用補簽卡）
+      const prevPledged = userDoc?.lastDailyPledge === true;
 
       let streak = 1;
       let freezesAfter = prevFreezes;
       let consumedFreeze = false;
+      let pledgeForfeited = false;
 
       if (userDoc?.lastDailyAt === yesterday) {
         streak = prevStreak + 1;
       } else if (
         userDoc?.lastDailyAt === dayBefore &&
         prevFreezes > 0 &&
-        prevStreak > 0
+        prevStreak > 0 &&
+        !prevPledged
       ) {
         // 用一張保護卡，streak 不歸零
         streak = prevStreak + 1;
         freezesAfter = prevFreezes - 1;
         consumedFreeze = true;
+      } else if (
+        userDoc?.lastDailyAt === dayBefore &&
+        prevPledged
+      ) {
+        // 昨天押倍 + 今天才簽（中間漏一天）→ 押倍違約，streak 歸 1
+        streak = 1;
+        pledgeForfeited = true;
       }
 
       // 達到 30/60/90... 連勝里程碑且庫存未滿 → +1 保護卡
@@ -127,6 +146,7 @@ module.exports = {
         {
           $set: {
             lastDailyAt: today,
+            lastDailyPledge: doubleOrNothing,
             streak,
             streakFreezes: freezesAfter,
             longestStreak: Math.max(streak, userDoc?.longestStreak || 0),
@@ -158,6 +178,7 @@ module.exports = {
 
       // 每日金幣（與 XP 同步發，使用相同 streak / 倍率邏輯）
       let coinResult = null;
+      let pledgeBonusMult = 1;
       if (coinSystem?.enabled && client.userCoinsCollection) {
         const cCfg = coinSystem.daily || {};
         const baseC = cCfg.baseCoins ?? 30;
@@ -167,6 +188,10 @@ module.exports = {
         if (streak >= 30) coinMult = cCfg.streak30Multiplier || 3.0;
         else if (streak >= 7) coinMult = cCfg.streak7Multiplier || 2.0;
         coinAmt = Math.floor(coinAmt * coinMult);
+        if (doubleOrNothing) {
+          coinAmt = coinAmt * 2;
+          pledgeBonusMult = 2;
+        }
 
         coinResult = await grantCoins(client, {
           userId,
@@ -176,7 +201,7 @@ module.exports = {
           amount: coinAmt,
           source: "daily",
           member: interaction.member,
-          meta: { streak, streakMultiplier: coinMult },
+          meta: { streak, streakMultiplier: coinMult, doubleOrNothing },
         });
       }
 
@@ -229,6 +254,11 @@ module.exports = {
         );
 
       const noteLines = [];
+      if (pledgeForfeited) {
+        noteLines.push(
+          `💀 你昨天**押倍**了卻沒簽到！streak 直接歸零（押倍違約規則）。`
+        );
+      }
       if (consumedFreeze) {
         noteLines.push(
           `🛡️ 你昨天忘了簽到，但消耗 1 張補簽卡，連勝沒歸零！剩餘庫存：${freezesAfter}`
@@ -237,6 +267,11 @@ module.exports = {
       if (unlockedFreeze) {
         noteLines.push(
           `🎁 達成 ${streak} 天連勝里程碑，獲得 1 張補簽卡！目前庫存：${freezesAfter}/${maxStock}`
+        );
+      }
+      if (doubleOrNothing) {
+        noteLines.push(
+          `🎲 **押倍生效！** 今日金幣已翻倍（×${pledgeBonusMult}）。但**明天沒簽到 streak 歸零**，且**不能用補簽卡**。慎之！`
         );
       }
       if (noteLines.length > 0) {

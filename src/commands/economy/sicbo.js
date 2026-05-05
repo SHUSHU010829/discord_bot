@@ -9,7 +9,7 @@ const { DateTime } = require("luxon");
 const { coinSystem, casino } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
 const { rollThree } = require("../../features/casino/sicbo/dice");
-const { settleBet } = require("../../features/casino/sicbo/engine");
+const { settleRound } = require("../../features/casino/sicbo/engine");
 const {
   isValidBet,
   describeBet,
@@ -26,6 +26,8 @@ const BET_CHOICES = [
   { name: "單骰 (押點數)", value: "single" },
   { name: "總點數", value: "total" },
 ];
+
+const MAX_BETS = 3;
 
 async function getTodayBetTotal(client, userId, guildId) {
   if (!client.coinTransactionsCollection) return 0;
@@ -45,39 +47,47 @@ async function getTodayBetTotal(client, userId, guildId) {
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ])
     .toArray();
-  // bet 是負數，取絕對值得「今日已下注總額」
   return Math.abs(agg[0]?.total || 0);
 }
 
-module.exports = {
-  data: new SlashCommandBuilder()
-    .setName("骰寶")
-    .setDescription("擲三顆骰子賭運氣 🎲")
-    .setDMPermission(false)
+function buildBetOptionGroup(builder, idx) {
+  const required = idx === 1;
+  const suffix = idx === 1 ? "" : String(idx);
+  builder
     .addStringOption((opt) =>
       opt
-        .setName("押法")
-        .setDescription("選擇下注類型")
-        .setRequired(true)
+        .setName(`押法${suffix}`)
+        .setDescription(idx === 1 ? "選擇下注類型" : `第 ${idx} 注的押法（選填）`)
+        .setRequired(required)
         .addChoices(...BET_CHOICES)
     )
     .addIntegerOption((opt) =>
       opt
-        .setName("金額")
-        .setDescription("下注 credits")
-        .setRequired(true)
+        .setName(`金額${suffix}`)
+        .setDescription(idx === 1 ? "下注 credits" : `第 ${idx} 注的金額`)
+        .setRequired(required)
         .setMinValue(casino?.sicbo?.minBet ?? 10)
         .setMaxValue(casino?.sicbo?.maxBet ?? 1000)
     )
     .addIntegerOption((opt) =>
       opt
-        .setName("數值")
-        .setDescription("單骰/對子/圍骰需要點數 1-6；總點數需要 4-17")
+        .setName(`數值${suffix}`)
+        .setDescription("單骰/對子/圍骰需要 1-6；總點數需要 4-17")
         .setRequired(false)
         .setMinValue(1)
         .setMaxValue(17)
-    )
-    .toJSON(),
+    );
+  return builder;
+}
+
+const builder = new SlashCommandBuilder()
+  .setName("骰寶")
+  .setDescription("擲三顆骰子賭運氣 🎲（最多同時押 3 注）")
+  .setDMPermission(false);
+for (let i = 1; i <= MAX_BETS; i += 1) buildBetOptionGroup(builder, i);
+
+module.exports = {
+  data: builder.toJSON(),
 
   run: async (client, interaction) => {
     await interaction.deferReply();
@@ -90,47 +100,61 @@ module.exports = {
         return interaction.editReply("🔧 金幣系統尚未啟動，請聯絡舒舒！");
       }
 
-      const betType = interaction.options.getString("押法");
-      const betAmount = interaction.options.getInteger("金額");
-      const betValueRaw = interaction.options.getInteger("數值");
-      const betValue = NEEDS_VALUE.includes(betType) ? betValueRaw : null;
-
-      if (NEEDS_VALUE.includes(betType) && betValueRaw === null) {
-        return interaction.editReply(
-          `押法「${describeBet(betType, null)}」需要指定**數值**參數。`
-        );
-      }
-      if (!isValidBet(betType, betValue)) {
-        if (betType === "single" || betType === "double" || betType === "triple_specific") {
+      // 解析 1~3 注
+      const bets = [];
+      for (let i = 1; i <= MAX_BETS; i += 1) {
+        const suffix = i === 1 ? "" : String(i);
+        const type = interaction.options.getString(`押法${suffix}`);
+        const amount = interaction.options.getInteger(`金額${suffix}`);
+        const valueRaw = interaction.options.getInteger(`數值${suffix}`);
+        if (!type) continue;
+        if (amount === null || amount === undefined) {
+          return interaction.editReply(`第 ${i} 注少了金額！`);
+        }
+        const needsValue = NEEDS_VALUE.includes(type);
+        if (needsValue && valueRaw === null) {
           return interaction.editReply(
-            `押法「${describeBet(betType, null)}」的**數值**必須是 1-6。`
+            `第 ${i} 注：「${describeBet(type, null)}」需要指定**數值**參數。`
           );
         }
-        if (betType === "total") {
-          return interaction.editReply(
-            "押法「總點數」的**數值**必須是 4-17（3 與 18 與圍骰重複，不開放）。"
-          );
+        const value = needsValue ? valueRaw : null;
+        if (!isValidBet(type, value)) {
+          if (type === "single" || type === "double" || type === "triple_specific") {
+            return interaction.editReply(
+              `第 ${i} 注：「${describeBet(type, null)}」的**數值**必須是 1-6。`
+            );
+          }
+          if (type === "total") {
+            return interaction.editReply(
+              `第 ${i} 注：「總點數」的**數值**必須是 4-17（3、18 與圍骰重複）。`
+            );
+          }
+          return interaction.editReply(`第 ${i} 注：下注參數錯誤。`);
         }
-        return interaction.editReply("下注參數錯誤。");
+        bets.push({ type, value, amount });
       }
 
+      if (bets.length === 0) {
+        return interaction.editReply("至少要押一注！");
+      }
+
+      const totalBet = bets.reduce((s, b) => s + b.amount, 0);
       const userId = interaction.user.id;
       const guildId = interaction.guildId;
       const username = interaction.member?.displayName || interaction.user.username;
+      const member = interaction.member;
 
-      // 餘額檢查
       const before = await client.userCoinsCollection.findOne({ userId, guildId });
       const balance = before?.totalCoins || 0;
-      if (balance < betAmount) {
+      if (balance < totalBet) {
         return interaction.editReply(
-          `💰 餘額不足！目前 **${balance.toLocaleString()}** credits，無法下注 ${betAmount.toLocaleString()}。`
+          `💰 餘額不足！目前 **${balance.toLocaleString()}** credits，無法下注 ${totalBet.toLocaleString()}（${bets.length} 注合計）。`
         );
       }
 
-      // 每日下注上限
       const dailyLimit = casino?.sicbo?.dailyBetLimit ?? 50000;
       const todayBet = await getTodayBetTotal(client, userId, guildId);
-      if (todayBet + betAmount > dailyLimit) {
+      if (todayBet + totalBet > dailyLimit) {
         const remain = Math.max(0, dailyLimit - todayBet);
         return interaction.editReply(
           `📈 今日骰寶下注已達上限。今日已下注 **${todayBet.toLocaleString()}** / ${dailyLimit.toLocaleString()}，剩 **${remain.toLocaleString()}**。`
@@ -138,70 +162,79 @@ module.exports = {
       }
 
       const roundId = crypto.randomUUID();
-      const member = interaction.member;
 
-      // 扣款
+      // 一次扣完所有注
       const betResult = await grantCoins(client, {
         userId,
         guildId,
         username,
         avatarHash: interaction.user.avatar,
-        amount: -betAmount,
+        amount: -totalBet,
         source: "bet",
         member,
         meta: {
           game: "sicbo",
-          betType,
-          betValue,
+          bets: bets.map((b) => ({ type: b.type, value: b.value, amount: b.amount })),
           roundId,
         },
       });
-
       if (!betResult) {
         return interaction.editReply("🔧 下注失敗，請稍後再試。");
       }
 
-      // 擲骰
+      // 擲骰、結算
       const dice = rollThree();
       const sum = dice[0] + dice[1] + dice[2];
       const isTriple = dice[0] === dice[1] && dice[1] === dice[2];
-      const settled = settleBet({ type: betType, value: betValue, amount: betAmount }, dice);
+      const round = settleRound(bets, dice);
 
-      let balanceAfter = betResult.doc?.totalCoins ?? balance - betAmount;
+      let balanceAfter = betResult.doc?.totalCoins ?? balance - totalBet;
 
-      // 中獎發 payout
-      if (settled.won && settled.payout > 0) {
+      if (round.totalPayout > 0) {
         const payoutResult = await grantCoins(client, {
           userId,
           guildId,
           username,
           avatarHash: interaction.user.avatar,
-          amount: settled.payout,
+          amount: round.totalPayout,
           source: "payout",
           member,
           meta: {
             game: "sicbo",
-            betType,
-            betValue,
-            multiplier: settled.multiplier,
+            results: round.results.map((r) => ({
+              type: r.bet.type,
+              value: r.bet.value,
+              amount: r.bet.amount,
+              won: r.won,
+              payout: r.payout,
+              multiplier: r.multiplier,
+            })),
             roundId,
           },
         });
-        balanceAfter = payoutResult?.doc?.totalCoins ?? balanceAfter + settled.payout;
+        balanceAfter = payoutResult?.doc?.totalCoins ?? balanceAfter + round.totalPayout;
       }
 
-      // 渲染圖卡
+      // 圖卡：以最高賠率那注作主要顯示，其他注列在文字
+      const primary = round.results.reduce((best, r) => {
+        if (!best) return r;
+        if (r.payout > best.payout) return r;
+        return best;
+      }, null);
+
       const buf = await generateSicboCard({
         userId,
         username,
         dice,
         sum,
-        betLabel: describeBet(betType, betValue),
-        betAmount,
-        won: settled.won,
+        betLabel: bets.length === 1
+          ? describeBet(primary.bet.type, primary.bet.value)
+          : `${bets.length} 注合押`,
+        betAmount: totalBet,
+        won: round.totalPayout > 0,
         isTriple,
-        payout: settled.payout,
-        multiplier: settled.multiplier,
+        payout: round.totalPayout,
+        multiplier: primary?.multiplier ?? 0,
         balance: balanceAfter,
       });
 
@@ -209,11 +242,22 @@ module.exports = {
         name: `sicbo-${roundId}.png`,
       });
 
-      const headline = settled.won
-        ? isTriple
-          ? `🎉 **圍骰！** 擲出 ${dice.join("・")} = ${sum}，**+${settled.payout.toLocaleString()}** credits`
-          : `✨ **中獎！** 擲出 ${dice.join("・")} = ${sum}，**+${settled.payout.toLocaleString()}** credits`
-        : `💸 擲出 ${dice.join("・")} = ${sum}，沒中，下次加油！`;
+      const lines = round.results.map((r, i) => {
+        const label = describeBet(r.bet.type, r.bet.value);
+        if (r.won) {
+          return `・第 ${i + 1} 注 **${label}**（押 ${r.bet.amount.toLocaleString()}）✨ 中 +${r.payout.toLocaleString()}（×${r.multiplier}）`;
+        }
+        return `・第 ${i + 1} 注 **${label}**（押 ${r.bet.amount.toLocaleString()}）💸 沒中`;
+      });
+
+      const headline = round.totalPayout > 0
+        ? isTriple && round.totalPayout >= totalBet * 30
+          ? `🎉 **圍骰大獎！** ${dice.join("・")} = ${sum}，總派彩 **+${round.totalPayout.toLocaleString()}** credits`
+          : `✨ ${dice.join("・")} = ${sum}，總派彩 **+${round.totalPayout.toLocaleString()}** credits`
+        : `💸 ${dice.join("・")} = ${sum}，全部沒中，下次加油！`;
+
+      const net = round.totalPayout - totalBet;
+      const netLine = `\n📊 淨輸贏：**${net >= 0 ? "+" : ""}${net.toLocaleString()}** credits`;
 
       const bankruptLine =
         balanceAfter <= 0
@@ -221,7 +265,7 @@ module.exports = {
           : "";
 
       await interaction.editReply({
-        content: `${headline}\n・押法：**${describeBet(betType, betValue)}**　・下注：${betAmount.toLocaleString()}　・餘額：**${balanceAfter.toLocaleString()}**${bankruptLine}`,
+        content: `${headline}\n${lines.join("\n")}${netLine}　・餘額：**${balanceAfter.toLocaleString()}**${bankruptLine}`,
         files: [attachment],
       });
     } catch (error) {
