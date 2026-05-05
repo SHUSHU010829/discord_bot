@@ -487,7 +487,7 @@ embed.js → 發送 Embed
 
 #### 12.2 賭場遊戲
 
-賭場類遊戲共用同一套節流 / 對帳機制：每款遊戲在 `casino/<game>` 區塊獨立設 `minBet`、`maxBet`、`dailyBetLimit`，下注走 `source: "bet"`、派彩走 `source: "payout"`，所以 `/我的賭場紀錄` 與 `/賭場排行` 才能算 RTP。
+賭場類遊戲共用同一套節流 / 對帳機制：每款遊戲在 `casino/<game>` 區塊獨立設 `minBet`、`maxBet`，下注走 `source: "bet"`、派彩走 `source: "payout"`，所以 `/我的賭場紀錄` 與 `/賭場排行` 才能算 RTP。
 
 | 指令 | 玩法 | 主要設定 |
 | --- | --- | --- |
