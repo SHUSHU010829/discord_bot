@@ -24,27 +24,39 @@ module.exports = async (client, interaction) => {
 
     if (!["hit", "stand", "double"].includes(action)) return;
 
+    // 先 defer，避免 DB 查詢 + 驗證讓 3 秒 token 過期觸發 10062
+    try {
+      await interaction.deferUpdate();
+    } catch (deferErr) {
+      if (deferErr?.code === 10062) {
+        console.log(
+          `[WARN] handleBlackjackButton: 互動已逾期，無法 defer（gameId=${gameId}）`
+            .yellow
+        );
+        return;
+      }
+      throw deferErr;
+    }
+
     const state = await client.blackjackGamesCollection.findOne({ gameId });
     if (!state) {
-      return interaction.reply({
+      return interaction.followUp({
         content: "🃏 這局已過期或找不到了。",
         ephemeral: true,
       });
     }
     if (state.userId !== interaction.user.id) {
-      return interaction.reply({
+      return interaction.followUp({
         content: "🚫 這不是你的局！別亂按 ㄎㄎ",
         ephemeral: true,
       });
     }
     if (state.status !== "playing") {
-      return interaction.reply({
+      return interaction.followUp({
         content: "🃏 這局已結束。",
         ephemeral: true,
       });
     }
-
-    await interaction.deferUpdate();
 
     const userId = state.userId;
     const guildId = state.guildId;
