@@ -8,7 +8,8 @@ const {
 } = require("discord.js");
 const config = require("../../config");
 const { loadPanels } = require("../../utils/suggestionPanelsStore");
-require("colors");
+const logger = require("../../utils/logger");
+const { trackError, trackSuccess } = require("../../utils/errorTracker");
 
 module.exports = async (client, interaction) => {
   // 只處理 StringSelectMenu 互動
@@ -24,7 +25,7 @@ module.exports = async (client, interaction) => {
   try {
     // 確保在伺服器中執行
     if (!interaction.guild) {
-      console.log(`[ERROR] interaction.guild 不存在，可能在 DM 中`.red);
+      logger.warn({ source: "suggestion-select" }, "interaction.guild 不存在,可能在 DM 中");
       return await interaction.reply({
         content: "❌ 此功能只能在伺服器中使用。",
         ephemeral: true,
@@ -37,7 +38,8 @@ module.exports = async (client, interaction) => {
       !Array.isArray(interaction.values) ||
       interaction.values.length === 0
     ) {
-      console.log(`[ERROR] interaction.values 不存在或為空`.red);
+      logger.error({ source: "suggestion-select" }, "interaction.values 不存在或為空");
+      trackError("suggestion-select", new Error("invalid interaction.values"));
       return await interaction.reply({
         content: "❌ 無法讀取你的選擇，請重試。",
         ephemeral: true,
@@ -48,7 +50,8 @@ module.exports = async (client, interaction) => {
     const suggestionType = config.suggestion.types[selectedType];
 
     if (!suggestionType) {
-      console.log(`[ERROR] 無效的建議類型：${selectedType}`.red);
+      logger.error({ source: "suggestion-select", selectedType }, "無效的建議類型");
+      trackError("suggestion-select", new Error(`invalid type: ${selectedType}`));
       return await interaction.reply({
         content: "❌ 無效的建議類型！",
         ephemeral: true,
@@ -101,9 +104,9 @@ module.exports = async (client, interaction) => {
       if (category && category.type === ChannelType.GuildCategory) {
         parentCategory = suggestionConfig.categoryId;
       } else {
-        console.log(
-          `[WARNING] 建議類別 ID ${suggestionConfig.categoryId} 無效或不存在，將在沒有類別的情況下創建頻道`
-            .yellow,
+        logger.warn(
+          { source: "suggestion-select", categoryId: suggestionConfig.categoryId },
+          "建議類別 ID 無效或不存在,改用無類別創建"
         );
       }
     }
@@ -156,9 +159,9 @@ module.exports = async (client, interaction) => {
           },
         );
       } else {
-        console.log(
-          `[WARNING] 支援團隊身份組 ID ${suggestionConfig.supportRoleId} 無效或不存在`
-            .yellow,
+        logger.warn(
+          { source: "suggestion-select", supportRoleId: suggestionConfig.supportRoleId },
+          "支援團隊身份組 ID 無效或不存在"
         );
       }
     }
@@ -193,13 +196,13 @@ module.exports = async (client, interaction) => {
       content: `✅ 建議頻道已創建！\n請前往 ${suggestionChannel}`,
       ephemeral: true,
     });
-
-    console.log(
-      `[SUGGESTION] 用戶 ${interaction.user.tag} 創建了建議頻道：${suggestionChannel.name}`
-        .green,
-    );
+    trackSuccess("suggestion-select");
   } catch (error) {
-    console.log(`[ERROR] 處理建議選單互動時出錯：${error}\n${error.stack}`.red);
+    logger.error(
+      { source: "suggestion-select", userId: interaction.user?.id, err: error.message, stack: error.stack },
+      "處理建議選單互動時出錯"
+    );
+    trackError("suggestion-select", error, { userId: interaction.user?.id });
 
     if (!interaction.replied && !interaction.deferred) {
       try {
@@ -208,7 +211,8 @@ module.exports = async (client, interaction) => {
           ephemeral: true,
         });
       } catch (replyError) {
-        console.log(`[ERROR] 回覆錯誤訊息時出錯：${replyError}`.red);
+        logger.error({ source: "suggestion-select", err: replyError.message }, "回覆錯誤訊息失敗");
+        trackError("suggestion-select", replyError);
       }
     } else {
       try {
@@ -217,7 +221,8 @@ module.exports = async (client, interaction) => {
           ephemeral: true,
         });
       } catch (editError) {
-        console.log(`[ERROR] 編輯回覆時出錯：${editError}`.red);
+        logger.error({ source: "suggestion-select", err: editError.message }, "編輯回覆失敗");
+        trackError("suggestion-select", editError);
       }
     }
   }

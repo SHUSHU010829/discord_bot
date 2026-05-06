@@ -1,9 +1,9 @@
-require("colors");
-
 const { casino } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
 const { guess, cashOut } = require("../../features/casino/hilo/engine");
 const { renderMessage } = require("../../features/casino/hilo/renderer");
+const logger = require("../../utils/logger");
+const { trackError, trackSuccess } = require("../../utils/errorTracker");
 
 function getHiloConfig() {
   return casino?.hilo || {};
@@ -29,10 +29,11 @@ module.exports = async (client, interaction) => {
       await interaction.deferUpdate();
     } catch (deferErr) {
       if (deferErr?.code === 10062) {
-        console.log(
-          `[WARN] handleHiloButton: 互動已逾期，無法 defer（gameId=${gameId}）`
-            .yellow
+        logger.warn(
+          { source: "hilo-button", gameId },
+          "互動已逾期,無法 defer"
         );
+        trackError("hilo-button", deferErr, { gameId, reason: "expired" });
         return;
       }
       throw deferErr;
@@ -131,8 +132,13 @@ module.exports = async (client, interaction) => {
       ...payload,
       attachments: [],
     });
+    trackSuccess("hilo-button");
   } catch (error) {
-    console.log(`[ERROR] handleHiloButton:\n${error}\n${error.stack}`.red);
+    logger.error(
+      { source: "hilo-button", userId: interaction.user?.id, customId: interaction.customId, err: error.message, stack: error.stack },
+      "HI-LO 按鈕處理失敗"
+    );
+    trackError("hilo-button", error, { userId: interaction.user?.id, customId: interaction.customId });
     try {
       if (interaction.deferred || interaction.replied) {
         await interaction.followUp({

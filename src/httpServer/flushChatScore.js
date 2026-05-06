@@ -1,7 +1,8 @@
-require("colors");
 const { randomInt } = require("../utils/levelMath");
 const grantXp = require("../features/leveling/grantXp");
 const { twitchSync, levelSystem } = require("../config");
+const logger = require("../utils/logger");
+const { trackError, trackSuccess } = require("../utils/errorTracker");
 
 function rollSessionXp(messageCount) {
   const min = levelSystem?.message?.minXp ?? 15;
@@ -20,7 +21,8 @@ async function buildSubMemberIndex(client) {
   const guild = client.guilds.cache.get(twitchSync.guildId)
     || (await client.guilds.fetch(twitchSync.guildId).catch(() => null));
   if (!guild) {
-    console.log(`[TWITCH-FLUSH] guild ${twitchSync.guildId} not found`.yellow);
+    logger.warn({ source: "twitch-flush", guildId: twitchSync.guildId }, "guild not found");
+    trackError("twitch-flush", new Error("guild not found"), { guildId: twitchSync.guildId });
     return null;
   }
 
@@ -28,7 +30,8 @@ async function buildSubMemberIndex(client) {
   if (tierIds.length === 0) return new Map();
 
   const members = await guild.members.fetch().catch((e) => {
-    console.log(`[TWITCH-FLUSH] members.fetch failed: ${e}`.red);
+    logger.error({ source: "twitch-flush", err: e.message }, "members.fetch failed");
+    trackError("twitch-flush", e, { phase: "members.fetch" });
     return null;
   });
   if (!members) return null;
@@ -52,7 +55,8 @@ module.exports = function createFlushChatScoreHandler(client) {
 
     const expectedSecret = process.env.DISCORD_BOT_SCORE_SECRET;
     if (!expectedSecret) {
-      console.log(`[TWITCH-FLUSH] DISCORD_BOT_SCORE_SECRET not configured`.red);
+      logger.error({ source: "twitch-flush" }, "DISCORD_BOT_SCORE_SECRET not configured");
+      trackError("twitch-flush", new Error("secret not configured"));
       return res.status(500).json({ error: "secret not configured" });
     }
 
@@ -137,7 +141,11 @@ module.exports = function createFlushChatScoreHandler(client) {
         });
         applied += 1;
       } catch (err) {
-        console.log(`[TWITCH-FLUSH] grantXp failed for ${login}: ${err}`.red);
+        logger.error(
+          { source: "twitch-flush", login, err: err.message },
+          "grantXp failed"
+        );
+        trackError("twitch-flush", err, { phase: "grantXp", login });
       }
     }
 
@@ -154,13 +162,19 @@ module.exports = function createFlushChatScoreHandler(client) {
     } catch (err) {
       // Race: another request inserted while we were processing.
       if (!(err && err.code === 11000)) {
-        console.log(`[TWITCH-FLUSH] insert flush record failed: ${err}`.red);
+        logger.error(
+          { source: "twitch-flush", sessionId, err: err.message },
+          "insert flush record failed"
+        );
+        trackError("twitch-flush", err, { phase: "insert", sessionId });
       }
     }
 
-    console.log(
-      `[TWITCH-FLUSH] session=${sessionId} applied=${applied} skipped=${skipped} total=${scores.length}`.cyan
+    logger.info(
+      { source: "twitch-flush", sessionId, applied, skipped, total: scores.length },
+      "twitch flush done"
     );
+    trackSuccess("twitch-flush");
 
     return res.status(200).json({
       ok: true,

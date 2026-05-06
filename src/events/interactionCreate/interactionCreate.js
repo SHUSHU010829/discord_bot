@@ -1,8 +1,9 @@
-require("colors");
 const { PermissionFlagsBits, ChannelType, EmbedBuilder } = require("discord.js");
 const config = require("../../config");
 const fs = require("fs");
 const { getDataFile } = require("../../utils/dataPaths");
+const logger = require("../../utils/logger");
+const { trackError, trackSuccess } = require("../../utils/errorTracker");
 
 // 票務面板數據文件路徑
 const PANELS_FILE = getDataFile("ticket-panels.json");
@@ -15,7 +16,8 @@ function loadPanels() {
       return JSON.parse(data);
     }
   } catch (error) {
-    console.log(`[ERROR] 讀取面板數據時出錯：\n${error}`.red);
+    logger.error({ source: "ticket-panels-load", err: error.message }, "讀取面板數據失敗");
+    trackError("ticket-panels-load", error);
   }
   return { panels: {} };
 }
@@ -63,7 +65,11 @@ module.exports = async (client, interaction) => {
       });
     }
   } catch (error) {
-    console.log(`[ERROR] 處理互動時出錯：\n${error}`.red);
+    logger.error(
+      { source: "interaction-dispatch", customId: interaction?.customId, err: error.message, stack: error.stack },
+      "處理互動時出錯"
+    );
+    trackError("interaction-dispatch", error, { customId: interaction?.customId });
   }
 };
 
@@ -110,7 +116,10 @@ async function handleTicketCreation(client, interaction) {
       if (category && category.type === ChannelType.GuildCategory) {
         parentCategory = ticketConfig.categoryId;
       } else {
-        console.log(`[WARNING] 票務類別 ID ${ticketConfig.categoryId} 無效或不存在，將在沒有類別的情況下創建頻道`.yellow);
+        logger.warn(
+          { source: "ticket-create", categoryId: ticketConfig.categoryId },
+          "票務類別 ID 無效或不存在,改用無類別創建"
+        );
       }
     }
 
@@ -160,7 +169,10 @@ async function handleTicketCreation(client, interaction) {
           }
         );
       } else {
-        console.log(`[WARNING] 支援團隊身份組 ID ${ticketConfig.supportRoleId} 無效或不存在`.yellow);
+        logger.warn(
+          { source: "ticket-create", supportRoleId: ticketConfig.supportRoleId },
+          "支援團隊身份組 ID 無效或不存在"
+        );
       }
     }
 
@@ -185,15 +197,21 @@ async function handleTicketCreation(client, interaction) {
       ),
       ephemeral: true,
     });
+    trackSuccess("ticket-create");
   } catch (error) {
-    console.log(`[ERROR] 創建票務時出錯：\n${error}\n${error.stack}`.red);
+    logger.error(
+      { source: "ticket-create", userId: interaction.user?.id, err: error.message, stack: error.stack },
+      "創建票務時出錯"
+    );
+    trackError("ticket-create", error, { userId: interaction.user?.id });
     try {
       await interaction.editReply({
         content: "❌ 創建票務時發生錯誤！請聯絡管理員。",
         ephemeral: true,
       });
     } catch (replyError) {
-      console.log(`[ERROR] 回覆錯誤訊息時出錯：\n${replyError}`.red);
+      logger.error({ source: "ticket-create", err: replyError.message }, "回覆錯誤訊息失敗");
+      trackError("ticket-create", replyError);
     }
   }
 }
@@ -271,16 +289,22 @@ async function handleVoteButton(client, interaction) {
 
     // 更新投票訊息顯示當前票數
     await updateVoteMessage(client, interaction, proposal);
+    trackSuccess("vote-button");
 
   } catch (error) {
-    console.log(`[ERROR] 處理投票按鈕時出錯：\n${error}\n${error.stack}`.red);
+    logger.error(
+      { source: "vote-button", userId: interaction.user?.id, customId: interaction.customId, err: error.message, stack: error.stack },
+      "處理投票按鈕時出錯"
+    );
+    trackError("vote-button", error, { userId: interaction.user?.id, customId: interaction.customId });
     try {
       await interaction.reply({
         content: "❌ 處理投票時發生錯誤！",
         ephemeral: true,
       });
     } catch (replyError) {
-      console.log(`[ERROR] 回覆錯誤訊息時出錯：\n${replyError}`.red);
+      logger.error({ source: "vote-button", err: replyError.message }, "回覆錯誤訊息失敗");
+      trackError("vote-button", replyError);
     }
   }
 }
@@ -297,7 +321,11 @@ async function updateVoteMessage(client, interaction, proposal) {
     // 獲取模板配置
     const template = config.voting.templates[updatedProposal.templateKey];
     if (!template) {
-      console.log(`[ERROR] 找不到模板：${updatedProposal.templateKey}`.red);
+      logger.error(
+        { source: "vote-update", templateKey: updatedProposal.templateKey },
+        "找不到投票模板"
+      );
+      trackError("vote-update", new Error(`template not found: ${updatedProposal.templateKey}`));
       return;
     }
 
@@ -369,6 +397,10 @@ async function updateVoteMessage(client, interaction, proposal) {
     await interaction.message.edit({ embeds: [updatedEmbed] });
 
   } catch (error) {
-    console.log(`[ERROR] 更新投票訊息時出錯：\n${error}`.red);
+    logger.error(
+      { source: "vote-update", err: error.message, stack: error.stack },
+      "更新投票訊息時出錯"
+    );
+    trackError("vote-update", error);
   }
 }
