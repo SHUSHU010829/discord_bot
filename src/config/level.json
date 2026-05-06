@@ -141,7 +141,17 @@
       "feeRate": 0.02,
       "feeRateHigh": 0.05,
       "highFeeThreshold": 1000,
-      "cooldownSeconds": 1800
+      "cooldownSeconds": 1800,
+      "suspiciousThreshold": 5000
+    },
+    "dailyEconomyReport": {
+      "enabled": true,
+      "channelId": "1501627333835096154",
+      "cronSchedule": "0 8 * * *",
+      "timezone": "Asia/Taipei",
+      "lookbackDays": 7,
+      "casinoLookbackDays": 7,
+      "suspiciousLookbackHours": 24
     },
     "deposit": {
       "enabled": true,
