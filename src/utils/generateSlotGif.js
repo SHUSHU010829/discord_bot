@@ -519,6 +519,25 @@ async function generateSlotGif(data) {
   const canvas = createCanvas(W, H);
   const ctx = canvas.getContext('2d');
 
+  // Pre-render everything that doesn't change per frame: chrome + footer
+  // (and the jackpot banner unless it flips state on bust reveal).
+  const staticCanvas = createCanvas(W, H);
+  const sctx = staticCanvas.getContext('2d');
+  drawBackground(sctx);
+  drawCardFrame(sctx);
+  drawHeader(sctx, accent);
+  dashedLine(sctx, 71, 141, W - 71, 141, PALETTE.muted, [5, 5]);
+  if (showJackpotBanner && !isBust) {
+    drawJackpotBanner(sctx, data.jackpotPool, data.jackpotBust || 0, false);
+  }
+  drawFooter(sctx, {
+    bet: data.bet,
+    balance: data.balance,
+    multiplier: data.multiplier,
+    won,
+    username: data.username,
+  });
+
   // Frame budget. Tuned so the GIF wraps just under 2s including hold.
   const TOTAL_FRAMES = 27;
   const FRAME_DELAY  = 50;     // 20 fps
@@ -529,7 +548,7 @@ async function generateSlotGif(data) {
 
   const encoder = new GIFEncoder(W, H, 'neuquant', true, TOTAL_FRAMES);
   encoder.setRepeat(0);
-  encoder.setQuality(20);
+  encoder.setQuality(30);
   encoder.start();
 
   // Yield event loop occasionally — same trick as roulette gif.
@@ -544,16 +563,12 @@ async function generateSlotGif(data) {
     else if (f >= TOTAL_FRAMES - 4)     encoder.setDelay(HOLD_DELAY);
     else                                encoder.setDelay(FRAME_DELAY);
 
-    // ── Background + frame ──
-    drawBackground(ctx);
-    drawCardFrame(ctx);
-    drawHeader(ctx, accent);
+    // ── Static chrome (pre-rendered) ──
+    ctx.drawImage(staticCanvas, 0, 0);
 
-    // dashed line under header
-    dashedLine(ctx, 71, 141, W - 71, 141, PALETTE.muted, [5, 5]);
-
-    if (showJackpotBanner) {
-      drawJackpotBanner(ctx, data.jackpotPool, data.jackpotBust || 0, isBust && inReveal);
+    // Bust banner is the only chrome that flips mid-GIF; redraw on reveal.
+    if (showJackpotBanner && isBust) {
+      drawJackpotBanner(ctx, data.jackpotPool, data.jackpotBust || 0, inReveal);
     }
 
     // ── Reels ──
@@ -596,15 +611,6 @@ async function generateSlotGif(data) {
       accent,
       areaY: resultAreaY,
       areaH: resultAreaH,
-    });
-
-    // ── Footer ──
-    drawFooter(ctx, {
-      bet: data.bet,
-      balance: data.balance,
-      multiplier: data.multiplier,
-      won,
-      username: data.username,
     });
 
     encoder.addFrame(ctx);
