@@ -428,10 +428,10 @@ function drawFooter(ctx, opts) {
 function buildReelPlan({ reels, totalFrames }) {
   // Phase frame budgets per reel (total must fit within totalFrames).
   // Reels stop in sequence: left → middle → right.
-  const SPIN_BASE   = 14;  // reel 0 spin frames
-  const SPIN_DELTA  = 4;   // each subsequent reel spins this many extra frames
+  const SPIN_BASE   = 10;  // reel 0 spin frames
+  const SPIN_DELTA  = 3;   // each subsequent reel spins this many extra frames
   const SETTLE_LEN  = 6;
-  const SPIN_SPEED  = 90;  // px / frame during free spin
+  const SPIN_SPEED  = 110; // px / frame during free spin
 
   const plans = reels.map((r, idx) => {
     const targetIdx = STRIP.findIndex((s) => s.id === r.id);
@@ -519,8 +519,8 @@ async function generateSlotGif(data) {
   const canvas = createCanvas(W, H);
   const ctx = canvas.getContext('2d');
 
-  // Frame budget. Tuned so the GIF wraps under ~2.2s including hold.
-  const TOTAL_FRAMES = 38;
+  // Frame budget. Tuned so the GIF wraps just under 2s including hold.
+  const TOTAL_FRAMES = 27;
   const FRAME_DELAY  = 50;     // 20 fps
   const HOLD_DELAY   = 140;    // slow down toward the end so people read result
 
@@ -540,7 +540,7 @@ async function generateSlotGif(data) {
     const inReveal = f >= revealStart;
 
     // Per-frame delay (longer on final frames so the result lingers).
-    if (f === TOTAL_FRAMES - 1)         encoder.setDelay(HOLD_DELAY * 6);
+    if (f === TOTAL_FRAMES - 1)         encoder.setDelay(HOLD_DELAY * 3);
     else if (f >= TOTAL_FRAMES - 4)     encoder.setDelay(HOLD_DELAY);
     else                                encoder.setDelay(FRAME_DELAY);
 
