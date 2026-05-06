@@ -5,12 +5,14 @@ const { MongoClient } = require("mongodb");
 const { casino } = require("../src/config");
 
 /**
+ * ⚠️ 一次性遷移腳本（prod 已於 2026-05-06 執行完畢，保留供 audit / 災難復原用）
+ *
  * 修復 Jackpot Pool seed bug：
  * 早期版本的 contribute() 在第一次 upsert 時沒有 $setOnInsert amount: seed，
  * 導致 pool 從 0 開始累積，而不是從 seedAmount (5000) 起跳。
  *
  * 此腳本針對 amount < seed 的 pool，把 amount 加上 seed 補回，
- * 完整保留已累積的貢獻金額。
+ * 完整保留已累積的貢獻金額。冪等：重跑無害（條件式查詢自動跳過已修好的 doc）。
  *
  * 用法：
  *   node scripts/fixJackpotPoolSeed.js          # dry run，只顯示要修哪些
