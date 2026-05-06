@@ -68,6 +68,8 @@ function settleHeadline(state) {
       return `🎉 **BLACKJACK！** ＋${state.payout.toLocaleString()} credits`;
     case "fivecard":
       return `🏆 **過五關！** ＋${state.payout.toLocaleString()} credits`;
+    case "dealerfivecard":
+      return `🛡️ **莊家過五關** －${stake.toLocaleString()} credits，下次加油！`;
     case "win":
       return `✨ **你贏了！** ＋${state.payout.toLocaleString()} credits`;
     case "push":
