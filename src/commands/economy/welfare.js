@@ -90,9 +90,14 @@ async function showStatus(client, interaction, userId, guildId) {
   const status = await welfareService.getStatus(client, userId, guildId);
   const eligible = status.eligibleByBalance && !status.claimedToday;
 
+  const assetLine =
+    status.depositTotal > 0
+      ? `錢包：**${status.balance.toLocaleString()}** 🪙 ・ 存款本金：**${status.depositTotal.toLocaleString()}** 🪙 ・ 總資產：**${status.totalAssets.toLocaleString()}** 🪙（門檻 ≤ ${status.threshold}）`
+      : `目前餘額：**${status.balance.toLocaleString()}** 🪙（門檻 ≤ ${status.threshold}）`;
+
   const lines = [
     `## 🪙 救濟金狀態`,
-    `目前餘額：**${status.balance.toLocaleString()}** 🪙（門檻 ≤ ${status.threshold}）`,
+    assetLine,
     `連續天數：**${status.streak}** 天 ・ 歷史最高：${status.longestStreak} 天 ・ 累計領取：${status.totalClaims} 次`,
   ];
 
@@ -101,7 +106,13 @@ async function showStatus(client, interaction, userId, guildId) {
       `\n✅ 今日已領取，下次可領：<t:${status.resetEpoch}:R>（<t:${status.resetEpoch}:t>）`
     );
   } else if (!status.eligibleByBalance) {
-    lines.push(`\n💰 目前金幣超過救濟線，先去玩玩看吧。`);
+    if (status.depositTotal > 0) {
+      lines.push(
+        `\n💰 總資產（含存款）超過救濟線，先 \`/領回\` 存款或 \`/錢包\` 看看再說。`
+      );
+    } else {
+      lines.push(`\n💰 目前金幣超過救濟線，先去玩玩看吧。`);
+    }
   } else {
     lines.push(
       `\n✅ **可領取** ${status.nextAmount.toLocaleString()} 🪙（連續第 ${status.nextStreak} 天）`
@@ -122,6 +133,11 @@ async function showStatus(client, interaction, userId, guildId) {
 
 function replyClaimFailure(interaction, result, username) {
   if (result.reason === "above_threshold") {
+    if (result.depositTotal > 0) {
+      return interaction.editReply(
+        `💰 錢包 **${result.balance.toLocaleString()}** + 存款本金 **${result.depositTotal.toLocaleString()}** = 總資產 **${result.totalAssets.toLocaleString()}** 🪙，超過救濟線 ${result.threshold}。\n先 \`/領回\` 存款或 \`/錢包\` 看看再說。`
+      );
+    }
     return interaction.editReply(
       `💰 目前金幣 **${result.balance.toLocaleString()}** 🪙，超過救濟線 ${result.threshold}，先去玩玩看吧！`
     );
