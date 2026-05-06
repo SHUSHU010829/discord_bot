@@ -7,6 +7,32 @@ const { DateTime } = require("luxon");
 
 const { coinSystem } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
+const { checkServerTenure } = require("../../features/economy/eligibility");
+
+function formatRemaining(seconds) {
+  const s = Math.max(0, Math.ceil(seconds));
+  if (s < 60) return `${s} 秒`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r === 0 ? `${m} 分` : `${m} 分 ${r} 秒`;
+}
+
+function computeTransferFee(amount, cfg) {
+  const baseRate = cfg?.feeRate ?? 0.02;
+  const highRate = cfg?.feeRateHigh ?? 0.05;
+  const threshold = cfg?.highFeeThreshold ?? 1000;
+  const rate = amount > threshold ? highRate : baseRate;
+  return { fee: Math.floor(amount * rate), rate };
+}
+
+async function getLastTransferOutAt(client, userId, guildId) {
+  if (!client.coinTransactionsCollection) return null;
+  const last = await client.coinTransactionsCollection.findOne(
+    { userId, guildId, source: "transfer_out" },
+    { sort: { createdAt: -1 }, projection: { createdAt: 1 } }
+  );
+  return last?.createdAt ? new Date(last.createdAt).getTime() : null;
+}
 
 async function getTodayTransferOut(client, userId, guildId) {
   if (!client.coinTransactionsCollection) return 0;
@@ -42,7 +68,7 @@ module.exports = {
     .addIntegerOption((opt) =>
       opt
         .setName("金額")
-        .setDescription("轉帳金額（會收手續費）")
+        .setDescription("轉帳金額（>1000 收 5% 手續費，否則 2%）")
         .setRequired(true)
         .setMinValue(1)
     )
@@ -68,6 +94,11 @@ module.exports = {
       }
       if (!client.userCoinsCollection || !client.coinTransactionsCollection) {
         return interaction.editReply("🔧 金幣系統尚未啟動，請聯絡舒舒！");
+      }
+
+      const tenure = checkServerTenure(interaction.member);
+      if (!tenure.ok) {
+        return interaction.editReply(tenure.message);
       }
 
       const target = interaction.options.getUser("對象");
@@ -98,14 +129,28 @@ module.exports = {
         guildId,
       });
       const balance = before?.totalCoins || 0;
-      const feeRate = cfg.feeRate ?? 0.02;
-      const fee = Math.floor(amount * feeRate);
+      const { fee, rate: feeRate } = computeTransferFee(amount, cfg);
       const totalDeduct = amount + fee;
 
       if (balance < totalDeduct) {
         return interaction.editReply(
           `💰 餘額不足！本次需要 **${totalDeduct.toLocaleString()}**（金額 ${amount.toLocaleString()} + 手續費 ${fee.toLocaleString()}），目前 ${balance.toLocaleString()}。`
         );
+      }
+
+      const cooldownSec = cfg.cooldownSeconds ?? 1800;
+      if (cooldownSec > 0) {
+        const lastAt = await getLastTransferOutAt(client, senderId, guildId);
+        if (lastAt) {
+          const elapsed = (Date.now() - lastAt) / 1000;
+          if (elapsed < cooldownSec) {
+            const readyEpoch = Math.floor((lastAt + cooldownSec * 1000) / 1000);
+            return interaction.editReply(
+              `⏳ 轉帳冷卻中，還要 **${formatRemaining(cooldownSec - elapsed)}**。\n` +
+                `下次可轉：<t:${readyEpoch}:R>（<t:${readyEpoch}:t>）`
+            );
+          }
+        }
       }
 
       const dailyCap = cfg.dailyCapPerSender ?? 20000;
@@ -183,7 +228,7 @@ module.exports = {
       const noteLine = note ? `\n📝 備註：${note}` : "";
 
       await interaction.editReply(
-        `✅ 已轉帳 <@${target.id}> **${amount.toLocaleString()}** credits（手續費 ${fee.toLocaleString()}）\n` +
+        `✅ 已轉帳 <@${target.id}> **${amount.toLocaleString()}** credits（手續費 ${fee.toLocaleString()}・${(feeRate * 100).toFixed(0)}%）\n` +
           `・你的餘額：**${senderAfter.toLocaleString()}**\n` +
           `・今日累計轉出：${(usedToday + amount).toLocaleString()} / ${dailyCap.toLocaleString()}` +
           noteLine

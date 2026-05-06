@@ -2,6 +2,7 @@
   "welfareSystem": {
     "enabled": true,
     "balanceThreshold": 100,
+    "minAccountAgeDays": 30,
     "resetTimezone": "Asia/Taipei",
     "tiers": [
       { "minStreak": 1, "maxStreak": 1, "amount": 500 },

@@ -14,6 +14,7 @@ const { DateTime } = require("luxon");
 const { levelSystem, coinSystem, questSystem } = require("../../config");
 const grantXp = require("../../features/leveling/grantXp");
 const grantCoins = require("../../features/economy/grantCoins");
+const { checkServerTenure } = require("../../features/economy/eligibility");
 const generateCheckinCard = require("../../utils/generateCheckinCard");
 const questService = require("../../features/quests/questService");
 
@@ -35,6 +36,11 @@ module.exports = {
     try {
       if (!client.userLevelsCollection || !client.dailyCheckinCollection) {
         return interaction.editReply("🔧 等級系統尚未啟動，請聯絡舒舒！");
+      }
+
+      const tenure = checkServerTenure(interaction.member);
+      if (!tenure.ok) {
+        return interaction.editReply(tenure.message);
       }
 
       const cfg = levelSystem.daily;
