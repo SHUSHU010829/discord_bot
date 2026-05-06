@@ -8,6 +8,9 @@ const { DateTime } = require("luxon");
 const { coinSystem } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
 const { checkServerTenure } = require("../../features/economy/eligibility");
+const {
+  fireImmediateCheck: fireSuspiciousTransferCheck,
+} = require("../../features/economy/suspiciousTransferDetector");
 
 function formatRemaining(seconds) {
   const s = Math.max(0, Math.ceil(seconds));
@@ -236,6 +239,13 @@ module.exports = {
 
       const senderAfter = debit.doc?.totalCoins ?? balance - totalDeduct;
       const noteLine = note ? `\n📝 備註：${note}` : "";
+
+      // 非阻塞：偵測雙向轉帳異常，超過閾值寫入告警頻道
+      fireSuspiciousTransferCheck(client, {
+        guildId,
+        senderId,
+        recipientId: target.id,
+      });
 
       await interaction.editReply(
         `✅ 已轉帳 <@${target.id}> **${amount.toLocaleString()}** credits（手續費 ${fee.toLocaleString()}・${(feeRate * 100).toFixed(0)}%）\n` +
