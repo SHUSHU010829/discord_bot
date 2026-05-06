@@ -31,6 +31,31 @@ async function buyItem(client, { userId, guildId, username, member, itemId }) {
     if (owned) return { ok: false, error: "你已經擁有這個主題了" };
   }
 
+  // 期限內非消耗品（role_color / custom_title）：持有未過期同 itemId 就拒絕重買
+  if (item.type === "role_color" || item.type === "custom_title") {
+    const owned = await client.userInventoryCollection
+      .findOne({
+        userId,
+        guildId,
+        itemId,
+        type: item.type,
+        expired: { $ne: true },
+        $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
+      })
+      .catch(() => null);
+    if (owned) {
+      const expEpoch = owned.expiresAt
+        ? Math.floor(new Date(owned.expiresAt).getTime() / 1000)
+        : null;
+      return {
+        ok: false,
+        error: expEpoch
+          ? `你已持有「${item.name}」，<t:${expEpoch}:R> 才到期，到期前無法重複購買。`
+          : `你已持有「${item.name}」。`,
+      };
+    }
+  }
+
   // 扣款（admin source 會跳過倍率，這裡用 shop_buy 為負值）
   const grant = await grantCoins(client, {
     userId,
