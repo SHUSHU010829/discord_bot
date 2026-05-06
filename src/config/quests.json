@@ -1,0 +1,69 @@
+{
+  "questSystem": {
+    "enabled": true,
+    "resetTimezone": "Asia/Taipei",
+    "daily": [
+      {
+        "id": "daily_morning",
+        "name": "早安打卡",
+        "description": "07:00–10:00 在指定頻道發言",
+        "reward": 150,
+        "target": 1,
+        "morningChannelId": "1174352640210124877",
+        "morningStartHour": 7,
+        "morningEndHour": 10
+      },
+      {
+        "id": "daily_messages",
+        "name": "文字活躍",
+        "description": "當日在伺服器傳送 ≥ 10 則訊息",
+        "reward": 200,
+        "target": 10
+      },
+      {
+        "id": "daily_voice_30",
+        "name": "語音初段",
+        "description": "當日在語音頻道待滿 30 分鐘",
+        "reward": 150,
+        "target": 30
+      },
+      {
+        "id": "daily_voice_60",
+        "name": "語音進階",
+        "description": "當日在語音頻道待滿 60 分鐘（累加，共 250）",
+        "reward": 100,
+        "target": 60
+      },
+      {
+        "id": "daily_gamble",
+        "name": "賭桌新手",
+        "description": "完成任意賭博遊戲一局（不論輸贏）",
+        "reward": 300,
+        "target": 1
+      }
+    ],
+    "weekly": [
+      {
+        "id": "weekly_attendance",
+        "name": "週週出席",
+        "description": "本週簽到 ≥ 5 天",
+        "reward": 1200,
+        "target": 5
+      },
+      {
+        "id": "weekly_messages",
+        "name": "活躍市民",
+        "description": "本週發送訊息 ≥ 50 則",
+        "reward": 1500,
+        "target": 50
+      },
+      {
+        "id": "weekly_popular",
+        "name": "人氣王",
+        "description": "本週收到 ≥ 20 個表情符號反應",
+        "reward": 2000,
+        "target": 20
+      }
+    ]
+  }
+}

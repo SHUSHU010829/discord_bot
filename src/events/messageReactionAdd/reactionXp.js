@@ -1,8 +1,9 @@
 require("colors");
 const { DateTime } = require("luxon");
-const { levelSystem, coinSystem } = require("../../config");
+const { levelSystem, coinSystem, questSystem } = require("../../config");
 const grantXp = require("../../features/leveling/grantXp");
 const grantCoins = require("../../features/economy/grantCoins");
+const questService = require("../../features/quests/questService");
 
 const COOLDOWN_MS = 30 * 1000;
 
@@ -100,6 +101,19 @@ module.exports = async (client, reaction, user) => {
 
     // 反應金幣：每 N 個反應給 1 金幣（counter 存在 userCoinsCollection 上）
     await tryGrantReactionCoin(client, message, authorMember, today, user, reaction);
+
+    // 人氣王任務：作者本週收到反應 +1（已排除自反應 + 同 reactor 30s cooldown）
+    if (questSystem?.enabled && client.questProgressCollection) {
+      questService
+        .incrementProgress(
+          client,
+          message.author.id,
+          message.guild.id,
+          "weekly_popular",
+          1
+        )
+        .catch((e) => console.log(`[ERROR] quest weekly_popular: ${e}`.red));
+    }
   } catch (error) {
     console.log(`[ERROR] reactionXp:\n${error}`.red);
   }

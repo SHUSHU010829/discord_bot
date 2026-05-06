@@ -92,6 +92,12 @@ module.exports = async (client) => {
     // 定期存款
     const coinDepositsCollection = database.collection("CoinDeposits");
 
+    // 救濟金領取紀錄（連續天數、最後領取日期）
+    const welfareClaimsCollection = database.collection("WelfareClaims");
+
+    // 任務進度（每日/每週任務的進度與領取狀態）
+    const questProgressCollection = database.collection("QuestProgress");
+
     client.database = database;
     client.collection = collection;
     client.gaslightCollection = gaslightCollection;
@@ -126,6 +132,8 @@ module.exports = async (client) => {
     client.jackpotPoolCollection = jackpotPoolCollection;
     client.coinTransfersCollection = coinTransfersCollection;
     client.coinDepositsCollection = coinDepositsCollection;
+    client.welfareClaimsCollection = welfareClaimsCollection;
+    client.questProgressCollection = questProgressCollection;
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
 
     // 自動修補沒有 category / drawCount 的舊資料（idempotent，沒事就不動）
@@ -386,6 +394,26 @@ module.exports = async (client) => {
       await lotteryWheelsCollection.createIndex(
         { wheelingId: 1 },
         { unique: true, name: "uniq_lottery_wheelingId" }
+      );
+
+      // 救濟金領取紀錄
+      await welfareClaimsCollection.createIndex(
+        { userId: 1, guildId: 1 },
+        { unique: true, name: "uniq_welfare_user_guild" }
+      );
+
+      // 任務進度：(user, guild, quest, period) 唯一
+      await questProgressCollection.createIndex(
+        { userId: 1, guildId: 1, questId: 1, period: 1 },
+        { unique: true, name: "uniq_quest_user_guild_quest_period" }
+      );
+      await questProgressCollection.createIndex(
+        { guildId: 1, period: 1, questId: 1 },
+        { name: "quest_guild_period_quest" }
+      );
+      await questProgressCollection.createIndex(
+        { updatedAt: 1 },
+        { expireAfterSeconds: 90 * 24 * 60 * 60, name: "quest_ttl_90d" }
       );
     } catch (indexError) {
       console.log(

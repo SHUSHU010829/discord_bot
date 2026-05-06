@@ -9,6 +9,8 @@ const freeGames = require("./freeGames.json");
 const twitch = require("./twitch.json");
 const casino = require("./casino.json");
 const shop = require("./shop.json");
+const welfare = require("./welfare.json");
+const quests = require("./quests.json");
 
 module.exports = {
   ...server,
@@ -20,4 +22,6 @@ module.exports = {
   ...twitch,
   ...casino,
   ...shop,
+  ...welfare,
+  ...quests,
 };
