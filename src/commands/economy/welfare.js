@@ -13,11 +13,8 @@ const welfareService = require("../../features/welfare/welfareService");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("乞討")
-    .setDescription("破產時領取救濟金 🪙")
-    .setDMPermission(false)
-    .addSubcommand((sub) =>
-      sub.setName("狀態").setDescription("查看救濟金資格與連續天數")
-    ),
+    .setDescription("破產時領取救濟金，符合資格直接發放，否則顯示狀態 🪙")
+    .setDMPermission(false),
 
   run: async (client, interaction) => {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -32,16 +29,8 @@ module.exports = {
 
       const userId = interaction.user.id;
       const guildId = interaction.guildId;
-      const username =
-        interaction.member?.displayName || interaction.user.username;
 
-      const sub = interaction.options.getSubcommand(false);
-
-      if (sub === "狀態") {
-        return showStatus(client, interaction, userId, guildId);
-      }
-
-      // 預設：嘗試領取
+      // 嘗試領取
       const result = await welfareService.claim(
         client,
         userId,
@@ -50,33 +39,22 @@ module.exports = {
         interaction.user.username
       );
 
-      if (!result.ok) {
-        return replyClaimFailure(interaction, result, username);
+      if (result.ok) {
+        return replyClaimSuccess(interaction, result);
       }
 
-      const container = new ContainerBuilder()
-        .setAccentColor(0xc9302c)
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(
-            `## 🪙 救濟金到手\n**+${result.amount.toLocaleString()}** 💰 ・ 連續 **${result.streak}** 天`
-          )
-        )
-        .addSeparatorComponents(new SeparatorBuilder())
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(
-            `目前餘額：**${(result.newBalance ?? 0).toLocaleString()}** 🪙\n下次可領：<t:${result.resetEpoch}:R>（<t:${result.resetEpoch}:t>）`
-          )
-        )
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(
-            `-# 救濟金不會無限發給你，記得連續來領才能拿加成（最高 800/日）。`
-          )
+      // 系統錯誤類：直接回錯誤
+      if (result.reason === "disabled" || result.reason === "system_unready") {
+        return interaction.editReply("🔧 救濟金系統尚未啟動，請聯絡舒舒！");
+      }
+      if (result.reason === "grant_failed") {
+        return interaction.editReply(
+          "🔧 系統發放失敗，請稍後再試或聯絡舒舒。"
         );
+      }
 
-      await interaction.editReply({
-        components: [container],
-        flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
-      });
+      // above_threshold / already_claimed / race_lost → 一律改顯示狀態
+      return showStatus(client, interaction, userId, guildId);
     } catch (error) {
       console.log(`[ERROR] /乞討:\n${error}\n${error.stack}`.red);
       await interaction
@@ -85,6 +63,32 @@ module.exports = {
     }
   },
 };
+
+function replyClaimSuccess(interaction, result) {
+  const container = new ContainerBuilder()
+    .setAccentColor(0xc9302c)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `## 🪙 救濟金到手\n**+${result.amount.toLocaleString()}** 💰 ・ 連續 **${result.streak}** 天`
+      )
+    )
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `目前餘額：**${(result.newBalance ?? 0).toLocaleString()}** 🪙\n下次可領：<t:${result.resetEpoch}:R>（<t:${result.resetEpoch}:t>）`
+      )
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `-# 救濟金不會無限發給你，記得連續來領才能拿加成（最高 800/日）。`
+      )
+    );
+
+  return interaction.editReply({
+    components: [container],
+    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+  });
+}
 
 async function showStatus(client, interaction, userId, guildId) {
   const status = await welfareService.getStatus(client, userId, guildId);
@@ -129,33 +133,4 @@ async function showStatus(client, interaction, userId, guildId) {
     components: [container],
     flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
   });
-}
-
-function replyClaimFailure(interaction, result, username) {
-  if (result.reason === "above_threshold") {
-    if (result.depositTotal > 0) {
-      return interaction.editReply(
-        `💰 錢包 **${result.balance.toLocaleString()}** + 存款本金 **${result.depositTotal.toLocaleString()}** = 總資產 **${result.totalAssets.toLocaleString()}** 🪙，超過救濟線 ${result.threshold}。\n先 \`/領回\` 存款或 \`/錢包\` 看看再說。`
-      );
-    }
-    return interaction.editReply(
-      `💰 目前金幣 **${result.balance.toLocaleString()}** 🪙，超過救濟線 ${result.threshold}，先去玩玩看吧！`
-    );
-  }
-  if (result.reason === "already_claimed") {
-    return interaction.editReply(
-      `🪙 今天已經領過了！連續 **${result.streak}** 天\n下次可領：<t:${result.resetEpoch}:R>（<t:${result.resetEpoch}:t>）`
-    );
-  }
-  if (result.reason === "race_lost") {
-    return interaction.editReply(
-      `⏳ 剛剛已經幫你領過了，請稍後用 \`/乞討 狀態\` 確認餘額。`
-    );
-  }
-  if (result.reason === "grant_failed") {
-    return interaction.editReply(
-      `🔧 系統發放失敗，請稍後再試或聯絡舒舒。`
-    );
-  }
-  return interaction.editReply("🔧 領取失敗，請聯絡舒舒。");
 }
