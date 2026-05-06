@@ -285,6 +285,15 @@ function drawReelBox(ctx, rx, ry, offset, accent, highlight, pulse) {
   }
 }
 
+function measureHeadline(ctx, headline, size, weight = '900', gap = 12) {
+  ctx.font = `${weight} ${size}px NotoSans`;
+  const textW = ctx.measureText(headline.text).width + (size * 0.05) * (headline.text.length - 1);
+  const emojiSize = Math.round(size * 1.05);
+  const leftW = headline.left ? emojiSize + gap : 0;
+  const rightW = headline.right ? emojiSize + gap : 0;
+  return leftW + textW + rightW;
+}
+
 function drawHeadline(ctx, headline, color, cx, cy, size, weight, gap = 12) {
   ctx.textBaseline = 'middle';
   ctx.font = `${weight} ${size}px NotoSans`;
@@ -332,16 +341,27 @@ function drawResultPanel(ctx, opts) {
 
   const headline = buildHeadline(matchType);
   if (payout > 0) {
-    const headlineY = areaY + 38;
-    const payoutY   = areaY + areaH - 50;
-    drawHeadline(ctx, headline, accent, cx, headlineY, 30, '900', 12);
+    const headlineSize = 44;
+    const payoutSize   = 68;
+    const innerGap     = 28;
+    const cy = areaY + areaH / 2;
 
-    ctx.font = '900 84px NotoSans';
+    const headlineW = measureHeadline(ctx, headline, headlineSize, '900', 12);
+    const numText = `＋${payout.toLocaleString()}`;
+    ctx.font = `900 ${payoutSize}px NotoSans`;
+    const payoutW = ctx.measureText(numText).width;
+
+    const totalW = headlineW + innerGap + payoutW;
+    const headlineCx = cx - totalW / 2 + headlineW / 2;
+    const payoutCx   = cx + totalW / 2 - payoutW / 2;
+
+    drawHeadline(ctx, headline, accent, headlineCx, cy, headlineSize, '900', 12);
+
+    ctx.font = `900 ${payoutSize}px NotoSans`;
     ctx.fillStyle = accent;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const numText = `＋${payout.toLocaleString()}`;
-    ctx.fillText(numText, cx, payoutY);
+    ctx.fillText(numText, payoutCx, cy);
   } else {
     drawHeadline(ctx, headline, PALETTE.muted, cx, areaY + areaH / 2, 48, '900', 16);
   }
