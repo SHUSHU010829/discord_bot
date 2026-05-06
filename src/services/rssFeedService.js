@@ -13,6 +13,44 @@ const parser = new Parser({
   },
 });
 
+const MAX_FETCH_ATTEMPTS = 3;
+const INITIAL_RETRY_DELAY_MS = 2000;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// 503/502/504/429 與網路錯誤都當成暫時性錯誤,值得重試
+const isRetryableError = (err) => {
+  const msg = err && err.message ? err.message : "";
+  const statusMatch = msg.match(/Status code (\d+)/i);
+  if (statusMatch) {
+    const status = Number(statusMatch[1]);
+    return status === 408 || status === 429 || (status >= 500 && status < 600);
+  }
+  const code = err && err.code;
+  return [
+    "ECONNRESET",
+    "ETIMEDOUT",
+    "ECONNABORTED",
+    "ENOTFOUND",
+    "EAI_AGAIN",
+  ].includes(code);
+};
+
+const parseURLWithRetry = async (url) => {
+  let lastErr;
+  for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt++) {
+    try {
+      return await parser.parseURL(url);
+    } catch (err) {
+      lastErr = err;
+      if (attempt === MAX_FETCH_ATTEMPTS || !isRetryableError(err)) throw err;
+      const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+      await sleep(delay);
+    }
+  }
+  throw lastErr;
+};
+
 /**
  * @typedef {Object} FeedItem
  * @property {string} guid
@@ -36,7 +74,7 @@ const stripHtmlToText = (html) => {
  * @returns {Promise<FeedItem[]>}
  */
 const fetchFeedItems = async (url) => {
-  const feed = await parser.parseURL(url);
+  const feed = await parseURLWithRetry(url);
   const items = Array.isArray(feed.items) ? feed.items : [];
 
   return items.map((raw) => {
