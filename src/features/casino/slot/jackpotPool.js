@@ -36,14 +36,26 @@ async function contribute(client, guildId, bet) {
   const inc = Math.max(0, Math.floor(bet * rate));
   if (inc <= 0) return 0;
   const seed = cfg.seedAmount ?? 5000;
+  // 先確保 doc 存在且帶 seed amount，避免新池從 0 開始累積
+  await client.jackpotPoolCollection.updateOne(
+    { guildId, game: "slot" },
+    {
+      $setOnInsert: {
+        guildId,
+        game: "slot",
+        amount: seed,
+        seed,
+        createdAt: new Date(),
+      },
+    },
+    { upsert: true }
+  );
   await client.jackpotPoolCollection.updateOne(
     { guildId, game: "slot" },
     {
       $inc: { amount: inc, totalContributed: inc },
-      $setOnInsert: { guildId, game: "slot", seed, createdAt: new Date() },
       $set: { updatedAt: new Date() },
-    },
-    { upsert: true }
+    }
   );
   return inc;
 }
