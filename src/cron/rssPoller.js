@@ -182,7 +182,7 @@ const pollFeed = async (client, feed) => {
 };
 
 const startRssPoller = (client) => {
-  const schedule = process.env.RSS_CRON || "*/10 * * * *";
+  const schedule = process.env.RSS_CRON || "0 */2 * * *";
   const timezone = process.env.RSS_TIMEZONE || "Asia/Taipei";
 
   const runOnce = async () => {
