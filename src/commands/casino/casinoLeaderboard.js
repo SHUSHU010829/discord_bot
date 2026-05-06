@@ -1,4 +1,4 @@
-// /賭場排行 — 賭場淨輸贏排行榜（賺最多 / 賠最多）
+// /賭場排行 — 賭場淨輸贏排行榜（賺最多 / 賠最多），預設周榜
 
 require("colors");
 const {
@@ -13,25 +13,27 @@ const { DateTime } = require("luxon");
 
 const TYPE_META = {
   winners: {
-    title: "💰 賭場賺最多排行榜",
+    titleSuffix: "賭場賺最多排行榜",
+    emoji: "💰",
     accent: 0x2ecc71,
     sort: -1,
     profitFilter: { netProfit: { $gt: 0 } },
-    emptyHint: "目前還沒有人在賭場賺到錢",
+    emptyVerb: "賺到錢",
   },
   losers: {
-    title: "💸 賭場賠最多排行榜",
+    titleSuffix: "賭場賠最多排行榜",
+    emoji: "💸",
     accent: 0xe74c3c,
     sort: 1,
     profitFilter: { netProfit: { $lt: 0 } },
-    emptyHint: "目前還沒有人在賭場賠錢",
+    emptyVerb: "賠錢",
   },
 };
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("賭場排行")
-    .setDescription("🎰 查看賭場淨輸贏排行榜")
+    .setDescription("🎰 查看賭場淨輸贏排行榜（預設本週）")
     .setDMPermission(false)
     .addStringOption((option) =>
       option
@@ -46,13 +48,12 @@ module.exports = {
     .addStringOption((option) =>
       option
         .setName("period")
-        .setDescription("統計期間")
+        .setDescription("統計期間（預設本週）")
         .setRequired(false)
         .addChoices(
           { name: "今天", value: "today" },
           { name: "本週", value: "week" },
           { name: "本月", value: "month" },
-          { name: "全部", value: "all" },
         ),
     )
     .toJSON(),
@@ -61,7 +62,7 @@ module.exports = {
     await interaction.deferReply();
 
     const type = interaction.options.getString("type");
-    const period = interaction.options.getString("period") || "all";
+    const period = interaction.options.getString("period") || "week";
     const meta = TYPE_META[type];
 
     try {
@@ -77,7 +78,9 @@ module.exports = {
       );
 
       if (!rows.length) {
-        return interaction.editReply(`📊 ${meta.emptyHint}`);
+        return interaction.editReply(
+          `📊 ${getPeriodText(period)}還沒有人在賭場${meta.emptyVerb}`,
+        );
       }
 
       const container = buildContainer({ meta, period, rows, range });
@@ -96,11 +99,10 @@ module.exports = {
 
 async function fetchCasinoLeaderboard(client, guildId, type, period) {
   const meta = TYPE_META[type];
-  const dateFilter = getDateFilter(period);
   const baseMatch = {
     guildId,
     source: { $in: ["bet", "payout"] },
-    ...dateFilter,
+    ...getDateFilter(period),
   };
 
   const [data, rangeAgg] = await Promise.all([
@@ -179,7 +181,9 @@ function buildContainer({ meta, period, rows, range }) {
   const container = new ContainerBuilder()
     .setAccentColor(meta.accent)
     .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`# ${meta.title}`),
+      new TextDisplayBuilder().setContent(
+        `# ${meta.emoji} ${getPeriodText(period)}${meta.titleSuffix}`,
+      ),
     )
     .addSeparatorComponents(
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large),
@@ -225,13 +229,11 @@ function getDateFilter(period) {
   switch (period) {
     case "today":
       return { date: now.toISODate() };
-    case "week":
-      return { date: { $gte: now.startOf("week").toISODate() } };
     case "month":
       return { date: { $gte: now.startOf("month").toISODate() } };
-    case "all":
+    case "week":
     default:
-      return {};
+      return { date: { $gte: now.startOf("week").toISODate() } };
   }
 }
 
@@ -239,12 +241,10 @@ function getPeriodText(period) {
   switch (period) {
     case "today":
       return "今天";
-    case "week":
-      return "本週";
     case "month":
       return "本月";
-    case "all":
+    case "week":
     default:
-      return "全部時間";
+      return "本週";
   }
 }
