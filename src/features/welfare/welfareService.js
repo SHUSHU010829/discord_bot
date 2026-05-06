@@ -26,12 +26,25 @@ const nextResetEpoch = () => {
   );
 };
 
+const getActiveDepositTotal = async (client, userId, guildId) => {
+  if (!client.coinDepositsCollection) return 0;
+  const agg = await client.coinDepositsCollection
+    .aggregate([
+      { $match: { userId, guildId, status: "active" } },
+      { $group: { _id: null, total: { $sum: "$principal" } } },
+    ])
+    .toArray();
+  return agg[0]?.total || 0;
+};
+
 const getStatus = async (client, userId, guildId) => {
   const tz = getTz();
   const t = today();
   const claim = await client.welfareClaimsCollection.findOne({ userId, guildId });
   const coinDoc = await client.userCoinsCollection.findOne({ userId, guildId });
-  const balance = coinDoc?.totalCoins || 0;
+  const walletBalance = coinDoc?.totalCoins || 0;
+  const depositTotal = await getActiveDepositTotal(client, userId, guildId);
+  const totalAssets = walletBalance + depositTotal;
   const threshold = welfareSystem?.balanceThreshold ?? 100;
   const claimedToday = claim?.lastClaimDate === t;
   const streak = claim?.streak || 0;
@@ -50,9 +63,11 @@ const getStatus = async (client, userId, guildId) => {
   const nextAmount = computeAmount(nextStreak);
 
   return {
-    balance,
+    balance: walletBalance,
+    depositTotal,
+    totalAssets,
     threshold,
-    eligibleByBalance: balance <= threshold,
+    eligibleByBalance: totalAssets <= threshold,
     claimedToday,
     streak,
     longestStreak,
@@ -77,9 +92,18 @@ const claim = async (client, userId, guildId, member, username) => {
   const threshold = welfareSystem?.balanceThreshold ?? 100;
 
   const coinDoc = await client.userCoinsCollection.findOne({ userId, guildId });
-  const balance = coinDoc?.totalCoins || 0;
-  if (balance > threshold) {
-    return { ok: false, reason: "above_threshold", balance, threshold };
+  const walletBalance = coinDoc?.totalCoins || 0;
+  const depositTotal = await getActiveDepositTotal(client, userId, guildId);
+  const totalAssets = walletBalance + depositTotal;
+  if (totalAssets > threshold) {
+    return {
+      ok: false,
+      reason: "above_threshold",
+      balance: walletBalance,
+      depositTotal,
+      totalAssets,
+      threshold,
+    };
   }
 
   const existing = await client.welfareClaimsCollection.findOne({ userId, guildId });
