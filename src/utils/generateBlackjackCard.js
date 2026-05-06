@@ -69,6 +69,8 @@ function pickAccent(state) {
       return PALETTE.gold;
     case "fivecard":
       return PALETTE.gold;
+    case "dealerfivecard":
+      return PALETTE.muted;
     case "win":
       return PALETTE.teal;
     case "push":
@@ -116,6 +118,8 @@ function buildResultLabel(state) {
       return { text: "BLACKJACK", color: PALETTE.gold };
     case "fivecard":
       return { text: "過五關", color: PALETTE.gold };
+    case "dealerfivecard":
+      return { text: "莊家過五關", color: PALETTE.muted };
     case "win":
       return { text: "玩家獲勝", color: PALETTE.teal };
     case "push":
@@ -154,6 +158,8 @@ function buildMarkup(data) {
 
   const dealerBadge = !isPlaying && dealerEval.isBust
     ? `<div style="display:flex;margin-left:14px;padding:2px 10px;background:${PALETTE.red};color:${PALETTE.cardWhite};font-family:'SpaceMono';font-size:14px;letter-spacing:2px;">BUST</div>`
+    : !isPlaying && state.dealerHand.length >= FIVE_CARD_THRESHOLD
+    ? `<div style="display:flex;margin-left:14px;padding:2px 10px;background:${PALETTE.muted};color:${PALETTE.cardWhite};font-family:'SpaceMono';font-size:14px;letter-spacing:2px;">5-CARD</div>`
     : !isPlaying && dealerEval.isBlackjack && state.dealerHand.length === 2
     ? `<div style="display:flex;margin-left:14px;padding:2px 10px;background:${PALETTE.gold};color:${PALETTE.ink};font-family:'SpaceMono';font-size:14px;letter-spacing:2px;">BJ</div>`
     : "";

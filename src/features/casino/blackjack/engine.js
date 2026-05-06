@@ -6,6 +6,7 @@
 //   - 莊家 ≥17 必停（含 soft 17，不 hit S17）
 //   - Blackjack（兩張 A+10/J/Q/K）賠率 3:2，一般贏 1:1，平手退本金
 //   - 過五關（Five-Card Charlie）：玩家持有 5 張未爆牌自動獲勝，賠率 2:1
+//   - 莊家過五關：莊家拿到 5 張未爆牌則莊家勝（玩家 BJ / 玩家過五關優先結算，不受影響）
 //
 // State 結構：
 //   {
@@ -15,7 +16,7 @@
 //     deck: string[],         // 剩餘牌堆
 //     playerHand: string[],
 //     dealerHand: string[],   // 結算前 dealerHand[1] 視為暗牌
-//     result: "blackjack"|"fivecard"|"win"|"push"|"lose"|null,
+//     result: "blackjack"|"fivecard"|"dealerfivecard"|"win"|"push"|"lose"|null,
 //     payout: number,         // 拿回的總額（含本金）；輸 = 0
 //   }
 
@@ -109,6 +110,7 @@ function playDealer(state) {
     const ev = evaluateHand(dealerHand);
     if (ev.isBust) break;
     if (ev.total >= 17) break;
+    if (dealerHand.length >= FIVE_CARD_THRESHOLD) break;
     const drawn = drawOne(deck);
     deck = drawn.deck;
     dealerHand = [...dealerHand, drawn.card];
@@ -156,6 +158,10 @@ function settle(state) {
   // 莊家爆 → 玩家贏
   if (dealerEval.isBust) {
     return finalize(afterDealer, "win", totalStake * 2);
+  }
+  // 莊家過五關：莊家持有 5 張未爆牌 → 莊家獲勝
+  if (afterDealer.dealerHand.length >= FIVE_CARD_THRESHOLD) {
+    return finalize(afterDealer, "dealerfivecard", 0);
   }
   // 比點數
   if (playerEval.total > dealerEval.total) {
