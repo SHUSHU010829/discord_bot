@@ -1,10 +1,11 @@
 require("colors");
 const cron = require("node-cron");
-const { levelSystem, coinSystem } = require("../../config");
+const { levelSystem, coinSystem, questSystem } = require("../../config");
 const { isVoiceXpEligible } = require("../../utils/xpGuards");
 const grantXp = require("../../features/leveling/grantXp");
 const grantCoins = require("../../features/economy/grantCoins");
 const voiceSessionStore = require("../../utils/voiceSessionStore");
+const questService = require("../../features/quests/questService");
 
 module.exports = async (client) => {
   if (!levelSystem?.enabled) return;
@@ -129,6 +130,16 @@ module.exports = async (client) => {
             channel: null,
             member,
           });
+
+          // 語音任務：每分鐘 +1 進度（incrementProgress 內部已 cap 在 target）
+          if (questSystem?.enabled && client.questProgressCollection) {
+            questService
+              .incrementProgress(client, session.userId, session.guildId, "daily_voice_30", 1)
+              .catch((e) => console.log(`[ERROR] quest voice_30: ${e}`.red));
+            questService
+              .incrementProgress(client, session.userId, session.guildId, "daily_voice_60", 1)
+              .catch((e) => console.log(`[ERROR] quest voice_60: ${e}`.red));
+          }
 
           // 語音金幣：每 N 分鐘給 1（由 minute-of-session 判斷）
           if (coinSystem?.enabled && client.userCoinsCollection) {

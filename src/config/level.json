@@ -132,7 +132,7 @@
     },
     "transfer": {
       "enabled": true,
-      "minAmount": 10,
+      "minAmount": 100,
       "maxAmount": 50000,
       "dailyCapPerSender": 20000,
       "feeRate": 0.02

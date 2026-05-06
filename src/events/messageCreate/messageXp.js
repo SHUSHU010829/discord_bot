@@ -1,9 +1,12 @@
 require("colors");
-const { levelSystem, coinSystem } = require("../../config");
+const { DateTime } = require("luxon");
+const { levelSystem, coinSystem, questSystem } = require("../../config");
 const { isMessageXpEligible, isMessageRepetitive } = require("../../utils/xpGuards");
 const { randomInt } = require("../../utils/levelMath");
 const grantXp = require("../../features/leveling/grantXp");
 const grantCoins = require("../../features/economy/grantCoins");
+const questService = require("../../features/quests/questService");
+const { getQuestById } = require("../../features/quests/questDefinitions");
 
 module.exports = async (client, message) => {
   try {
@@ -13,6 +16,11 @@ module.exports = async (client, message) => {
 
     const cfg = levelSystem.message;
     if (!isMessageXpEligible(message, cfg)) return;
+
+    if (isMessageRepetitive(message.author.id, message.content.trim())) return;
+
+    // 任務進度先更新（不受 XP cooldown 影響，玩家連發 10 則會正常計數）
+    await tryUpdateMessageQuests(client, message);
 
     // Cooldown 改用 DB 查詢（去除 per-process Map，sharding-safe）
     const cooldownMs = (cfg.cooldownSeconds || 30) * 1000;
@@ -26,8 +34,6 @@ module.exports = async (client, message) => {
       { projection: { _id: 1 } },
     );
     if (recent) return;
-
-    if (isMessageRepetitive(message.author.id, message.content.trim())) return;
 
     const xp = randomInt(cfg.minXp, cfg.maxXp);
 
@@ -86,4 +92,37 @@ async function tryGrantMessageCoins(client, message) {
     meta: { channelId: message.channelId, messageId: message.id },
     member: message.member,
   });
+}
+
+async function tryUpdateMessageQuests(client, message) {
+  if (!questSystem?.enabled) return;
+  if (!client.questProgressCollection) return;
+  try {
+    const userId = message.author.id;
+    const guildId = message.guildId;
+
+    await questService
+      .incrementProgress(client, userId, guildId, "daily_messages", 1)
+      .catch((e) => console.log(`[ERROR] quest daily_messages: ${e}`.red));
+    await questService
+      .incrementProgress(client, userId, guildId, "weekly_messages", 1)
+      .catch((e) => console.log(`[ERROR] quest weekly_messages: ${e}`.red));
+
+    const morningDef = getQuestById("daily_morning");
+    if (morningDef && morningDef.morningChannelId) {
+      if (message.channelId === morningDef.morningChannelId) {
+        const tz = questSystem.resetTimezone || "Asia/Taipei";
+        const hour = DateTime.now().setZone(tz).hour;
+        const startH = morningDef.morningStartHour ?? 7;
+        const endH = morningDef.morningEndHour ?? 10;
+        if (hour >= startH && hour < endH) {
+          await questService
+            .markCompleted(client, userId, guildId, "daily_morning")
+            .catch((e) => console.log(`[ERROR] quest daily_morning: ${e}`.red));
+        }
+      }
+    }
+  } catch (e) {
+    console.log(`[ERROR] tryUpdateMessageQuests: ${e}`.red);
+  }
 }

@@ -12,6 +12,7 @@ const MSG_VOICE_SOURCES = ["message", "voice"];
 const CASINO_SOURCES = ["bet", "payout"];
 const SINK_SOURCES = ["shop_buy", "auction_bid", "wealth_tax", "transfer_out", "deposit_lock"];
 const PEER_SOURCES = ["transfer_in", "transfer_out", "deposit_lock", "deposit_release"];
+const FLAT_REWARD_SOURCES = ["welfare", "quest_daily", "quest_weekly", "quest_event"];
 
 module.exports = async (client, opts) => {
   if (!coinSystem?.enabled) return null;
@@ -38,7 +39,8 @@ module.exports = async (client, opts) => {
     opts.source === "admin" ||
     CASINO_SOURCES.includes(opts.source) ||
     SINK_SOURCES.includes(opts.source) ||
-    PEER_SOURCES.includes(opts.source);
+    PEER_SOURCES.includes(opts.source) ||
+    FLAT_REWARD_SOURCES.includes(opts.source);
   const twitchInfo = skipMultipliers
     ? { multiplier: 1, name: null }
     : getCoinTwitchSubBonus(opts.member, opts.source);
@@ -141,6 +143,16 @@ module.exports = async (client, opts) => {
     console.log(
       `[COIN] ${opts.username || opts.userId} ${amount} (from ${opts.source})`.yellow
     );
+  }
+
+  // 賭桌新手任務：source=bet 視為完成一局賭博
+  if (opts.source === "bet") {
+    try {
+      const questService = require("../quests/questService");
+      await questService.markCompleted(client, opts.userId, opts.guildId, "daily_gamble").catch(() => {});
+    } catch (e) {
+      // questService 還沒載入或還沒實作就靜默
+    }
   }
 
   return {

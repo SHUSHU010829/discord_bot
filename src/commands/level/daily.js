@@ -11,10 +11,11 @@ const {
 } = require("discord.js");
 const { DateTime } = require("luxon");
 
-const { levelSystem, coinSystem } = require("../../config");
+const { levelSystem, coinSystem, questSystem } = require("../../config");
 const grantXp = require("../../features/leveling/grantXp");
 const grantCoins = require("../../features/economy/grantCoins");
 const generateCheckinCard = require("../../utils/generateCheckinCard");
+const questService = require("../../features/quests/questService");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -163,6 +164,13 @@ module.exports = {
         },
         { upsert: true }
       );
+
+      // 週週出席任務：簽到成功 +1
+      if (questSystem?.enabled && client.questProgressCollection) {
+        questService
+          .incrementProgress(client, userId, guildId, "weekly_attendance", 1)
+          .catch((e) => console.log(`[ERROR] quest weekly_attendance: ${e}`.red));
+      }
 
       const grantResult = await grantXp(client, {
         userId,
