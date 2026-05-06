@@ -29,6 +29,30 @@ async function loadFonts() {
   return fontsCache;
 }
 
+function detectImageMime(buffer, contentType) {
+  if (buffer && buffer.length >= 4) {
+    if (
+      buffer[0] === 0x89 &&
+      buffer[1] === 0x50 &&
+      buffer[2] === 0x4e &&
+      buffer[3] === 0x47
+    ) {
+      return "image/png";
+    }
+    if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+      return "image/jpeg";
+    }
+  }
+  if (contentType) {
+    const ct = contentType.toLowerCase();
+    if (ct.includes("image/png")) return "image/png";
+    if (ct.includes("image/jpeg") || ct.includes("image/jpg")) {
+      return "image/jpeg";
+    }
+  }
+  return null;
+}
+
 async function fetchAvatarDataUri(url) {
   if (!url) return null;
   try {
@@ -36,9 +60,10 @@ async function fetchAvatarDataUri(url) {
       responseType: "arraybuffer",
       timeout: 8000,
     });
-    const ext = url.toLowerCase().includes(".png") ? "png" : "jpeg";
-    const b64 = Buffer.from(res.data).toString("base64");
-    return `data:image/${ext};base64,${b64}`;
+    const buffer = Buffer.from(res.data);
+    const mime = detectImageMime(buffer, res.headers?.["content-type"]);
+    if (!mime) return null;
+    return `data:${mime};base64,${buffer.toString("base64")}`;
   } catch (e) {
     return null;
   }
