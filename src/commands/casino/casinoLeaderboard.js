@@ -167,8 +167,14 @@ function buildContainer({ meta, period, rows, range }) {
     );
   };
 
-  const top3 = rows.slice(0, 3).map(renderRow).join("\n");
-  const rest = rows.slice(3).map(renderRow).join("\n");
+  const top3 = rows
+    .slice(0, 3)
+    .map((row, i) => renderRow(row, i))
+    .join("\n");
+  const rest = rows
+    .slice(3)
+    .map((row, i) => renderRow(row, i + 3))
+    .join("\n");
 
   const container = new ContainerBuilder()
     .setAccentColor(meta.accent)
