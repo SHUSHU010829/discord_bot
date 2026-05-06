@@ -66,6 +66,46 @@ const downloadImageAsAttachment = async (url, filename) => {
 // → 改用 attachment 上傳。picnob 已是 proxy,直接用 URL 即可。
 const needsAttachmentFallback = (feedType) => feedType === "threads";
 
+const FIELD_GETTERS = {
+  description: (item) => item.textContent || "",
+  title: (item) => item.title || "",
+  author: (item) => item.author || "",
+};
+
+// 把 feed.filter 編譯成 (item) => boolean。無效 regex 會 log 警告並跳過該條件。
+const compileFilter = (filter, feedId) => {
+  if (
+    !filter ||
+    !Array.isArray(filter.conditions) ||
+    filter.conditions.length === 0
+  ) {
+    return () => true;
+  }
+  const mode = filter.match === "any" ? "any" : "all";
+  const checkers = filter.conditions.map((cond) => {
+    const getter = FIELD_GETTERS[cond.field] || FIELD_GETTERS.description;
+    let regex = null;
+    try {
+      regex = new RegExp(cond.pattern, "i");
+    } catch (err) {
+      console.log(
+        `[WARN] RSS(${feedId}) 過濾條件 regex 無效 "${cond.pattern}": ${err.message}`
+          .yellow
+      );
+    }
+    const negate = cond.op === "not_matches";
+    return (item) => {
+      if (!regex) return true;
+      const matched = regex.test(getter(item));
+      return negate ? !matched : matched;
+    };
+  });
+  return (item) =>
+    mode === "any"
+      ? checkers.some((fn) => fn(item))
+      : checkers.every((fn) => fn(item));
+};
+
 const buildEmbedsAndFiles = async ({ item, feed }) => {
   const embeds = [];
   const files = [];
@@ -158,10 +198,19 @@ const pollFeed = async (client, feed) => {
   // RSS 通常新→舊,推播時要舊→新
   const ordered = [...newItems].reverse();
 
-  console.log(`[INFO] RSS(${feed.id}): 推播 ${ordered.length} 則新貼文`.cyan);
+  const filterFn = compileFilter(feed.filter, feed.id);
+  const matchedCount = ordered.filter(filterFn).length;
+  console.log(
+    `[INFO] RSS(${feed.id}): ${ordered.length} 則新貼文,過濾後 ${matchedCount} 則`.cyan
+  );
 
   let lastPushedGuid = lastGuid;
   for (const item of ordered) {
+    if (!filterFn(item)) {
+      // 不符合過濾條件也要推進 guid,避免下次重複比對
+      lastPushedGuid = item.guid;
+      continue;
+    }
     try {
       const { embeds, files } = await buildEmbedsAndFiles({ item, feed });
       await channel.send({ embeds, files });
