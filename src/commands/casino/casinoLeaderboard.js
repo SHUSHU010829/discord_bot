@@ -13,18 +13,20 @@ const { DateTime } = require("luxon");
 
 const TYPE_META = {
   winners: {
-    title: "💰 賭場賺最多排行榜",
+    titleSuffix: "賭場賺最多排行榜",
+    emoji: "💰",
     accent: 0x2ecc71,
     sort: -1,
     profitFilter: { netProfit: { $gt: 0 } },
-    emptyHint: "目前還沒有人在賭場賺到錢",
+    emptyVerb: "賺到錢",
   },
   losers: {
-    title: "💸 賭場賠最多排行榜",
+    titleSuffix: "賭場賠最多排行榜",
+    emoji: "💸",
     accent: 0xe74c3c,
     sort: 1,
     profitFilter: { netProfit: { $lt: 0 } },
-    emptyHint: "目前還沒有人在賭場賠錢",
+    emptyVerb: "賠錢",
   },
 };
 
@@ -76,7 +78,9 @@ module.exports = {
       );
 
       if (!rows.length) {
-        return interaction.editReply(`📊 ${meta.emptyHint}`);
+        return interaction.editReply(
+          `📊 ${getPeriodText(period)}還沒有人在賭場${meta.emptyVerb}`,
+        );
       }
 
       const container = buildContainer({ meta, period, rows, range });
@@ -177,7 +181,9 @@ function buildContainer({ meta, period, rows, range }) {
   const container = new ContainerBuilder()
     .setAccentColor(meta.accent)
     .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`# ${meta.title}`),
+      new TextDisplayBuilder().setContent(
+        `# ${meta.emoji} ${getPeriodText(period)}${meta.titleSuffix}`,
+      ),
     )
     .addSeparatorComponents(
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large),
