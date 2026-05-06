@@ -13,7 +13,7 @@ const {
   getPool: getJackpotPool,
   getCfg: getJackpotCfg,
 } = require("../../features/casino/slot/jackpotPool");
-const generateSlotCard = require("../../utils/generateSlotCard");
+const generateSlotGif = require("../../utils/generateSlotGif");
 
 function getSlotConfig() {
   return casino?.slot || {};
@@ -171,8 +171,8 @@ module.exports = {
         jackpotPool = poolDoc?.amount ?? null;
       }
 
-      // 出圖
-      const buf = await generateSlotCard({
+      // 出圖（GIF 一鏡到底，含轉軸動畫）
+      const buf = await generateSlotGif({
         userId,
         username,
         reels: result.reels,
@@ -187,7 +187,7 @@ module.exports = {
       });
 
       const attachment = new AttachmentBuilder(buf, {
-        name: `slot-${roundId}.png`,
+        name: `slot-${roundId}.gif`,
       });
 
       const jackpotLine =

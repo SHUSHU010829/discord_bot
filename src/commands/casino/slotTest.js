@@ -7,7 +7,7 @@ const {
 
 const { spin } = require("../../features/casino/slot/slotMachine");
 const { SYMBOL_BY_ID } = require("../../features/casino/slot/paytable");
-const generateSlotCard = require("../../utils/generateSlotCard");
+const generateSlotGif = require("../../utils/generateSlotGif");
 
 const PREVIEW_CHOICES = [
   { name: "JACKPOT (七七七)", value: "jackpot" },
@@ -103,7 +103,7 @@ async function runPreview(interaction) {
     const preview = buildPreviewReels(kind);
     const payout = Math.floor(bet * preview.multiplier);
 
-    const buf = await generateSlotCard({
+    const buf = await generateSlotGif({
       userId: interaction.user.id,
       username: interaction.member?.displayName || interaction.user.username,
       reels: preview.reels,
@@ -116,7 +116,7 @@ async function runPreview(interaction) {
     });
 
     const attachment = new AttachmentBuilder(buf, {
-      name: `slot-preview-${kind}.png`,
+      name: `slot-preview-${kind}.gif`,
     });
 
     await interaction.editReply({
