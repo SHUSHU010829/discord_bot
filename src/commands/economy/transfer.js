@@ -169,6 +169,16 @@ module.exports = {
         return interaction.editReply("❌ 找不到該成員，可能已退出伺服器。");
       }
 
+      const recipientTenure = checkServerTenure(targetMember);
+      if (!recipientTenure.ok) {
+        const tail = recipientTenure.eligibleEpoch
+          ? `\n可收款時間：<t:${recipientTenure.eligibleEpoch}:R>（<t:${recipientTenure.eligibleEpoch}:f>）`
+          : "";
+        return interaction.editReply(
+          `❌ 對方加入伺服器尚未滿 **${recipientTenure.minDays}** 天，無法收款（防小帳洗幣）。${tail}`
+        );
+      }
+
       const transferId = `xfer-${Date.now()}-${senderId}-${target.id}`;
 
       // 扣款（含手續費）
