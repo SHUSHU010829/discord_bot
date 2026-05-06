@@ -10,5 +10,8 @@ pnpm-lock.json
 # Calendar backup files
 src/data/calender.backup_*.json
 
+# RSS poller runtime state
+src/data/rss_state.json
+
 # Test output
 /tmp
