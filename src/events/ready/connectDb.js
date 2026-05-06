@@ -98,6 +98,9 @@ module.exports = async (client) => {
     // 任務進度（每日/每週任務的進度與領取狀態）
     const questProgressCollection = database.collection("QuestProgress");
 
+    // 經濟健康快照（每日聚合，用於通膨追蹤）
+    const economySnapshotsCollection = database.collection("EconomySnapshots");
+
     client.database = database;
     client.collection = collection;
     client.gaslightCollection = gaslightCollection;
@@ -134,6 +137,12 @@ module.exports = async (client) => {
     client.coinDepositsCollection = coinDepositsCollection;
     client.welfareClaimsCollection = welfareClaimsCollection;
     client.questProgressCollection = questProgressCollection;
+    client.economySnapshotsCollection = economySnapshotsCollection;
+    await economySnapshotsCollection
+      .createIndex({ guildId: 1, date: 1 }, { unique: true })
+      .catch((e) =>
+        console.log(`[WARN] EconomySnapshots index 建立失敗：${e.message}`.yellow),
+      );
     console.log(`[DATA] Successfully connected to MongoDB!`.cyan);
 
     // 自動修補沒有 category / drawCount 的舊資料（idempotent，沒事就不動）
