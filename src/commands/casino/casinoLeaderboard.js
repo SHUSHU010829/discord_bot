@@ -1,4 +1,4 @@
-// /賭場排行 — 賭場淨輸贏周榜（賺最多 / 賠最多）
+// /賭場排行 — 賭場淨輸贏排行榜（賺最多 / 賠最多），預設周榜
 
 require("colors");
 const {
@@ -13,25 +13,25 @@ const { DateTime } = require("luxon");
 
 const TYPE_META = {
   winners: {
-    title: "💰 賭場賺最多周榜",
+    title: "💰 賭場賺最多排行榜",
     accent: 0x2ecc71,
     sort: -1,
     profitFilter: { netProfit: { $gt: 0 } },
-    emptyHint: "本週還沒有人在賭場賺到錢",
+    emptyHint: "目前還沒有人在賭場賺到錢",
   },
   losers: {
-    title: "💸 賭場賠最多周榜",
+    title: "💸 賭場賠最多排行榜",
     accent: 0xe74c3c,
     sort: 1,
     profitFilter: { netProfit: { $lt: 0 } },
-    emptyHint: "本週還沒有人在賭場賠錢",
+    emptyHint: "目前還沒有人在賭場賠錢",
   },
 };
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("賭場排行")
-    .setDescription("🎰 查看賭場本週淨輸贏排行榜")
+    .setDescription("🎰 查看賭場淨輸贏排行榜（預設本週）")
     .setDMPermission(false)
     .addStringOption((option) =>
       option
@@ -43,12 +43,24 @@ module.exports = {
           { name: "💸 賠最多", value: "losers" },
         ),
     )
+    .addStringOption((option) =>
+      option
+        .setName("period")
+        .setDescription("統計期間（預設本週）")
+        .setRequired(false)
+        .addChoices(
+          { name: "今天", value: "today" },
+          { name: "本週", value: "week" },
+          { name: "本月", value: "month" },
+        ),
+    )
     .toJSON(),
 
   run: async (client, interaction) => {
     await interaction.deferReply();
 
     const type = interaction.options.getString("type");
+    const period = interaction.options.getString("period") || "week";
     const meta = TYPE_META[type];
 
     try {
@@ -60,13 +72,14 @@ module.exports = {
         client,
         interaction.guild.id,
         type,
+        period,
       );
 
       if (!rows.length) {
         return interaction.editReply(`📊 ${meta.emptyHint}`);
       }
 
-      const container = buildContainer({ meta, rows, range });
+      const container = buildContainer({ meta, period, rows, range });
       await interaction.editReply({
         components: [container],
         flags: MessageFlags.IsComponentsV2,
@@ -80,12 +93,12 @@ module.exports = {
   },
 };
 
-async function fetchCasinoLeaderboard(client, guildId, type) {
+async function fetchCasinoLeaderboard(client, guildId, type, period) {
   const meta = TYPE_META[type];
   const baseMatch = {
     guildId,
     source: { $in: ["bet", "payout"] },
-    ...getWeekFilter(),
+    ...getDateFilter(period),
   };
 
   const [data, rangeAgg] = await Promise.all([
@@ -141,7 +154,7 @@ async function fetchCasinoLeaderboard(client, guildId, type) {
   return { rows, range };
 }
 
-function buildContainer({ meta, rows, range }) {
+function buildContainer({ meta, period, rows, range }) {
   const medals = ["🥇", "🥈", "🥉"];
   const renderRow = (row, idx) => {
     const medal = medals[idx] || `**${idx + 1}.**`;
@@ -186,7 +199,7 @@ function buildContainer({ meta, rows, range }) {
     .addSeparatorComponents(new SeparatorBuilder())
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `-# 統計期間：本週（${rangeText}）・ <t:${Math.floor(Date.now() / 1000)}:R>\n` +
+        `-# 統計期間：${getPeriodText(period)}（${rangeText}）・ <t:${Math.floor(Date.now() / 1000)}:R>\n` +
           `-# 統計範圍：拉霸、21 點、HI-LO、輪盤、骰寶、德州撲克、樂透（交易紀錄最多保留 90 天）`,
       ),
     );
@@ -205,7 +218,27 @@ function describeRange(range) {
   return `${range.firstDate} ~ ${range.lastDate}・共 ${days} 天`;
 }
 
-function getWeekFilter() {
+function getDateFilter(period) {
   const now = DateTime.now().setZone("Asia/Taipei");
-  return { date: { $gte: now.startOf("week").toISODate() } };
+  switch (period) {
+    case "today":
+      return { date: now.toISODate() };
+    case "month":
+      return { date: { $gte: now.startOf("month").toISODate() } };
+    case "week":
+    default:
+      return { date: { $gte: now.startOf("week").toISODate() } };
+  }
+}
+
+function getPeriodText(period) {
+  switch (period) {
+    case "today":
+      return "今天";
+    case "month":
+      return "本月";
+    case "week":
+    default:
+      return "本週";
+  }
 }
