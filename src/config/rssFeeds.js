@@ -12,18 +12,18 @@ const DEFAULT_CHANNEL_ID = "1174352640210124877";
 
 const RSS_FEEDS = [
   {
-    id: "threads_liveking",
-    url: "https://discord-news.zeabur.app/threads/liveking_is_life",
+    id: "picnob_liveking",
+    url: "https://discord-news.zeabur.app/picnob.info/user/liveking_is_life",
     channelId:
       process.env.RSS_THREADS_LIVEKING_CHANNEL_ID || DEFAULT_CHANNEL_ID,
-    type: "threads",
+    type: "picnob",
     filter: {
       match: "all",
       conditions: [
         {
           field: "description",
           op: "matches",
-          pattern: "一週售票速報|演唱會行事曆",
+          pattern: "一週售票速報|演唱會行事曆|演唱會整理",
         },
         {
           field: "description",
