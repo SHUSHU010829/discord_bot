@@ -1,6 +1,7 @@
 // 處理樂透訂閱取消按鈕。
 
-require("colors");
+const logger = require("../../utils/logger");
+const { trackError, trackSuccess } = require("../../utils/errorTracker");
 
 module.exports = async (client, interaction) => {
   try {
@@ -44,7 +45,12 @@ module.exports = async (client, interaction) => {
       content: `✅ 已取消訂閱(剩餘 ${sub.drawsRemaining} 期未扣款)。`,
       ephemeral: true,
     });
+    trackSuccess("lottery-cancel-sub");
   } catch (err) {
-    console.log(`[ERROR] handleLotteryCancelSubscription:\n${err}\n${err.stack}`.red);
+    logger.error(
+      { source: "lottery-cancel-sub", userId: interaction.user?.id, err: err.message, stack: err.stack },
+      "處理樂透訂閱取消失敗"
+    );
+    trackError("lottery-cancel-sub", err, { userId: interaction.user?.id });
   }
 };

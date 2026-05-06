@@ -1,10 +1,11 @@
-require("colors");
 const {
   ActionRowBuilder,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
 } = require("discord.js");
+const logger = require("../../utils/logger");
+const { trackError, trackSuccess } = require("../../utils/errorTracker");
 
 const {
   findActiveGameInChannel,
@@ -143,9 +144,6 @@ async function handleButton(client, interaction) {
 
   // 開始下一局（waiting → preflop）
   if (action === "start") {
-    console.log(
-      `[POKER] start clicked by user=${interaction.user.id} gameId=${gameId} status=${doc.status} players=${doc.players.length}/${doc.minPlayers}`.cyan
-    );
     if (doc.creatorId !== interaction.user.id) {
       return interaction.reply({ content: "🚫 只有開桌者能開局。", ephemeral: true });
     }
@@ -163,9 +161,6 @@ async function handleButton(client, interaction) {
     const next = engine.startHand(doc);
     await persistEngineState(client, doc, next);
     const updated = await fetchByGameId(client, gameId);
-    console.log(
-      `[POKER] hand started gameId=${gameId} hand=${updated.handNumber} phase=${updated.phase} toAct=${updated.toActIdx}`.cyan
-    );
     await refreshTableMessage(client, updated);
     await announceHandStart(client, updated);
     return true;
@@ -362,15 +357,21 @@ module.exports = async (client, interaction) => {
     if (interaction.isButton()) {
       if (!interaction.customId?.startsWith("pk_")) return;
       await handleButton(client, interaction);
+      trackSuccess("poker-interaction");
       return;
     }
     if (interaction.isModalSubmit?.()) {
       if (!interaction.customId?.startsWith("pk_raisemodal_")) return;
       await handleModal(client, interaction);
+      trackSuccess("poker-interaction");
       return;
     }
   } catch (error) {
-    console.log(`[ERROR] handlePokerInteraction:\n${error}\n${error.stack}`.red);
+    logger.error(
+      { source: "poker-interaction", userId: interaction.user?.id, customId: interaction.customId, err: error.message, stack: error.stack },
+      "撲克互動處理失敗"
+    );
+    trackError("poker-interaction", error, { userId: interaction.user?.id, customId: interaction.customId });
     try {
       if (interaction.deferred || interaction.replied) {
         await interaction.followUp({

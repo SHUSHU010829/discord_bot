@@ -1,6 +1,7 @@
-require("colors");
 const express = require("express");
 const createFlushChatScoreHandler = require("./flushChatScore");
+const logger = require("../utils/logger");
+const { snapshot } = require("../utils/errorTracker");
 
 module.exports = function startHttpServer(client) {
   const app = express();
@@ -11,20 +12,50 @@ module.exports = function startHttpServer(client) {
     res.status(200).json({ ok: true, ready: client.isReady() });
   });
 
+  // 診斷端點：列出最近 N 分鐘各服務 (source) 的成功/失敗次數,
+  // 用來找出是哪一塊服務在連續失敗。設 DISCORD_BOT_DIAGNOSTICS_TOKEN
+  // 後需附 `x-diagnostics-token` header 才會回應。
+  app.get("/diagnostics", (req, res) => {
+    const token = process.env.DISCORD_BOT_DIAGNOSTICS_TOKEN;
+    if (token) {
+      const got = req.header("x-diagnostics-token");
+      if (got !== token) {
+        return res.status(401).json({ error: "unauthorized" });
+      }
+    }
+    const snap = snapshot();
+    const sortedSources = Object.entries(snap.sources)
+      .sort(
+        ([, a], [, b]) =>
+          b.errorsLastWindow - a.errorsLastWindow ||
+          b.errorsTotal - a.errorsTotal
+      )
+      .reduce((acc, [k, v]) => {
+        acc[k] = v;
+        return acc;
+      }, {});
+    res.status(200).json({
+      ok: true,
+      ready: client.isReady(),
+      windowMs: snap.windowMs,
+      sources: sortedSources,
+    });
+  });
+
   app.post("/api/twitch-chat-score", createFlushChatScoreHandler(client));
 
   app.use((err, _req, res, _next) => {
-    console.log(`[HTTP] unhandled error: ${err}`.red);
+    logger.error({ source: "http", err: err.message, stack: err.stack }, "HTTP unhandled error");
     res.status(500).json({ error: "internal" });
   });
 
   const port = Number(process.env.PORT) || 8080;
   const server = app.listen(port, () => {
-    console.log(`[HTTP] listening on port ${port}`.cyan);
+    logger.info({ source: "http", port }, "HTTP server listening");
   });
 
   server.on("error", (err) => {
-    console.log(`[HTTP] server error: ${err}`.red);
+    logger.error({ source: "http", err: err.message }, "HTTP server error");
   });
 
   return server;

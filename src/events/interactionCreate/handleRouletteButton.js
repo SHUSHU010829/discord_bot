@@ -1,4 +1,3 @@
-require('colors');
 const {
   ModalBuilder,
   TextInputBuilder,
@@ -12,6 +11,8 @@ const { BET_TYPES, validateInsideBet, isOutside } = require('../../features/casi
 const generateRouletteGif = require('../../utils/generateRouletteGif');
 const { spinWheel, settle, totalWagered } = require('../../features/casino/roulette/engine');
 const { buildBettingRows, buildStatusContent } = require('../../commands/casino/roulette');
+const logger = require('../../utils/logger');
+const { trackError, trackSuccess } = require('../../utils/errorTracker');
 
 const RED_SET = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
 
@@ -249,7 +250,11 @@ module.exports = async (client, interaction) => {
         });
         gifAttachment = new AttachmentBuilder(gifBuf, { name: 'roulette.gif' });
       } catch (gifErr) {
-        console.log(`[ROULETTE] GIF 生成失敗（純文字降級）: ${gifErr.message}`.yellow);
+        logger.warn(
+          { source: "roulette-gif", err: gifErr.message },
+          "輪盤 GIF 生成失敗,降級為純文字"
+        );
+        trackError("roulette-gif", gifErr);
       }
 
       await interaction.editReply({
@@ -286,8 +291,13 @@ module.exports = async (client, interaction) => {
 
       await interaction.editReply({ content: '🎰 已取消，籌碼全額退回。', components: [] });
     }
+    trackSuccess("roulette-button");
   } catch (err) {
-    console.log(`[ERROR] handleRouletteButton:\n${err}\n${err.stack}`.red);
+    logger.error(
+      { source: "roulette-button", userId: interaction.user?.id, customId: interaction.customId, err: err.message, stack: err.stack },
+      "輪盤按鈕處理失敗"
+    );
+    trackError("roulette-button", err, { userId: interaction.user?.id, customId: interaction.customId });
     try {
       if (interaction.deferred || interaction.replied) {
         await interaction.followUp({ content: '🔧 輪盤按鈕處理失敗，請呼叫舒舒！', ephemeral: true });

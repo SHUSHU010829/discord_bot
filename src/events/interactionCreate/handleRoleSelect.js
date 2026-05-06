@@ -3,9 +3,10 @@ const {
   StringSelectMenuBuilder,
   EmbedBuilder,
 } = require("discord.js");
-require("colors");
 
 const { loadPanels } = require("../../utils/rolePanelsStore");
+const logger = require("../../utils/logger");
+const { trackError, trackSuccess } = require("../../utils/errorTracker");
 
 const ITEMS_PER_MENU = 25; // Discord StringSelectMenu 每頁最多 25 個選項
 
@@ -64,7 +65,11 @@ async function ensureMember(interaction) {
     try {
       member = await interaction.guild.members.fetch(interaction.user.id);
     } catch (error) {
-      console.log(`[ERROR] 無法獲取 member：${error.message}`.red);
+      logger.error(
+        { source: "role-select", userId: interaction.user?.id, err: error.message },
+        "無法獲取 member"
+      );
+      trackError("role-select", error, { phase: "ensureMember" });
       await interaction.reply({
         content: "❌ 無法獲取你的身份組資訊，請稍後再試。",
         flags: 64,
@@ -118,7 +123,11 @@ async function handleOpenPanel(client, interaction) {
       flags: 64,
     });
   } catch (error) {
-    console.log(`[ERROR] 開啟角色選單時出錯：${error}\n${error.stack}`.red);
+    logger.error(
+      { source: "role-panel-open", userId: interaction.user?.id, err: error.message, stack: error.stack },
+      "開啟角色選單時出錯"
+    );
+    trackError("role-panel-open", error, { userId: interaction.user?.id });
     if (!interaction.replied && !interaction.deferred) {
       try {
         await interaction.reply({
@@ -126,7 +135,8 @@ async function handleOpenPanel(client, interaction) {
           flags: 64,
         });
       } catch (replyError) {
-        console.log(`[ERROR] 回覆錯誤訊息時出錯：${replyError}`.red);
+        logger.error({ source: "role-panel-open", err: replyError.message }, "回覆錯誤訊息失敗");
+        trackError("role-panel-open", replyError);
       }
     }
   }
@@ -138,7 +148,11 @@ async function handleRoleSubmit(interaction) {
     if (!member) return;
 
     if (!interaction.values || !Array.isArray(interaction.values)) {
-      console.log(`[ERROR] interaction.values 不存在或不是陣列`.red);
+      logger.error(
+        { source: "role-submit", userId: interaction.user?.id },
+        "interaction.values 不存在或不是陣列"
+      );
+      trackError("role-submit", new Error("invalid interaction.values"));
       return await interaction.reply({
         content: "❌ 無法讀取你的選擇，請重試。",
         flags: 64,
@@ -152,7 +166,11 @@ async function handleRoleSubmit(interaction) {
     );
 
     if (menuOptionRoleIds.length === 0) {
-      console.log(`[WARNING] 無法從 interaction.component 取得選項`.yellow);
+      logger.warn(
+        { source: "role-submit", userId: interaction.user?.id },
+        "無法從 interaction.component 取得選項"
+      );
+      trackError("role-submit", new Error("empty component options"));
       return await interaction.reply({
         content: "❌ 無法讀取選單資訊，請重試。",
         flags: 64,
@@ -185,7 +203,7 @@ async function handleRoleSubmit(interaction) {
         const role = interaction.guild.roles.cache.get(roleId);
         if (!role) {
           failedRoles.push(roleId);
-          console.log(`[WARNING] 找不到角色：${roleId}`.yellow);
+          logger.warn({ source: "role-submit", roleId }, "找不到角色");
           return;
         }
         try {
@@ -193,24 +211,28 @@ async function handleRoleSubmit(interaction) {
           addedRoles.push(role.name);
         } catch (error) {
           failedRoles.push(roleId);
-          console.log(
-            `[ERROR] 新增角色 ${roleId} 時出錯：${error.message}`.red,
+          logger.error(
+            { source: "role-submit", roleId, err: error.message },
+            "新增角色時出錯"
           );
+          trackError("role-submit", error, { op: "add", roleId });
         }
       }),
       ...toRemove.map(async (roleId) => {
         const role = interaction.guild.roles.cache.get(roleId);
         if (!role) {
-          console.log(`[WARNING] 找不到角色：${roleId}`.yellow);
+          logger.warn({ source: "role-submit", roleId }, "找不到角色");
           return;
         }
         try {
           await member.roles.remove(role);
           removedRoles.push(role.name);
         } catch (error) {
-          console.log(
-            `[ERROR] 移除角色 ${roleId} 時出錯：${error.message}`.red,
+          logger.error(
+            { source: "role-submit", roleId, err: error.message },
+            "移除角色時出錯"
           );
+          trackError("role-submit", error, { op: "remove", roleId });
         }
       }),
     ]);
@@ -237,8 +259,13 @@ async function handleRoleSubmit(interaction) {
       content: message.trim(),
       flags: 64, // MessageFlags.Ephemeral
     });
+    trackSuccess("role-submit");
   } catch (error) {
-    console.log(`[ERROR] 處理角色選單互動時出錯：${error}\n${error.stack}`.red);
+    logger.error(
+      { source: "role-submit", userId: interaction.user?.id, err: error.message, stack: error.stack },
+      "處理角色選單互動時出錯"
+    );
+    trackError("role-submit", error, { userId: interaction.user?.id });
 
     if (!interaction.replied && !interaction.deferred) {
       try {
@@ -247,10 +274,9 @@ async function handleRoleSubmit(interaction) {
           flags: 64,
         });
       } catch (replyError) {
-        console.log(`[ERROR] 回覆錯誤訊息時出錯：${replyError}`.red);
+        logger.error({ source: "role-submit", err: replyError.message }, "回覆錯誤訊息失敗");
+        trackError("role-submit", replyError);
       }
-    } else {
-      console.log(`[WARNING] Interaction 已經被回覆，無法發送錯誤訊息`.yellow);
     }
   }
 }
