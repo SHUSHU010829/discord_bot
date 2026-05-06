@@ -63,6 +63,9 @@
 
   "coinSystem": {
     "enabled": true,
+    "eligibility": {
+      "minServerTenureDays": 7
+    },
     "message": {
       "minCoins": 0,
       "maxCoins": 2,
@@ -135,7 +138,10 @@
       "minAmount": 100,
       "maxAmount": 50000,
       "dailyCapPerSender": 20000,
-      "feeRate": 0.02
+      "feeRate": 0.02,
+      "feeRateHigh": 0.05,
+      "highFeeThreshold": 1000,
+      "cooldownSeconds": 1800
     },
     "deposit": {
       "enabled": true,

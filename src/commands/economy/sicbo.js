@@ -6,6 +6,7 @@ const {
 } = require("discord.js");
 const { coinSystem, casino } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
+const { checkServerTenure } = require("../../features/economy/eligibility");
 const { rollThree } = require("../../features/casino/sicbo/dice");
 const { settleRound } = require("../../features/casino/sicbo/engine");
 const {
@@ -80,6 +81,11 @@ module.exports = {
       }
       if (!client.userCoinsCollection || !client.coinTransactionsCollection) {
         return interaction.editReply("🔧 金幣系統尚未啟動，請聯絡舒舒！");
+      }
+
+      const tenure = checkServerTenure(interaction.member);
+      if (!tenure.ok) {
+        return interaction.editReply(tenure.message);
       }
 
       const allIn = interaction.options.getBoolean("梭哈") === true;
