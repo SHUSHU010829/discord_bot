@@ -55,8 +55,8 @@
       { "id": "boost_xp_1h", "category": "加成藥水", "type": "xp_boost", "name": "XP 藥水（1.5×／1 小時）", "description": "1 小時內所有 XP 來源 ×1.5", "price": 600, "payload": { "multiplier": 1.5, "durationMinutes": 60 } },
       { "id": "boost_xp_1d", "category": "加成藥水", "type": "xp_boost", "name": "XP 藥水（1.5×／1 日）", "description": "24 小時內所有 XP 來源 ×1.5", "price": 4000, "payload": { "multiplier": 1.5, "durationMinutes": 1440 } },
       { "id": "boost_xp_double", "category": "加成藥水", "type": "xp_boost", "name": "XP 雙倍藥水（1 小時）", "description": "1 小時內 XP ×2，難得的暴衝機會", "price": 1500, "payload": { "multiplier": 2.0, "durationMinutes": 60 } },
-      { "id": "boost_coin_1h", "category": "加成藥水", "type": "coin_boost", "name": "金幣藥水（1.5×／1 小時）", "description": "1 小時內所有金幣來源 ×1.5", "price": 800, "payload": { "multiplier": 1.5, "durationMinutes": 60 } },
-      { "id": "boost_coin_1d", "category": "加成藥水", "type": "coin_boost", "name": "金幣藥水（1.5×／1 日）", "description": "24 小時內所有金幣來源 ×1.5", "price": 5000, "payload": { "multiplier": 1.5, "durationMinutes": 1440 } },
+      { "id": "boost_coin_1h", "category": "加成藥水", "type": "coin_boost", "name": "金幣藥水（1.5×／1 小時）", "description": "1 小時內主動互動獲得的金幣 ×1.5（發言／語音／表情／簽到／升等／里程碑／訂閱／加成／Twitch 聊天／轉盤）；賭場、商店、轉帳與固定任務福利不適用", "price": 800, "payload": { "multiplier": 1.5, "durationMinutes": 60 } },
+      { "id": "boost_coin_1d", "category": "加成藥水", "type": "coin_boost", "name": "金幣藥水（1.5×／1 日）", "description": "24 小時內主動互動獲得的金幣 ×1.5（發言／語音／表情／簽到／升等／里程碑／訂閱／加成／Twitch 聊天／轉盤）；賭場、商店、轉帳與固定任務福利不適用", "price": 5000, "payload": { "multiplier": 1.5, "durationMinutes": 1440 } },
 
       { "id": "theme_temple", "category": "卡面風格", "type": "wallet_theme", "name": "廟宇籤詩", "description": "永久解鎖：米黃紙底 + 朱紅外框 + 大寫漢字數字，像一張求財籤", "price": 6000, "payload": { "themeId": "temple" } },
       { "id": "theme_glitch", "category": "卡面風格", "type": "wallet_theme", "name": "故障藝術", "description": "永久解鎖：黑底 + RGB 三層分離疊字 + 駭客感橫向色帶", "price": 9000, "payload": { "themeId": "glitch" } },
