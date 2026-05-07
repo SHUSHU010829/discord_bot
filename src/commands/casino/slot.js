@@ -13,6 +13,9 @@ const {
   getPool: getJackpotPool,
   getCfg: getJackpotCfg,
 } = require("../../features/casino/slot/jackpotPool");
+const {
+  checkAndAnnouncePoolMilestones: checkSlotPoolMilestones,
+} = require("../../features/casino/slot/poolAnnouncer");
 const generateSlotGif = require("../../utils/generateSlotGif");
 
 function getSlotConfig() {
@@ -227,6 +230,13 @@ module.exports = {
             ).catch(() => {});
           }
         } catch (_) { /* ignore */ }
+      }
+
+      // 彩池里程碑播報（沒爆池才檢查；爆池後 pool 已歸 seed）
+      if (jackpotEnabled && jackpotBust === 0) {
+        checkSlotPoolMilestones(client, guildId).catch((e) =>
+          console.log(`[SLOT] milestone check failed: ${e}`.yellow)
+        );
       }
     } catch (error) {
       console.log(`[ERROR] /拉霸:\n${error}\n${error.stack}`.red);

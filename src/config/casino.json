@@ -20,7 +20,8 @@
         "enabled": true,
         "contributionRate": 0.03,
         "seedAmount": 5000,
-        "announceChannelId": null
+        "announceChannelId": "1501770364982657084",
+        "poolMilestones": [10000, 25000, 50000, 100000]
       }
     },
     "blackjack": {
@@ -51,8 +52,8 @@
     },
     "lottery": {
       "enabled": true,
-      "announceChannelId": "1174352640210124877",
-      "poolMilestoneChannelId": null,
+      "announceChannelId": "1501770364982657084",
+      "poolMilestoneChannelId": "1501770364982657084",
       "drawCron": "0 21 * * 0",
       "subscriptionCron": "30 20 * * 0",
       "reminderCron": "0 * * * *",
