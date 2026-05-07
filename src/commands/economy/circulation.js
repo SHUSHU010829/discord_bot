@@ -91,8 +91,8 @@ async function sumOpenLotteryPools(client) {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("流通量")
-    .setDescription("[ADMIN] 查看全機器人金幣流通量總計 💰")
+    .setName("circulation")
+    .setDescription("[ADMIN] Show total coin circulation across all guilds 💰")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .setDMPermission(false)
     .toJSON(),
@@ -179,7 +179,7 @@ module.exports = {
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-      console.log(`[ERROR] /流通量:\n${error}\n${error.stack}`.red);
+      console.log(`[ERROR] /circulation:\n${error}\n${error.stack}`.red);
       await interaction
         .editReply("🔧 計算流通量失敗，看 console")
         .catch(() => {});
