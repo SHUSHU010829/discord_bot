@@ -41,7 +41,10 @@
     "horseRacing": {
       "enabled": true,
       "minBet": 10,
-      "maxBet": 1000
+      "maxBet": 1000,
+      "bettingWindowSeconds": 600,
+      "raceTtlSeconds": 1800,
+      "frameDelayMs": 1200
     },
     "poker": {
       "enabled": true,

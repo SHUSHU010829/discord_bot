@@ -1,61 +1,31 @@
+// /賽馬 — 開一場 channel-scoped 賽馬，10 分鐘售票期，到時自動開賽。
+//
+// 流程：
+//   1) 開盤者下指令 → 在頻道貼售票訊息（按鈕押注）
+//   2) 任何人點 hr_pick_<horseId>_<gameId> → 跳 modal 輸入金額 → 入注
+//   3) cron / setTimeout 撈到 expiresAt 過期或開盤者按 🚀 → 自動開賽
+//   4) 開賽：simulateRace 跑動畫，到結尾依各筆下注分別 grantCoins 派彩
+//   5) 0 人下注 → 直接取消、不跑動畫
+
 require("colors");
 const crypto = require("crypto");
 const { SlashCommandBuilder } = require("discord.js");
 
 const { coinSystem, casino } = require("../../config");
-const grantCoins = require("../../features/economy/grantCoins");
 const {
-  HORSES,
-  getHorse,
-  pickWinnerWeighted,
-  simulateRace,
-  calcPayout,
-} = require("../../features/casino/horseRacing/engine");
-const {
-  renderFrame,
-  renderFinalMessage,
+  renderBettingPhase,
 } = require("../../features/casino/horseRacing/renderer");
+const { startRaceIfDue } = require("../../features/casino/horseRacing/raceRunner");
 
 function getCfg() {
   return casino?.horseRacing || {};
 }
 
-const FRAME_DELAY_MS = 1200;
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("賽馬")
-    .setDescription("六匹馬賽跑，押你看好的馬奪冠！🐎")
+    .setDescription("🐎 開一場賽馬！售票期內大家進來押注，時間到自動開賽")
     .setDMPermission(false)
-    .addIntegerOption((opt) =>
-      opt
-        .setName("馬匹")
-        .setDescription("選一匹馬下注（編號越大賠率越高、勝率越低）")
-        .setRequired(true)
-        .addChoices(
-          ...HORSES.map((h) => ({
-            name: `${h.id}. ${h.emoji} ${h.name} ×${h.payout.toFixed(1)}`,
-            value: h.id,
-          })),
-        ),
-    )
-    .addIntegerOption((opt) =>
-      opt
-        .setName("下注")
-        .setDescription("下注 credits（勾選梭哈時可省略）")
-        .setRequired(false)
-        .setMinValue(getCfg().minBet ?? 10),
-    )
-    .addBooleanOption((opt) =>
-      opt
-        .setName("梭哈")
-        .setDescription("一次押上目前全部餘額")
-        .setRequired(false),
-    )
     .toJSON(),
 
   run: async (client, interaction) => {
@@ -68,136 +38,79 @@ module.exports = {
       if (!client.userCoinsCollection || !client.coinTransactionsCollection) {
         return interaction.editReply("🔧 金幣系統尚未啟動，請聯絡舒舒！");
       }
+      if (!client.horseRaceGamesCollection) {
+        return interaction.editReply("🔧 賽馬系統未啟動，請聯絡舒舒！");
+      }
 
       const cfg = getCfg();
       if (cfg.enabled === false) {
         return interaction.editReply("🔧 賽馬暫時關閉中！");
       }
 
-      const minBet = cfg.minBet ?? 10;
-      const maxBet = cfg.maxBet ?? 1000;
-
-      const horseId = interaction.options.getInteger("馬匹");
-      const horse = getHorse(horseId);
-      if (!horse) {
-        return interaction.editReply("❌ 馬匹編號無效。");
-      }
-
-      const betInput = interaction.options.getInteger("下注");
-      const allIn = interaction.options.getBoolean("梭哈") === true;
-      if (!allIn && (!Number.isInteger(betInput) || betInput < minBet)) {
-        return interaction.editReply(
-          `下注金額至少需 ${minBet.toLocaleString()} credits（或勾選梭哈）。`,
-        );
-      }
-
-      const userId = interaction.user.id;
       const guildId = interaction.guildId;
+      const channelId = interaction.channelId;
+      const userId = interaction.user.id;
       const username =
         interaction.member?.displayName || interaction.user.username;
-      const member = interaction.member;
 
-      const before = await client.userCoinsCollection.findOne({
-        userId,
-        guildId,
+      // 同頻道一次只能有一場 betting/running
+      const existing = await client.horseRaceGamesCollection.findOne({
+        channelId,
+        status: { $in: ["betting", "running"] },
       });
-      const balance = before?.totalCoins || 0;
-      let bet = allIn ? balance : betInput;
-      if (allIn && balance < minBet) {
+      if (existing) {
         return interaction.editReply(
-          `💰 餘額不足以梭哈！目前 **${balance.toLocaleString()}** credits，至少需 ${minBet.toLocaleString()}。`,
+          "🐎 這個頻道已經有一場賽馬在進行中，先等它跑完再開新場！",
         );
       }
-      if (balance < bet) {
-        return interaction.editReply(
-          `💰 餘額不足！目前 **${balance.toLocaleString()}** credits，無法下注 ${bet.toLocaleString()}。`,
-        );
-      }
-      // 梭哈也吃 maxBet 上限，避免大戶單局拉爆 RTP
-      if (bet > maxBet) bet = maxBet;
 
-      const roundId = crypto.randomUUID();
+      const windowSec = cfg.bettingWindowSeconds ?? 600;
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + windowSec * 1000);
+      const gameId = crypto.randomUUID();
 
-      // 扣下注
-      const betResult = await grantCoins(client, {
-        userId,
+      const state = {
+        gameId,
         guildId,
-        username,
-        avatarHash: interaction.user.avatar,
-        amount: -bet,
-        source: "bet",
-        member,
-        meta: { game: "horseRacing", roundId, horseId: horse.id },
-      });
-      if (!betResult) {
-        return interaction.editReply("🔧 下注失敗，請稍後再試。");
+        channelId,
+        messageId: null,
+        hostUserId: userId,
+        hostUsername: username,
+        status: "betting",
+        bets: [],
+        winnerId: null,
+        rankings: null,
+        finalPositions: null,
+        settles: null,
+        createdAt: now,
+        updatedAt: now,
+        expiresAt,
+      };
+
+      await client.horseRaceGamesCollection.insertOne(state);
+
+      const payload = renderBettingPhase(state);
+      const message = await interaction.editReply(payload);
+
+      // 紀錄 messageId 供之後 edit
+      await client.horseRaceGamesCollection.updateOne(
+        { gameId },
+        { $set: { messageId: message.id, updatedAt: new Date() } },
+      );
+
+      // 安排 setTimeout 自動開賽（cron 也會撈，重複觸發靠 atomic update 防重）
+      const delayMs = expiresAt.getTime() - Date.now();
+      if (delayMs > 0) {
+        setTimeout(() => {
+          startRaceIfDue(client, gameId).catch((e) =>
+            console.log(`[HORSE] auto-start failed (timeout): ${e}`.yellow),
+          );
+        }, delayMs).unref?.();
       }
-      let balanceAfter = betResult.doc?.totalCoins ?? balance - bet;
-
-      // 跑比賽
-      const winnerId = pickWinnerWeighted();
-      const { frames, rankings } = simulateRace(winnerId);
-
-      // 動畫：逐幀 editReply
-      for (let i = 0; i < frames.length - 1; i++) {
-        const content = renderFrame({
-          positions: frames[i],
-          username,
-          bet,
-          horse,
-          status: "running",
-        });
-        await interaction.editReply({ content }).catch(() => {});
-        await sleep(FRAME_DELAY_MS);
-      }
-
-      // 結算
-      const won = winnerId === horse.id;
-      const payout = won ? calcPayout(bet, horse.payout) : 0;
-
-      if (won && payout > 0) {
-        const payoutResult = await grantCoins(client, {
-          userId,
-          guildId,
-          username,
-          amount: payout,
-          source: "payout",
-          member,
-          meta: {
-            game: "horseRacing",
-            roundId,
-            horseId: horse.id,
-            winnerId,
-            multiplier: horse.payout,
-            bet,
-          },
-        });
-        balanceAfter = payoutResult?.doc?.totalCoins ?? balanceAfter + payout;
-      }
-
-      const finalContent = renderFinalMessage({
-        positions: frames[frames.length - 1],
-        username,
-        bet,
-        horse,
-        rankings,
-        won,
-        payout,
-        balance: balanceAfter,
-      });
-
-      const bankruptLine =
-        balanceAfter <= 0
-          ? "\n🚨 **你破產了！** 餘額歸零，去發言、聊天賺金幣再來吧！"
-          : "";
-
-      await interaction.editReply({
-        content: finalContent + bankruptLine,
-      });
     } catch (error) {
       console.log(`[ERROR] /賽馬:\n${error}\n${error.stack}`.red);
       await interaction
-        .editReply("🔧 賽馬執行失敗，請呼叫舒舒！")
+        .editReply("🔧 賽馬開盤失敗，請呼叫舒舒！")
         .catch(() => {});
     }
   },
