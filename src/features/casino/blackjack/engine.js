@@ -25,8 +25,8 @@ const { evaluateHand } = require("./hand");
 
 // 過五關門檻：抽到第 N 張未爆牌即自動結算為過五關
 const FIVE_CARD_THRESHOLD = 5;
-// 過五關賠率倍數（拿回的總額 = 注額 × 此倍數）。3 = 2:1 賠率（本金 + 2 倍贏額）
-const FIVE_CARD_PAYOUT_MULTIPLIER = 3;
+// 過五關賠率倍數（拿回的總額 = 注額 × 此倍數）。2 = 1:1 賠率（本金 + 等額獎金）
+const FIVE_CARD_PAYOUT_MULTIPLIER = 2;
 
 function startGame({ bet, deckCount = 1 }) {
   let deck = freshShuffledDeck(deckCount);
