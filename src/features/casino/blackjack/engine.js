@@ -1,35 +1,89 @@
 // 21 點核心引擎：純函數，不接觸 DB / Discord。
 //
-// 設計簡化版規則（無 split、無 insurance、無 surrender）：
+// 規則：
 //   - 1 副 52 張，每局重洗
-//   - 玩家可 hit / stand / double
+//   - 玩家可 hit / stand / double / split
 //   - 莊家 ≥17 必停（含 soft 17，不 hit S17）
 //   - Blackjack（兩張 A+10/J/Q/K）賠率 3:2，一般贏 1:1，平手退本金
 //   - 過五關（Five-Card Charlie）：玩家持有 5 張未爆牌自動獲勝，賠率 2:1
 //   - 莊家過五關：莊家拿到 5 張未爆牌則莊家勝（玩家 BJ / 玩家過五關優先結算，不受影響）
+//   - 分牌（Split）：起手兩張同點數可分牌，需追加一筆等額注；
+//     分牌後的 21 不算 BJ；分對 A 只能各補一張且不能再要牌、不能加倍；
+//     不支援再分牌（最多兩手）
 //
 // State 結構：
 //   {
-//     bet: number,            // 原始下注（double 後 doubled=true，但 bet 不變）
-//     doubled: boolean,
+//     bet: number,            // 每手原始下注
+//     doubled: boolean,       // legacy / 未分牌時的 active hand 是否 double
 //     status: "playing"|"settled",
 //     deck: string[],         // 剩餘牌堆
-//     playerHand: string[],
+//     playerHand: string[],   // 目前 active hand 的牌（=hands[activeIndex].cards）
 //     dealerHand: string[],   // 結算前 dealerHand[1] 視為暗牌
-//     result: "blackjack"|"fivecard"|"dealerfivecard"|"win"|"push"|"lose"|null,
-//     payout: number,         // 拿回的總額（含本金）；輸 = 0
+//     hands: Array<{
+//       cards: string[],
+//       bet: number,
+//       doubled: boolean,
+//       done: boolean,        // 玩家動作已結束（stand/bust/21/double/fivecard/splitAce）
+//       result: string|null,  // 結算後填入：blackjack/win/push/lose/fivecard/dealerfivecard
+//       payout: number,       // 此手拿回的總額
+//       fromSplitAces: boolean,
+//     }>,
+//     activeIndex: number,    // 目前操作的手序號
+//     isSplit: boolean,
+//     result: string|null,    // 整局 headline 結果（多手時取最佳）
+//     payout: number,         // 全部手加總拿回的總額
 //   }
 
-const { freshShuffledDeck, drawOne } = require("./deck");
-const { evaluateHand } = require("./hand");
+const { freshShuffledDeck, drawOne, rankOf } = require("./deck");
+const { evaluateHand, rankValue } = require("./hand");
 
 // 過五關門檻：抽到第 N 張未爆牌即自動結算為過五關
 const FIVE_CARD_THRESHOLD = 5;
 // 過五關賠率倍數（拿回的總額 = 注額 × 此倍數）。2 = 1:1 賠率（本金 + 等額獎金）
 const FIVE_CARD_PAYOUT_MULTIPLIER = 2;
 
-function startGame({ bet, deckCount = 1 }) {
-  let deck = freshShuffledDeck(deckCount);
+// 把舊版（沒有 hands 欄位）的 state/doc 補成新結構，方便升級當下還在進行的局正常 resume。
+function ensureHandsShape(state) {
+  if (Array.isArray(state.hands) && state.hands.length > 0) return state;
+  const hand = {
+    cards: state.playerHand,
+    bet: state.bet,
+    doubled: !!state.doubled,
+    done: false,
+    result: null,
+    payout: 0,
+    fromSplitAces: false,
+  };
+  return {
+    ...state,
+    hands: [hand],
+    activeIndex: 0,
+    isSplit: false,
+  };
+}
+
+function makeHand(cards, bet, fromSplitAces = false) {
+  return {
+    cards,
+    bet,
+    doubled: false,
+    done: false,
+    result: null,
+    payout: 0,
+    fromSplitAces,
+  };
+}
+
+function syncActive(state) {
+  return {
+    ...state,
+    playerHand: state.hands[state.activeIndex].cards,
+    doubled: state.isSplit ? state.doubled : state.hands[0].doubled,
+  };
+}
+
+function startGame({ bet }) {
+  let deck = freshShuffledDeck(1);
   const playerHand = [];
   const dealerHand = [];
 
@@ -42,11 +96,13 @@ function startGame({ bet, deckCount = 1 }) {
   const state = {
     bet,
     doubled: false,
-    deckCount: Math.max(1, Math.floor(deckCount)),
     status: "playing",
     deck,
     playerHand,
     dealerHand,
+    hands: [makeHand(playerHand, bet)],
+    activeIndex: 0,
+    isSplit: false,
     result: null,
     payout: 0,
   };
@@ -61,48 +117,111 @@ function startGame({ bet, deckCount = 1 }) {
   return state;
 }
 
+function canSplit(state) {
+  if (state.status !== "playing") return false;
+  if (state.isSplit) return false;
+  if (state.hands.length !== 1) return false;
+  const cur = state.hands[0];
+  if (cur.cards.length !== 2) return false;
+  return rankValue(rankOf(cur.cards[0])) === rankValue(rankOf(cur.cards[1]));
+}
+
 function hit(state) {
   if (state.status !== "playing") return state;
+  const idx = state.activeIndex;
+  const cur = state.hands[idx];
+  if (cur.done) return state;
+  if (cur.fromSplitAces) return state; // 分對 A 不可再要牌
+
   const { card, deck } = drawOne(state.deck);
-  const playerHand = [...state.playerHand, card];
-  const next = { ...state, deck, playerHand };
-  const ev = evaluateHand(playerHand);
+  const newCards = [...cur.cards, card];
+  const ev = evaluateHand(newCards);
+  const newCur = { ...cur, cards: newCards };
   if (ev.isBust) {
-    return settle(next);
+    newCur.done = true;
+  } else if (newCards.length >= FIVE_CARD_THRESHOLD) {
+    newCur.done = true;
+  } else if (ev.total === 21) {
+    newCur.done = true;
   }
-  // 過五關：抽到第 5 張未爆牌，自動獲勝
-  if (playerHand.length >= FIVE_CARD_THRESHOLD) {
-    return settle(next);
-  }
-  // 玩家湊到 21 自動 stand（不可能再 hit 出更好結果）
-  if (ev.total === 21) {
-    return settle(next);
-  }
-  return next;
+  const newHands = state.hands.map((h, i) => (i === idx ? newCur : h));
+  return advanceOrSettle({ ...state, deck, hands: newHands });
 }
 
 function stand(state) {
   if (state.status !== "playing") return state;
-  return settle(state);
+  const idx = state.activeIndex;
+  const cur = state.hands[idx];
+  if (cur.done) return state;
+  const newCur = { ...cur, done: true };
+  const newHands = state.hands.map((h, i) => (i === idx ? newCur : h));
+  return advanceOrSettle({ ...state, hands: newHands });
 }
 
 // double：把玩家加倍下注的責任交給呼叫端（要先扣第二筆 bet）。
-// 這裡只標記 doubled=true，發一張、自動結算。
+// 標記該手 doubled=true，發一張、該手結束。
 function doubleDown(state) {
   if (state.status !== "playing") return state;
-  if (state.playerHand.length !== 2) return state;
+  const idx = state.activeIndex;
+  const cur = state.hands[idx];
+  if (cur.done) return state;
+  if (cur.cards.length !== 2) return state;
+  if (cur.doubled) return state;
+  if (cur.fromSplitAces) return state;
+
   const { card, deck } = drawOne(state.deck);
-  const playerHand = [...state.playerHand, card];
+  const newCards = [...cur.cards, card];
+  const newCur = { ...cur, cards: newCards, doubled: true, done: true };
+  const newHands = state.hands.map((h, i) => (i === idx ? newCur : h));
+  return advanceOrSettle({ ...state, deck, hands: newHands });
+}
+
+// split：把第一手拆成兩手，每手各補一張。需要呼叫端先扣第二筆 bet。
+function split(state) {
+  if (!canSplit(state)) return state;
+  const cur = state.hands[0];
+  const isAces = rankOf(cur.cards[0]) === "A" && rankOf(cur.cards[1]) === "A";
+  const [c1, c2] = cur.cards;
+
+  let deck = state.deck;
+  let drawA;
+  let drawB;
+  ({ card: drawA, deck } = drawOne(deck));
+  ({ card: drawB, deck } = drawOne(deck));
+
+  const handA = makeHand([c1, drawA], state.bet, isAces);
+  const handB = makeHand([c2, drawB], state.bet, isAces);
+  if (isAces) {
+    // 分對 A：每手只補一張，自動結束
+    handA.done = true;
+    handB.done = true;
+  } else {
+    // 補完牌就 21 → 自動結束該手（同 hit 邏輯）
+    if (evaluateHand(handA.cards).total === 21) handA.done = true;
+    if (evaluateHand(handB.cards).total === 21) handB.done = true;
+  }
+
   const next = {
     ...state,
     deck,
-    playerHand,
-    doubled: true,
+    isSplit: true,
+    hands: [handA, handB],
+    activeIndex: 0,
   };
-  return settle(next);
+  return advanceOrSettle(next);
 }
 
-// 跑莊家流程：≥17 停、否則繼續抽（含 soft 17 也停 = stand on all 17）。
+// 把 active 推進到下一手未完成的牌；若沒有就跑莊家結算。
+function advanceOrSettle(state) {
+  let idx = state.activeIndex;
+  while (idx < state.hands.length && state.hands[idx].done) idx += 1;
+  if (idx >= state.hands.length) {
+    return settle({ ...state, activeIndex: state.hands.length - 1 });
+  }
+  return syncActive({ ...state, activeIndex: idx });
+}
+
+// 跑莊家流程：≥17 停、否則繼續抽（含 soft 17 也停 = stand on all 17 / S17）。
 function playDealer(state) {
   let deck = state.deck;
   let dealerHand = [...state.dealerHand];
@@ -118,67 +237,90 @@ function playDealer(state) {
   return { ...state, deck, dealerHand };
 }
 
-function settle(state) {
-  const playerEval = evaluateHand(state.playerHand);
+// 對單手（含 BJ / 過五關 / 比點）給出結果與 payout。
+function settleHand(hand, dealerEval, dealerCardCount, isSplit) {
+  const ev = evaluateHand(hand.cards);
+  const stake = hand.bet * (hand.doubled ? 2 : 1);
 
-  // 玩家爆牌：直接輸（不看莊家）
-  if (playerEval.isBust) {
-    return finalize(state, "lose", 0);
+  // 玩家爆牌
+  if (ev.isBust) {
+    return { ...hand, result: "lose", payout: 0 };
   }
-
-  const totalStake = state.bet * (state.doubled ? 2 : 1);
-
-  // 過五關：玩家持有 5 張以上未爆牌 → 自動獲勝，不比莊家點數
-  // 仍把莊家牌跑完讓畫面看得到完整對局，但結果固定
-  if (state.playerHand.length >= FIVE_CARD_THRESHOLD) {
-    const afterDealer = playDealer(state);
-    return finalize(
-      afterDealer,
-      "fivecard",
-      totalStake * FIVE_CARD_PAYOUT_MULTIPLIER
-    );
+  // 玩家過五關 → 自動贏，不看莊家
+  if (hand.cards.length >= FIVE_CARD_THRESHOLD) {
+    return { ...hand, result: "fivecard", payout: stake * FIVE_CARD_PAYOUT_MULTIPLIER };
   }
+  // BJ 只算在「未分牌」且第一手原始兩張就 21 的情況
+  const isHandBJ =
+    !isSplit && !hand.fromSplitAces && ev.isBlackjack && hand.cards.length === 2;
 
-  // 跑莊家
-  const afterDealer = playDealer(state);
-  const dealerEval = evaluateHand(afterDealer.dealerHand);
-
-  // BJ 對撞 → push
-  if (playerEval.isBlackjack && dealerEval.isBlackjack) {
-    return finalize(afterDealer, "push", totalStake);
+  if (isHandBJ && dealerEval.isBlackjack) {
+    return { ...hand, result: "push", payout: stake };
   }
-  // 玩家 BJ → 3:2（payout = bet × 2.5），double 過的話不會走到這（doubled 後手牌一定 ≥3 張）
-  if (playerEval.isBlackjack) {
-    return finalize(afterDealer, "blackjack", Math.floor(state.bet * 2.5));
+  if (isHandBJ) {
+    return { ...hand, result: "blackjack", payout: Math.floor(hand.bet * 2.5) };
   }
-  // 莊家 BJ → 玩家輸
   if (dealerEval.isBlackjack) {
-    return finalize(afterDealer, "lose", 0);
+    return { ...hand, result: "lose", payout: 0 };
   }
-  // 莊家爆 → 玩家贏
   if (dealerEval.isBust) {
-    return finalize(afterDealer, "win", totalStake * 2);
+    return { ...hand, result: "win", payout: stake * 2 };
   }
-  // 莊家過五關：莊家持有 5 張未爆牌 → 莊家獲勝
-  if (afterDealer.dealerHand.length >= FIVE_CARD_THRESHOLD) {
-    return finalize(afterDealer, "dealerfivecard", 0);
+  if (dealerCardCount >= FIVE_CARD_THRESHOLD) {
+    return { ...hand, result: "dealerfivecard", payout: 0 };
   }
-  // 比點數
-  if (playerEval.total > dealerEval.total) {
-    return finalize(afterDealer, "win", totalStake * 2);
+  if (ev.total > dealerEval.total) {
+    return { ...hand, result: "win", payout: stake * 2 };
   }
-  if (playerEval.total < dealerEval.total) {
-    return finalize(afterDealer, "lose", 0);
+  if (ev.total < dealerEval.total) {
+    return { ...hand, result: "lose", payout: 0 };
   }
-  return finalize(afterDealer, "push", totalStake);
+  return { ...hand, result: "push", payout: stake };
 }
 
-function finalize(state, result, payout) {
+// 多手結算的 headline：依「最佳結果」優先排序，方便畫面顯示一句話總結。
+const RESULT_RANK = {
+  blackjack: 6,
+  fivecard: 5,
+  win: 4,
+  push: 3,
+  dealerfivecard: 2,
+  lose: 1,
+};
+function pickHeadline(hands) {
+  let best = null;
+  for (const h of hands) {
+    if (!h.result) continue;
+    if (!best || (RESULT_RANK[h.result] || 0) > (RESULT_RANK[best] || 0)) {
+      best = h.result;
+    }
+  }
+  return best;
+}
+
+function settle(state) {
+  // 全部手都爆了就不必再讓莊家抽（畫面也直接揭曉暗牌）
+  const allBust = state.hands.every((h) => evaluateHand(h.cards).isBust);
+
+  const afterDealer = allBust ? state : playDealer(state);
+  const dealerEval = evaluateHand(afterDealer.dealerHand);
+
+  const settledHands = afterDealer.hands.map((h) =>
+    settleHand(h, dealerEval, afterDealer.dealerHand.length, state.isSplit)
+  );
+  const totalPayout = settledHands.reduce((s, h) => s + h.payout, 0);
+  const headline = pickHeadline(settledHands) || "lose";
+
+  const lastIdx = settledHands.length - 1;
   return {
-    ...state,
+    ...afterDealer,
+    hands: settledHands,
+    activeIndex: lastIdx,
+    playerHand: settledHands[lastIdx].cards,
+    doubled: state.isSplit ? state.doubled : settledHands[0].doubled,
     status: "settled",
-    result,
-    payout,
+    result: headline,
+    payout: totalPayout,
   };
 }
 
@@ -187,9 +329,13 @@ module.exports = {
   hit,
   stand,
   doubleDown,
+  split,
+  canSplit,
+  ensureHandsShape,
   FIVE_CARD_THRESHOLD,
   FIVE_CARD_PAYOUT_MULTIPLIER,
   // exposed for testing
   settle,
   playDealer,
+  settleHand,
 };

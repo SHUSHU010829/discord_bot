@@ -33,10 +33,23 @@ function renderHandLine(label, cards, total, isHidden) {
 
 function buildButtons(state, balance) {
   const gameId = state.gameId;
+  const isPlaying = state.status === "playing";
+  const activeHand = state.hands?.[state.activeIndex];
+  const canHitOrStand =
+    isPlaying && !!activeHand && !activeHand.fromSplitAces;
   const canDouble =
-    state.status === "playing" &&
-    state.playerHand.length === 2 &&
-    !state.doubled &&
+    isPlaying &&
+    !!activeHand &&
+    activeHand.cards.length === 2 &&
+    !activeHand.doubled &&
+    !activeHand.fromSplitAces &&
+    balance >= state.bet;
+  const canSplitBtn =
+    isPlaying &&
+    !state.isSplit &&
+    state.hands?.length === 1 &&
+    activeHand?.cards.length === 2 &&
+    canSplitFromCards(activeHand.cards) &&
     balance >= state.bet;
 
   return new ActionRowBuilder().addComponents(
@@ -45,24 +58,49 @@ function buildButtons(state, balance) {
       .setLabel("要牌")
       .setEmoji("🃏")
       .setStyle(ButtonStyle.Primary)
-      .setDisabled(state.status !== "playing"),
+      .setDisabled(!canHitOrStand),
     new ButtonBuilder()
       .setCustomId(`bj_stand_${gameId}`)
       .setLabel("停牌")
       .setEmoji("✋")
       .setStyle(ButtonStyle.Secondary)
-      .setDisabled(state.status !== "playing"),
+      .setDisabled(!canHitOrStand),
     new ButtonBuilder()
       .setCustomId(`bj_double_${gameId}`)
       .setLabel("加倍")
       .setEmoji("💰")
       .setStyle(ButtonStyle.Success)
-      .setDisabled(!canDouble)
+      .setDisabled(!canDouble),
+    new ButtonBuilder()
+      .setCustomId(`bj_split_${gameId}`)
+      .setLabel("分牌")
+      .setEmoji("✂️")
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(!canSplitBtn)
   );
 }
 
+const RANK_VALUE = {
+  A: 1, T: 10, J: 10, Q: 10, K: 10,
+  2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9,
+};
+function canSplitFromCards(cards) {
+  if (!cards || cards.length !== 2) return false;
+  return RANK_VALUE[cards[0][0]] === RANK_VALUE[cards[1][0]];
+}
+
+function totalStakeOf(state) {
+  if (Array.isArray(state.hands) && state.hands.length > 0) {
+    return state.hands.reduce(
+      (s, h) => s + h.bet * (h.doubled ? 2 : 1),
+      0
+    );
+  }
+  return state.bet * (state.doubled ? 2 : 1);
+}
+
 function settleHeadline(state) {
-  const stake = state.bet * (state.doubled ? 2 : 1);
+  const stake = totalStakeOf(state);
   switch (state.result) {
     case "blackjack":
       return `🎉 **BLACKJACK！** ＋${state.payout.toLocaleString()} credits`;
@@ -84,8 +122,15 @@ function settleHeadline(state) {
 // 依據 state 產生純文字訊息（M2 版）。M3 會額外生圖。
 function renderText(state, { username, balance } = {}) {
   const isPlaying = state.status === "playing";
-  const playerEval = evaluateHand(state.playerHand);
   const dealerEval = evaluateHand(state.dealerHand);
+  const hands = Array.isArray(state.hands) && state.hands.length > 0
+    ? state.hands
+    : [{
+        cards: state.playerHand,
+        bet: state.bet,
+        doubled: !!state.doubled,
+        result: null,
+      }];
 
   const dealerLine = renderHandLine(
     "莊家",
@@ -93,39 +138,41 @@ function renderText(state, { username, balance } = {}) {
     dealerEval.total,
     isPlaying // 結算前都暗牌
   );
-  const playerLine = renderHandLine(
-    "你的",
-    state.playerHand,
-    playerEval.total,
-    false
-  );
 
   const handle = username ? `@${username}` : "";
-  const stake = state.bet * (state.doubled ? 2 : 1);
-  const stakeLabel = state.doubled
-    ? `Bet: ${state.bet.toLocaleString()} ×2 = **${stake.toLocaleString()}**`
-    : `Bet: **${state.bet.toLocaleString()}**`;
-
-  const deckLabel = state.deckCount && state.deckCount > 1
-    ? ` ・ ${state.deckCount} 副牌`
-    : "";
+  const totalStake = totalStakeOf(state);
+  const stakeLabel = state.isSplit
+    ? `Bet: ${state.bet.toLocaleString()} ×2手 = **${totalStake.toLocaleString()}**`
+    : (hands[0].doubled
+        ? `Bet: ${state.bet.toLocaleString()} ×2 = **${totalStake.toLocaleString()}**`
+        : `Bet: **${state.bet.toLocaleString()}**`);
 
   const lines = [
-    `🃏 **BLACKJACK** ・ ${stakeLabel}${deckLabel}${handle ? ` ・ ${handle}` : ""}`,
+    `🃏 **BLACKJACK** ・ ${stakeLabel}${handle ? ` ・ ${handle}` : ""}`,
     "─────────────────────",
     dealerLine,
-    playerLine,
   ];
 
-  if (isPlaying && state.playerHand.length >= 3 && !playerEval.isBust) {
-    const remain = FIVE_CARD_THRESHOLD - state.playerHand.length;
-    if (remain > 0) {
-      lines.push(`🏆 再抽 ${remain} 張未爆牌即過五關（賠率 2:1）`);
+  hands.forEach((h, i) => {
+    const ev = evaluateHand(h.cards);
+    const label = state.isSplit ? `第 ${i + 1} 手` : "你的";
+    const marker = isPlaying && i === state.activeIndex && state.isSplit ? " ▶" : "";
+    lines.push(renderHandLine(label + marker, h.cards, ev.total, false));
+    if (isPlaying && h.cards.length >= 3 && !ev.isBust) {
+      const remain = FIVE_CARD_THRESHOLD - h.cards.length;
+      if (remain > 0 && (!state.isSplit || i === state.activeIndex)) {
+        lines.push(`🏆 再抽 ${remain} 張未爆牌即過五關（賠率 2:1）`);
+      }
     }
-  }
+  });
 
   if (!isPlaying) {
     lines.push("─────────────────────");
+    if (state.isSplit) {
+      hands.forEach((h, i) => {
+        lines.push(`第 ${i + 1} 手：${perHandHeadline(h)}`);
+      });
+    }
     lines.push(settleHeadline(state));
     if (typeof balance === "number") {
       lines.push(`餘額：**${balance.toLocaleString()}** credits`);
@@ -133,6 +180,25 @@ function renderText(state, { username, balance } = {}) {
   }
 
   return lines.join("\n");
+}
+
+function perHandHeadline(hand) {
+  const stake = hand.bet * (hand.doubled ? 2 : 1);
+  switch (hand.result) {
+    case "blackjack":
+      return `BLACKJACK ＋${hand.payout.toLocaleString()}`;
+    case "fivecard":
+      return `過五關 ＋${hand.payout.toLocaleString()}`;
+    case "dealerfivecard":
+      return `莊家過五關 －${stake.toLocaleString()}`;
+    case "win":
+      return `贏 ＋${hand.payout.toLocaleString()}`;
+    case "push":
+      return `平手 退回 ${stake.toLocaleString()}`;
+    case "lose":
+    default:
+      return `輸 －${stake.toLocaleString()}`;
+  }
 }
 
 function buildSettleHeadlineLine(state) {
