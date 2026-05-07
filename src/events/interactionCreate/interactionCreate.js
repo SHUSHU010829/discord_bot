@@ -4,6 +4,7 @@ const fs = require("fs");
 const { getDataFile } = require("../../utils/dataPaths");
 const logger = require("../../utils/logger");
 const { trackError, trackSuccess } = require("../../utils/errorTracker");
+const { consume } = require("../../utils/rateLimiter");
 
 // 票務面板數據文件路徑
 const PANELS_FILE = getDataFile("ticket-panels.json");
@@ -25,6 +26,28 @@ function loadPanels() {
 module.exports = async (client, interaction) => {
   try {
     if (!interaction.isButton()) return;
+
+    // 通用按鈕速率限制：票務 / 投票 / 身份組共用一個冷卻
+    const customId = interaction.customId || "";
+    const isHandled =
+      customId === "create_ticket" ||
+      customId.startsWith("vote_") ||
+      customId.startsWith("role_btn_");
+    if (isHandled) {
+      const rl = consume(interaction.user.id, "btn:generic", {
+        windowMs: 2000,
+        max: 1,
+      });
+      if (!rl.allowed) {
+        try {
+          await interaction.reply({
+            content: `⏳ 操作太頻繁，請 ${Math.ceil(rl.retryAfterMs / 1000)} 秒後再試。`,
+            ephemeral: true,
+          });
+        } catch (_) { /* noop */ }
+        return;
+      }
+    }
 
     // 處理票務按鈕
     if (interaction.customId === "create_ticket") {

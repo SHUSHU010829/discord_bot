@@ -6,6 +6,7 @@ const {
 } = require("discord.js");
 const logger = require("../../utils/logger");
 const { trackError, trackSuccess } = require("../../utils/errorTracker");
+const { consume } = require("../../utils/rateLimiter");
 
 const {
   findActiveGameInChannel,
@@ -356,6 +357,20 @@ module.exports = async (client, interaction) => {
   try {
     if (interaction.isButton()) {
       if (!interaction.customId?.startsWith("pk_")) return;
+      // 速率限制：擋連點，避免製造 10062
+      const rl = consume(interaction.user.id, "btn:poker", {
+        windowMs: 1000,
+        max: 1,
+      });
+      if (!rl.allowed) {
+        try {
+          await interaction.reply({
+            content: `⏳ 點太快了，等 ${Math.ceil(rl.retryAfterMs / 1000)} 秒。`,
+            ephemeral: true,
+          });
+        } catch (_) { /* noop */ }
+        return;
+      }
       await handleButton(client, interaction);
       trackSuccess("poker-interaction");
       return;

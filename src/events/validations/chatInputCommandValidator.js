@@ -1,9 +1,20 @@
 require("colors");
 
-const { EmbedBuilder } = require("discord.js");
+const { EmbedBuilder, PermissionFlagsBits } = require("discord.js");
 const { developersId, serverId } = require("../../config");
 const mConfig = require("../../messageConfig.json");
 const getLocalCommands = require("../../utils/getLocalCommands");
+const { consume } = require("../../utils/rateLimiter");
+
+// 賭場類指令冷卻較短，避免打斷遊戲節奏
+const CASINO_COMMANDS = new Set([
+  "blackjack",
+  "hilo",
+  "roulette",
+  "slot",
+  "slottest",
+  "poker",
+]);
 
 // Discord 互動 token 只有 3 秒效期；超過就會回 10062 Unknown interaction。
 // 這個錯誤已經無法挽救，記下警告就好，不要再嘗試回覆。
@@ -32,6 +43,27 @@ module.exports = async (client, interaction) => {
       (cmd) => cmd.data.name === interaction.commandName
     );
     if (!commandObject) return;
+
+    // 速率限制：開發者與管理員豁免
+    const isDev = developersId.includes(interaction.member?.id);
+    const isAdmin = interaction.memberPermissions?.has(
+      PermissionFlagsBits.Administrator
+    );
+    if (!isDev && !isAdmin) {
+      const cmdName = interaction.commandName;
+      const windowMs = CASINO_COMMANDS.has(cmdName) ? 1500 : 3000;
+      const r = consume(interaction.user.id, `cmd:${cmdName}`, {
+        windowMs,
+        max: 1,
+      });
+      if (!r.allowed) {
+        const sec = Math.ceil(r.retryAfterMs / 1000);
+        await safeReply(interaction, {
+          content: `⏳ 操作太頻繁，請 ${sec} 秒後再試。`,
+        });
+        return;
+      }
+    }
 
     if (commandObject.devOnly) {
       if (!developersId.includes(interaction.member.id)) {

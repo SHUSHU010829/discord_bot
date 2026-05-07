@@ -4,6 +4,7 @@ const { hit, stand, doubleDown } = require("../../features/casino/blackjack/engi
 const { renderMessage } = require("../../features/casino/blackjack/renderer");
 const logger = require("../../utils/logger");
 const { trackError, trackSuccess } = require("../../utils/errorTracker");
+const { consume } = require("../../utils/rateLimiter");
 
 function getBjConfig() {
   return casino?.blackjack || {};
@@ -23,6 +24,21 @@ module.exports = async (client, interaction) => {
     const gameId = rest.slice(splitIdx + 1);
 
     if (!["hit", "stand", "double"].includes(action)) return;
+
+    // 速率限制：擋連點，避免製造 10062
+    const rl = consume(interaction.user.id, "btn:blackjack", {
+      windowMs: 1000,
+      max: 1,
+    });
+    if (!rl.allowed) {
+      try {
+        await interaction.reply({
+          content: `⏳ 點太快了，等 ${Math.ceil(rl.retryAfterMs / 1000)} 秒。`,
+          ephemeral: true,
+        });
+      } catch (_) { /* noop */ }
+      return;
+    }
 
     // 先 defer，避免 DB 查詢 + 驗證讓 3 秒 token 過期觸發 10062
     try {
