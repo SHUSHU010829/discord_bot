@@ -6,15 +6,7 @@ const {
   ButtonStyle,
 } = require("discord.js");
 
-const { HORSES, TRACK_LENGTH } = require("./engine");
-
-// ── 跑道字符 ──
-function renderTrack(pos) {
-  const reached = pos >= TRACK_LENGTH;
-  const left = "━".repeat(Math.min(pos, TRACK_LENGTH));
-  const right = "·".repeat(Math.max(0, TRACK_LENGTH - pos));
-  return reached ? `${left}🏁` : `${left}${right}🏁`;
-}
+const { HORSES } = require("./engine");
 
 function aggregateBetsByHorse(bets = []) {
   const map = new Map();
@@ -98,23 +90,14 @@ function renderBettingPhase(state) {
   };
 }
 
-// ── 比賽中：每幀 ──
-function renderRaceFrame(state, positions) {
-  const winnerId = state.winnerId;
+// ── 比賽中：上方文字搭配 GIF 附件 ──
+function renderRunningPhase(state) {
+  const totalPool = (state.bets || []).reduce((s, b) => s + b.amount, 0);
   const lines = [
     `🐎 **賽馬大賽 ・ 比賽進行中**`,
-    `💰 總彩池：**${(state.bets || []).reduce((s, b) => s + b.amount, 0).toLocaleString()}** credits ・ ${(state.bets || []).length} 筆下注`,
-    "─────────────────────",
+    `💰 總彩池：**${totalPool.toLocaleString()}** credits ・ ${(state.bets || []).length} 筆下注`,
+    "-# 🏇 看誰先衝過終點線…",
   ];
-
-  for (let i = 0; i < HORSES.length; i++) {
-    const h = HORSES[i];
-    lines.push(`${h.id} ${h.emoji} ${renderTrack(positions[i])} ${h.name}`);
-  }
-
-  lines.push("─────────────────────");
-  lines.push(winnerId ? "-# 🏇 衝刺中…" : "-# 🏇 比賽進行中…");
-
   return { content: lines.join("\n"), components: [] };
 }
 
@@ -168,7 +151,7 @@ function renderCancelled(state, reason = "已取消") {
 
 module.exports = {
   renderBettingPhase,
-  renderRaceFrame,
+  renderRunningPhase,
   renderSettledPhase,
   renderCancelled,
   buildBettingButtons,
