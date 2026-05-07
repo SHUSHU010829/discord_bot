@@ -13,6 +13,9 @@ const MAX_DESCRIPTION_LENGTH = 280;
 // Discord 單訊息最多 10 個 embed,主 embed 一個 + 最多 9 張額外圖。
 // 規格指定第 2~4 張(共 3 張)組為額外 embed。
 const EXTRA_IMAGE_COUNT = 3;
+// picnob/threads gateway 偶爾會重新生成 guid,只記最新一筆會在 guid 漂移時整批重推。
+// 因此保留近 N 筆已處理過的識別子(guid / link 雙鍵)做 rolling dedup。
+const SEEN_HISTORY_LIMIT = 50;
 
 const readState = () => {
   const filePath = getDataFile(STATE_FILE);
@@ -34,6 +37,36 @@ const writeState = (state) => {
   } catch (err) {
     console.log(`[ERROR] 寫入 ${STATE_FILE} 失敗: ${err.message}`.red);
   }
+};
+
+const getSeenList = (state, feedId) => {
+  const entry = state[feedId];
+  if (!entry) return [];
+  // 舊格式相容:state[feedId] 直接是字串 guid
+  if (typeof entry === "string") return [`g:${entry}`];
+  if (Array.isArray(entry)) return entry;
+  if (Array.isArray(entry.seen)) return entry.seen;
+  return [];
+};
+
+const itemKeys = (item) => {
+  const keys = [];
+  if (item.guid) keys.push(`g:${item.guid}`);
+  // link 是 picnob 的 post permalink,即使 gateway 重生 guid 也應穩定
+  if (item.link) keys.push(`l:${item.link}`);
+  return keys;
+};
+
+const mergeSeen = (newKeys, oldKeys) => {
+  const seen = new Set();
+  const merged = [];
+  for (const k of [...newKeys, ...oldKeys]) {
+    if (seen.has(k)) continue;
+    seen.add(k);
+    merged.push(k);
+    if (merged.length >= SEEN_HISTORY_LIMIT) break;
+  }
+  return merged;
 };
 
 const truncate = (text, max) => {
@@ -114,8 +147,8 @@ const buildEmbedsAndFiles = async ({ item, feed }) => {
 
   const main = new EmbedBuilder().setColor(0x5865f2);
   if (item.author) main.setAuthor({ name: item.author });
+  if (item.link) main.setTitle(item.link).setURL(item.link);
   if (description) main.setDescription(description);
-  if (item.link) main.setURL(item.link);
   if (item.pubDate) {
     const ts = new Date(item.pubDate);
     if (!Number.isNaN(ts.getTime())) main.setTimestamp(ts);
@@ -174,11 +207,12 @@ const pollFeed = async (client, feed) => {
   }
 
   const state = readState();
-  const lastGuid = state[feed.id];
+  const seenList = getSeenList(state, feed.id);
+  const seenSet = new Set(seenList);
 
-  // 首次執行:只記錄最新 guid,避免一次推幾十篇舊文洗版
-  if (!lastGuid) {
-    state[feed.id] = items[0].guid;
+  // 首次執行:只記錄最新一筆,避免一次推幾十篇舊文洗版
+  if (seenSet.size === 0) {
+    state[feed.id] = { seen: itemKeys(items[0]) };
     writeState(state);
     console.log(
       `[INFO] RSS(${feed.id}): 首次執行,記錄最新 guid=${items[0].guid},不推播`.cyan
@@ -186,9 +220,10 @@ const pollFeed = async (client, feed) => {
     return;
   }
 
-  // 找出 lastGuid 在當前 items 中的位置;之前的(index 較小)就是新文。
-  const lastIndex = items.findIndex((it) => it.guid === lastGuid);
-  const newItems = lastIndex === -1 ? items : items.slice(0, lastIndex);
+  // 用 guid + link 雙鍵 dedup;任一鍵命中已見集合就視為舊文。
+  const newItems = items.filter(
+    (it) => !itemKeys(it).some((k) => seenSet.has(k))
+  );
 
   if (newItems.length === 0) {
     console.log(`[INFO] RSS(${feed.id}): 沒有新貼文`.gray);
@@ -204,17 +239,18 @@ const pollFeed = async (client, feed) => {
     `[INFO] RSS(${feed.id}): ${ordered.length} 則新貼文,過濾後 ${matchedCount} 則`.cyan
   );
 
-  let lastPushedGuid = lastGuid;
+  // 處理過(包含被 filter 略過)的識別子,等回寫時合併進 seen
+  const processedKeys = [];
   for (const item of ordered) {
     if (!filterFn(item)) {
-      // 不符合過濾條件也要推進 guid,避免下次重複比對
-      lastPushedGuid = item.guid;
+      // 不符合過濾條件也要記入 seen,避免下次重複比對
+      processedKeys.unshift(...itemKeys(item));
       continue;
     }
     try {
       const { embeds, files } = await buildEmbedsAndFiles({ item, feed });
       await channel.send({ embeds, files });
-      lastPushedGuid = item.guid;
+      processedKeys.unshift(...itemKeys(item));
     } catch (err) {
       console.log(
         `[ERROR] RSS(${feed.id}) 推播失敗 guid=${item.guid}: ${err.message}`.red
@@ -224,9 +260,12 @@ const pollFeed = async (client, feed) => {
     }
   }
 
+  if (processedKeys.length === 0) return;
+
   // 重新讀 state 再寫,避免覆蓋其他 feed 期間的更新
   const latest = readState();
-  latest[feed.id] = lastPushedGuid;
+  const merged = mergeSeen(processedKeys, getSeenList(latest, feed.id));
+  latest[feed.id] = { seen: merged };
   writeState(latest);
 };
 
