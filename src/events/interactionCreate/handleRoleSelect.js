@@ -51,12 +51,20 @@ function buildPersonalizedRows(allRoles, currentRoleIdSet) {
   return rows;
 }
 
+async function safeUserReply(interaction, content) {
+  const payload = { content, flags: 64 };
+  try {
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({ content });
+    } else {
+      await interaction.reply(payload);
+    }
+  } catch (_) { /* noop */ }
+}
+
 async function ensureMember(interaction) {
   if (!interaction.guild) {
-    await interaction.reply({
-      content: "❌ 此功能只能在伺服器中使用。",
-      flags: 64,
-    });
+    await safeUserReply(interaction, "❌ 此功能只能在伺服器中使用。");
     return null;
   }
 
@@ -70,19 +78,13 @@ async function ensureMember(interaction) {
         "無法獲取 member"
       );
       trackError("role-select", error, { phase: "ensureMember" });
-      await interaction.reply({
-        content: "❌ 無法獲取你的身份組資訊，請稍後再試。",
-        flags: 64,
-      });
+      await safeUserReply(interaction, "❌ 無法獲取你的身份組資訊，請稍後再試。");
       return null;
     }
   }
 
   if (!member.roles || !member.roles.cache) {
-    await interaction.reply({
-      content: "❌ 無法獲取你的身份組資訊，請稍後再試。",
-      flags: 64,
-    });
+    await safeUserReply(interaction, "❌ 無法獲取你的身份組資訊，請稍後再試。");
     return null;
   }
 
@@ -90,15 +92,34 @@ async function ensureMember(interaction) {
 }
 
 async function handleOpenPanel(client, interaction) {
+  // 先 defer，避免 members.fetch + loadPanels 讓 3 秒 token 過期觸發 10062
+  try {
+    await interaction.deferReply({ flags: 64 });
+  } catch (deferErr) {
+    if (deferErr?.code === 10062) {
+      logger.warn(
+        { source: "role-panel-open", customId: interaction.customId },
+        "互動已逾期,無法 defer"
+      );
+      trackError("role-panel-open", deferErr, { reason: "expired" });
+      return;
+    }
+    logger.error(
+      { source: "role-panel-open", err: deferErr.message },
+      "defer 失敗"
+    );
+    trackError("role-panel-open", deferErr);
+    return;
+  }
+
   try {
     const member = await ensureMember(interaction);
     if (!member) return;
 
     const data = await loadPanels(client);
     if (!data.roles || data.roles.length === 0) {
-      return await interaction.reply({
+      return await interaction.editReply({
         content: "❌ 目前沒有任何遊戲身份組可供選擇，請聯絡管理員設定。",
-        flags: 64,
       });
     }
 
@@ -117,10 +138,9 @@ async function handleOpenPanel(client, interaction) {
       .setTitle("🎮 你的遊戲身份組")
       .setDescription("已自動勾選你目前擁有的身份組，未變更的會保留。");
 
-    await interaction.reply({
+    await interaction.editReply({
       embeds: [embed],
       components: rows,
-      flags: 64,
     });
   } catch (error) {
     logger.error(
@@ -128,21 +148,38 @@ async function handleOpenPanel(client, interaction) {
       "開啟角色選單時出錯"
     );
     trackError("role-panel-open", error, { userId: interaction.user?.id });
-    if (!interaction.replied && !interaction.deferred) {
-      try {
-        await interaction.reply({
-          content: "❌ 開啟身份組選單時發生錯誤！請聯絡管理員。",
-          flags: 64,
-        });
-      } catch (replyError) {
-        logger.error({ source: "role-panel-open", err: replyError.message }, "回覆錯誤訊息失敗");
-        trackError("role-panel-open", replyError);
-      }
+    try {
+      await interaction.editReply({
+        content: "❌ 開啟身份組選單時發生錯誤！請聯絡管理員。",
+      });
+    } catch (replyError) {
+      logger.error({ source: "role-panel-open", err: replyError.message }, "回覆錯誤訊息失敗");
+      trackError("role-panel-open", replyError);
     }
   }
 }
 
 async function handleRoleSubmit(interaction) {
+  // 先 defer，避免 members.fetch + roles.add/remove 讓 3 秒 token 過期觸發 10062
+  try {
+    await interaction.deferReply({ flags: 64 });
+  } catch (deferErr) {
+    if (deferErr?.code === 10062) {
+      logger.warn(
+        { source: "role-submit", customId: interaction.customId },
+        "互動已逾期,無法 defer"
+      );
+      trackError("role-submit", deferErr, { reason: "expired" });
+      return;
+    }
+    logger.error(
+      { source: "role-submit", err: deferErr.message },
+      "defer 失敗"
+    );
+    trackError("role-submit", deferErr);
+    return;
+  }
+
   try {
     const member = await ensureMember(interaction);
     if (!member) return;
@@ -153,9 +190,8 @@ async function handleRoleSubmit(interaction) {
         "interaction.values 不存在或不是陣列"
       );
       trackError("role-submit", new Error("invalid interaction.values"));
-      return await interaction.reply({
+      return await interaction.editReply({
         content: "❌ 無法讀取你的選擇，請重試。",
-        flags: 64,
       });
     }
 
@@ -171,9 +207,8 @@ async function handleRoleSubmit(interaction) {
         "無法從 interaction.component 取得選項"
       );
       trackError("role-submit", new Error("empty component options"));
-      return await interaction.reply({
+      return await interaction.editReply({
         content: "❌ 無法讀取選單資訊，請重試。",
-        flags: 64,
       });
     }
 
@@ -255,9 +290,8 @@ async function handleRoleSubmit(interaction) {
       message += `⚠️ 部分角色處理失敗，請聯絡管理員。`;
     }
 
-    await interaction.reply({
+    await interaction.editReply({
       content: message.trim(),
-      flags: 64, // MessageFlags.Ephemeral
     });
     trackSuccess("role-submit");
   } catch (error) {
@@ -267,16 +301,13 @@ async function handleRoleSubmit(interaction) {
     );
     trackError("role-submit", error, { userId: interaction.user?.id });
 
-    if (!interaction.replied && !interaction.deferred) {
-      try {
-        await interaction.reply({
-          content: "❌ 處理身份組時發生錯誤！請聯絡管理員。",
-          flags: 64,
-        });
-      } catch (replyError) {
-        logger.error({ source: "role-submit", err: replyError.message }, "回覆錯誤訊息失敗");
-        trackError("role-submit", replyError);
-      }
+    try {
+      await interaction.editReply({
+        content: "❌ 處理身份組時發生錯誤！請聯絡管理員。",
+      });
+    } catch (replyError) {
+      logger.error({ source: "role-submit", err: replyError.message }, "回覆錯誤訊息失敗");
+      trackError("role-submit", replyError);
     }
   }
 }

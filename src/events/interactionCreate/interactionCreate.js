@@ -241,6 +241,21 @@ async function handleTicketCreation(client, interaction) {
 
 async function handleVoteButton(client, interaction) {
   try {
+    // 先 defer，避免 DB 查詢 + 多次 updateOne 讓 3 秒 token 過期觸發 10062
+    try {
+      await interaction.deferReply({ ephemeral: true });
+    } catch (deferErr) {
+      if (deferErr?.code === 10062) {
+        logger.warn(
+          { source: "vote-button", customId: interaction.customId },
+          "互動已逾期,無法 defer"
+        );
+        trackError("vote-button", deferErr, { reason: "expired" });
+        return;
+      }
+      throw deferErr;
+    }
+
     // 查找對應的投票提案
     const proposal = await client.votingProposalsCollection.findOne({
       messageId: interaction.message.id,
@@ -248,9 +263,8 @@ async function handleVoteButton(client, interaction) {
     });
 
     if (!proposal) {
-      return interaction.reply({
+      return interaction.editReply({
         content: "❌ 找不到對應的投票或投票已結束！",
-        ephemeral: true,
       });
     }
 
@@ -260,9 +274,8 @@ async function handleVoteButton(client, interaction) {
     // 解析按鈕 ID：vote_{template}_{button}
     const parts = customId.split("_");
     if (parts.length < 3) {
-      return interaction.reply({
+      return interaction.editReply({
         content: "❌ 無效的按鈕 ID！",
-        ephemeral: true,
       });
     }
 
@@ -272,18 +285,16 @@ async function handleVoteButton(client, interaction) {
     // 獲取模板配置
     const template = config.voting.templates[templateKey];
     if (!template) {
-      return interaction.reply({
+      return interaction.editReply({
         content: "❌ 找不到對應的投票模板！",
-        ephemeral: true,
       });
     }
 
     // 找到對應的按鈕配置
     const buttonConfig = template.buttons.find(btn => btn.id === buttonId);
     if (!buttonConfig) {
-      return interaction.reply({
+      return interaction.editReply({
         content: "❌ 找不到對應的按鈕配置！",
-        ephemeral: true,
       });
     }
 
@@ -305,9 +316,8 @@ async function handleVoteButton(client, interaction) {
     );
 
     // 回覆用戶
-    await interaction.reply({
+    await interaction.editReply({
       content: `${buttonConfig.emoji} 已將您的票更改為【${buttonConfig.label}】`,
-      ephemeral: true,
     });
 
     // 更新投票訊息顯示當前票數
@@ -321,10 +331,16 @@ async function handleVoteButton(client, interaction) {
     );
     trackError("vote-button", error, { userId: interaction.user?.id, customId: interaction.customId });
     try {
-      await interaction.reply({
-        content: "❌ 處理投票時發生錯誤！",
-        ephemeral: true,
-      });
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({
+          content: "❌ 處理投票時發生錯誤！",
+        });
+      } else {
+        await interaction.reply({
+          content: "❌ 處理投票時發生錯誤！",
+          ephemeral: true,
+        });
+      }
     } catch (replyError) {
       logger.error({ source: "vote-button", err: replyError.message }, "回覆錯誤訊息失敗");
       trackError("vote-button", replyError);
