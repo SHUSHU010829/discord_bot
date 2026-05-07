@@ -84,7 +84,11 @@ async function bustPool(client, guildId) {
   await client.jackpotPoolCollection.updateOne(
     { guildId, game: "slot", amount: current },
     {
-      $set: { amount: seed, lastBustAt: new Date() },
+      $set: {
+        amount: seed,
+        lastBustAt: new Date(),
+        announcedMilestones: [],
+      },
       $inc: { bustCount: 1, totalPaid: won },
     }
   );
