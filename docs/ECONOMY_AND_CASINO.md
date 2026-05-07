@@ -237,7 +237,7 @@ amount          = floor(baseAmount × totalMultiplier)
 | --- | --- |
 | `enabled` | true |
 | `minAmount` | 100 |
-| `maxAmount` | 50,000 |
+| `maxAmount` | 20,000 |
 | `dailyCapPerSender` | 20,000 |
 | `feeRate` | 2% |
 | `feeRateHigh` | 5% |

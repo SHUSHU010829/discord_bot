@@ -116,7 +116,7 @@ module.exports = {
       }
 
       const minAmount = cfg.minAmount ?? 10;
-      const maxAmount = cfg.maxAmount ?? 50000;
+      const maxAmount = cfg.maxAmount ?? 20000;
       if (amount < minAmount || amount > maxAmount) {
         return interaction.editReply(
           `❌ 單筆金額需在 **${minAmount.toLocaleString()}** ~ **${maxAmount.toLocaleString()}** 之間。`
