@@ -4,8 +4,11 @@ const cheerio = require("cheerio");
 const { parseImages } = require("../utils/parseImages");
 
 // 部分 RSS gateway (例如 discord-news.zeabur.app) 會擋非瀏覽器 UA → 403
+// 該 gateway 是即時抓 picnob 再轉 RSS,冷啟動 / 上游慢時很容易超過 15s
+const FETCH_TIMEOUT_MS = Number(process.env.RSS_FETCH_TIMEOUT_MS) || 45000;
+
 const parser = new Parser({
-  timeout: 15000,
+  timeout: FETCH_TIMEOUT_MS,
   headers: {
     "User-Agent":
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -13,7 +16,7 @@ const parser = new Parser({
   },
 });
 
-const MAX_FETCH_ATTEMPTS = 3;
+const MAX_FETCH_ATTEMPTS = Number(process.env.RSS_FETCH_MAX_ATTEMPTS) || 3;
 const INITIAL_RETRY_DELAY_MS = 2000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -26,6 +29,9 @@ const isRetryableError = (err) => {
     const status = Number(statusMatch[1]);
     return status === 408 || status === 429 || (status >= 500 && status < 600);
   }
+  // rss-parser 的 timeout 直接 throw `new Error('Request timed out after Xms')`,
+  // 沒有 err.code,需要用訊息判斷
+  if (/timed out|timeout/i.test(msg)) return true;
   const code = err && err.code;
   return [
     "ECONNRESET",
