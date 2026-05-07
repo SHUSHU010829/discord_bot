@@ -82,8 +82,22 @@ const markCompleted = async (client, userId, guildId, questId) => {
   const period = periodKey(quest.period);
   const target = quest.target || 1;
 
+  // 已領取 → 直接回傳，避免 upsert 撞 unique index (E11000)
+  const existing = await client.questProgressCollection.findOne({
+    userId,
+    guildId,
+    questId,
+    period,
+  });
+  if (existing?.claimed) {
+    return existing;
+  }
+  if (existing?.completed) {
+    return existing;
+  }
+
   const update = await client.questProgressCollection.findOneAndUpdate(
-    { userId, guildId, questId, period, claimed: { $ne: true } },
+    { userId, guildId, questId, period },
     {
       $set: {
         progress: target,
