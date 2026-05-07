@@ -81,7 +81,7 @@ const buildFreeGameEmbed = ({ item, steamData = null }) => {
     .setColor(color)
     .setDescription(summaryParts.join("  ·  "))
     .setTimestamp(new Date())
-    .setFooter({ text: "來源:LootScraper" });
+    .setFooter({ text: "來源:GamerPower" });
 
   const image = (steamData && steamData.header_image) || item.image;
   if (image) embed.setImage(image);

@@ -35,24 +35,12 @@ module.exports = async (client) => {
     await ensureIndexes(client.freeGamesCollection);
   }
 
-  // 平台 → feed URL 對照,支援 env 覆寫。來源:LootScraper
+  // 來源:GamerPower API (https://www.gamerpower.com/api-read)
+  // 同一個 base URL 帶不同 platform query 即可,留 env 給未來想換 mirror
+  const apiUrl = process.env.FREE_GAMES_API_URL || cfg.apiUrl || undefined;
   const platforms = [
-    {
-      platform: "epic",
-      enabled: cfg.platforms?.epic !== false,
-      feedUrl:
-        process.env.FREE_GAMES_EPIC_FEED_URL ||
-        cfg.feeds?.epic ||
-        "https://feed.eikowagenknecht.com/lootscraper_epic_game.xml",
-    },
-    {
-      platform: "steam",
-      enabled: cfg.platforms?.steam !== false,
-      feedUrl:
-        process.env.FREE_GAMES_STEAM_FEED_URL ||
-        cfg.feeds?.steam ||
-        "https://feed.eikowagenknecht.com/lootscraper_steam_game.xml",
-    },
+    { platform: "epic", enabled: cfg.platforms?.epic !== false, apiUrl },
+    { platform: "steam", enabled: cfg.platforms?.steam !== false, apiUrl },
   ].filter((p) => p.enabled);
 
   const cronSchedule =
@@ -73,7 +61,7 @@ module.exports = async (client) => {
           channelId,
           config: cfg,
           platform: p.platform,
-          feedUrl: p.feedUrl,
+          apiUrl: p.apiUrl,
           dryRun: process.env.FREE_GAMES_DRY_RUN === "true",
         });
       } catch (error) {
