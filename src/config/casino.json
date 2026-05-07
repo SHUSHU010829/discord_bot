@@ -38,6 +38,15 @@
       "houseEdge": 0.05,
       "maxRounds": 10
     },
+    "horseRacing": {
+      "enabled": true,
+      "minBet": 10,
+      "maxBet": 1000,
+      "bettingWindowSeconds": 600,
+      "raceTtlSeconds": 1800,
+      "frameDelayMs": 1200,
+      "announceChannelId": "1501770364982657084"
+    },
     "poker": {
       "enabled": true,
       "minBlind": 10,

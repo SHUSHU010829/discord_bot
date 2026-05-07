@@ -66,6 +66,9 @@ module.exports = async (client) => {
     // 德州撲克牌桌狀態（多人，channel-scoped）
     const pokerGamesCollection = database.collection("PokerGames");
 
+    // 賽馬牌桌狀態（多人，channel-scoped 售票 → 開賽 → 結算）
+    const horseRaceGamesCollection = database.collection("HorseRaceGames");
+
     // 商店系統 collections
     const userInventoryCollection = database.collection("UserInventory");
     const shopTransactionsCollection = database.collection("ShopTransactions");
@@ -123,6 +126,7 @@ module.exports = async (client) => {
     client.hiloGamesCollection = hiloGamesCollection;
     client.rouletteGamesCollection = rouletteGamesCollection;
     client.pokerGamesCollection = pokerGamesCollection;
+    client.horseRaceGamesCollection = horseRaceGamesCollection;
     client.twitchScoreFlushesCollection = twitchScoreFlushesCollection;
     client.twitchLiveStateCollection = twitchLiveStateCollection;
     client.userInventoryCollection = userInventoryCollection;
@@ -316,6 +320,24 @@ module.exports = async (client) => {
       await pokerGamesCollection.createIndex(
         { updatedAt: 1 },
         { expireAfterSeconds: 30 * 24 * 60 * 60, name: "poker_ttl_30d" }
+      );
+
+      // 賽馬牌桌索引：channel-scoped 售票期 + cron 撈逾期局開賽
+      await horseRaceGamesCollection.createIndex(
+        { gameId: 1 },
+        { unique: true, name: "uniq_hr_gameId" }
+      );
+      await horseRaceGamesCollection.createIndex(
+        { channelId: 1, status: 1 },
+        { name: "hr_channel_status" }
+      );
+      await horseRaceGamesCollection.createIndex(
+        { status: 1, expiresAt: 1 },
+        { name: "hr_status_expiry" }
+      );
+      await horseRaceGamesCollection.createIndex(
+        { updatedAt: 1 },
+        { expireAfterSeconds: 30 * 24 * 60 * 60, name: "hr_ttl_30d" }
       );
 
       // 商店：背包索引（同人同 guild 同 itemId 可有多筆，因為到期時間/裝備狀態不同）

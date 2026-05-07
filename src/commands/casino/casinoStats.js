@@ -20,6 +20,7 @@ const GAME_LABELS = {
   roulette: "🎡 輪盤",
   poker: "🃏 德州撲克",
   lottery: "🎟️ 樂透",
+  horseRacing: "🐎 賽馬",
   unknown: "❓ 未分類",
 };
 
@@ -31,6 +32,7 @@ const GAME_CHOICES = [
   { name: "🃏 Poker", value: "poker" },
   { name: "🎰 Slot", value: "slot" },
   { name: "🎲 Sicbo", value: "sicbo" },
+  { name: "🐎 Horse Racing", value: "horseRacing" },
   { name: "🎟️ Lottery", value: "lottery" },
 ];
 
