@@ -6,10 +6,13 @@
 
 require("colors");
 
+const { AttachmentBuilder } = require("discord.js");
+
 const grantCoins = require("../../economy/grantCoins");
 const { casino } = require("../../../config");
 const {
   HORSES,
+  TRACK_LENGTH,
   pickWinnerWeighted,
   simulateRace,
   calcPayout,
@@ -19,6 +22,7 @@ const {
   renderSettledPhase,
   renderCancelled,
 } = require("./renderer");
+const generateHorseRaceResultCard = require("../../../utils/generateHorseRaceResultCard");
 
 function getCfg() {
   return casino?.horseRacing || {};
@@ -176,14 +180,43 @@ async function runRaceAnimation(client, state) {
     status: "settled",
   };
 
+  const settledPayload = renderSettledPhase(finalState);
+  const totalPool = (state.bets || []).reduce((s, b) => s + b.amount, 0);
+  const totalPaid = settles.reduce((s, x) => s + (x.payout || 0), 0);
+
+  let attachments = [];
+  try {
+    const buf = await generateHorseRaceResultCard({
+      gameId: state.gameId,
+      drawnAtLabel: new Date()
+        .toISOString()
+        .slice(0, 16)
+        .replace("T", " "),
+      horses: HORSES,
+      rankings,
+      finalPositions,
+      trackLength: TRACK_LENGTH,
+      pool: totalPool,
+      paid: totalPaid,
+      betsCount: (state.bets || []).length,
+    });
+    attachments = [
+      new AttachmentBuilder(buf, { name: `race-${state.gameId}.png` }),
+    ];
+  } catch (err) {
+    console.log(`[HORSE] result card render failed: ${err}`.yellow);
+  }
+
+  const finalPayload = { ...settledPayload, files: attachments };
+
   if (message) {
-    await message.edit(renderSettledPhase(finalState)).catch(() => {});
+    await message.edit(finalPayload).catch(() => {});
   } else {
     // 沒辦法 edit 原訊息：丟一筆訊息到頻道（若可達）
     try {
       const channel = await client.channels.fetch(state.channelId);
       if (channel?.isTextBased?.()) {
-        await channel.send(renderSettledPhase(finalState)).catch(() => {});
+        await channel.send(finalPayload).catch(() => {});
       }
     } catch (_) { /* noop */ }
   }

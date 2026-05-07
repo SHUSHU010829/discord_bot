@@ -16,13 +16,6 @@ function renderTrack(pos) {
   return reached ? `${left}🏁` : `${left}${right}🏁`;
 }
 
-function rankBadge(n) {
-  if (n === 1) return "🥇";
-  if (n === 2) return "🥈";
-  if (n === 3) return "🥉";
-  return `#${n}`;
-}
-
 function aggregateBetsByHorse(bets = []) {
   const map = new Map();
   for (const h of HORSES) map.set(h.id, { totalAmount: 0, betters: 0 });
@@ -126,37 +119,19 @@ function renderRaceFrame(state, positions) {
 }
 
 // ── 結算 ──
+// 圖卡裡已經有領獎台 / 完整名次 / 彩池統計,文字部分只負責「冠軍宣告 + 中獎玩家 mention」。
 function renderSettledPhase(state) {
-  const positions = state.finalPositions || [];
   const rankings = state.rankings || [];
   const winnerHorse = HORSES.find((h) => h.id === rankings[0]);
-  const rankMap = new Map();
-  rankings.forEach((id, i) => rankMap.set(id, i + 1));
 
   const lines = [
     `🐎 **賽馬大賽 ・ 結果出爐**`,
-    `🏆 冠軍：${winnerHorse ? `${winnerHorse.emoji} **${winnerHorse.name}** ×${winnerHorse.payout.toFixed(1)}` : "—"}`,
-    "─────────────────────",
+    winnerHorse
+      ? `🏆 冠軍：${winnerHorse.emoji} **${winnerHorse.name}** ×${winnerHorse.payout.toFixed(1)}`
+      : `🏆 冠軍：—`,
   ];
 
-  for (let i = 0; i < HORSES.length; i++) {
-    const h = HORSES[i];
-    const rank = rankMap.get(h.id);
-    lines.push(
-      `${h.id} ${h.emoji} ${renderTrack(positions[i] ?? 0)} ${h.name} ${rank ? rankBadge(rank) : ""}`,
-    );
-  }
-
-  lines.push("─────────────────────");
-
   const settles = state.settles || [];
-  const totalPool = (state.bets || []).reduce((s, b) => s + b.amount, 0);
-  const totalPaid = settles.reduce((s, x) => s + (x.payout || 0), 0);
-  lines.push(
-    `💰 彩池：**${totalPool.toLocaleString()}** credits ・ 派彩：**${totalPaid.toLocaleString()}**`,
-  );
-
-  // 中獎玩家
   const winners = settles.filter((s) => s.payout > 0);
   if (winners.length > 0) {
     lines.push("");
