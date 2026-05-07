@@ -7,8 +7,6 @@ const DEFAULT_BASE_URL = "https://www.gamerpower.com/api/giveaways";
 const PLATFORM_QUERY = {
   epic: "epic-games-store",
   steam: "steam",
-  android: "android",
-  ios: "ios",
 };
 
 // 只取出對 Discord 推播有意義的類型;DLC 也保留 (在 embed 端會顯示為「限免 DLC」)

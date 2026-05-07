@@ -31,16 +31,6 @@ const PLATFORM_META = {
         ? `https://store.steampowered.com/app/${appid}/?cc=tw`
         : "https://store.steampowered.com/search/?specials=1&maxprice=free",
   },
-  android: {
-    label: "Android",
-    fallbackUrl: () =>
-      "https://play.google.com/store/search?q=free&c=apps",
-  },
-  ios: {
-    label: "iOS",
-    fallbackUrl: () =>
-      "https://apps.apple.com/tw/charts/iphone/free-games/6014",
-  },
 };
 
 const truncate = (text, max) => {

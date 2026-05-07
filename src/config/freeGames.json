@@ -10,9 +10,7 @@
     },
     "platforms": {
       "epic": true,
-      "steam": true,
-      "android": true,
-      "ios": true
+      "steam": true
     },
     "apiUrl": "https://www.gamerpower.com/api/giveaways"
   }

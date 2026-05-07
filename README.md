@@ -297,7 +297,7 @@ embed.js → 發送 Embed
 
 ### 6. 喜加一（限時免費）推播
 
-**目的**：彙整 Epic / Steam / Android / iOS 的限時免費遊戲。
+**目的**：彙整 Epic / Steam 的限時免費遊戲。
 
 **設定**位於 `config.json` 的 `freeGames`，可單獨開關各平台、覆寫 GamerPower API base URL；同樣支援 Dry-run、首啟即跑。資料來源為 [GamerPower API](https://www.gamerpower.com/api-read)。
 

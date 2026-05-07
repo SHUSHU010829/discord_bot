@@ -41,8 +41,6 @@ module.exports = async (client) => {
   const platforms = [
     { platform: "epic", enabled: cfg.platforms?.epic !== false, apiUrl },
     { platform: "steam", enabled: cfg.platforms?.steam !== false, apiUrl },
-    { platform: "android", enabled: cfg.platforms?.android !== false, apiUrl },
-    { platform: "ios", enabled: cfg.platforms?.ios !== false, apiUrl },
   ].filter((p) => p.enabled);
 
   const cronSchedule =
