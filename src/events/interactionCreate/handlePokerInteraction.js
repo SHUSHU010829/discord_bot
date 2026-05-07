@@ -42,6 +42,25 @@ async function fetchByGameId(client, gameId) {
   return client.pokerGamesCollection.findOne({ gameId });
 }
 
+// 行為分類：決定要先 deferUpdate / deferReply / 或保留（showModal 不能 defer）
+const POKER_ACTIONS_DEFER_UPDATE = new Set([
+  "raiseto",
+  "start",
+  "next",
+  "fold",
+  "callcheck",
+  "allin",
+]);
+const POKER_ACTIONS_DEFER_REPLY = new Set([
+  "help",
+  "hand",
+  "resend",
+  "join",
+  "close",
+  "leave",
+]);
+// "raise" 會 showModal，不能事先 defer
+
 async function handleButton(client, interaction) {
   if (!interaction.customId?.startsWith("pk_")) return false;
   if (!client.pokerGamesCollection) return true;
@@ -64,38 +83,73 @@ async function handleButton(client, interaction) {
     gameId = parsed.gameId;
   }
 
+  // 在 DB 查詢之前先 defer，避免 3 秒 token 過期觸發 10062。
+  // raise 必須留給 showModal（modal 不能在 defer 後出現）。
+  if (POKER_ACTIONS_DEFER_UPDATE.has(action)) {
+    try {
+      await interaction.deferUpdate();
+    } catch (deferErr) {
+      if (deferErr?.code === 10062) {
+        logger.warn(
+          { source: "poker-interaction", action, gameId },
+          "互動已逾期,無法 defer"
+        );
+        trackError("poker-interaction", deferErr, { action, reason: "expired" });
+        return true;
+      }
+      throw deferErr;
+    }
+  } else if (POKER_ACTIONS_DEFER_REPLY.has(action)) {
+    try {
+      await interaction.deferReply({ ephemeral: true });
+    } catch (deferErr) {
+      if (deferErr?.code === 10062) {
+        logger.warn(
+          { source: "poker-interaction", action, gameId },
+          "互動已逾期,無法 defer"
+        );
+        trackError("poker-interaction", deferErr, { action, reason: "expired" });
+        return true;
+      }
+      throw deferErr;
+    }
+  }
+
   const doc = await fetchByGameId(client, gameId);
   if (!doc) {
-    await interaction.reply({ content: "🃏 找不到這張桌（可能已結束）。", ephemeral: true });
+    await pokerSafeReply(interaction, "🃏 找不到這張桌（可能已結束）。");
     return true;
   }
 
   // 玩法說明：所有狀態都允許
   if (action === "help") {
-    return interaction.reply(renderHelp());
+    return interaction.editReply(renderHelp());
   }
 
   // 查看手牌：所有狀態都允許
   if (action === "hand") {
-    return interaction.reply(renderEphemeralHand(doc, interaction.user.id));
+    return interaction.editReply(renderEphemeralHand(doc, interaction.user.id));
   }
 
   // 快速加注：pk_raiseto_<amount>_<gameId>
   if (action === "raiseto") {
     if (doc.status !== "playing") {
-      return interaction.reply({ content: "現在不需要行動。", ephemeral: true });
+      await pokerFollowUpEphemeral(interaction, "現在不需要行動。");
+      return true;
     }
     const idx = doc.players.findIndex((p) => p.userId === interaction.user.id);
     if (idx < 0) {
-      return interaction.reply({ content: "你不在這桌上。", ephemeral: true });
+      await pokerFollowUpEphemeral(interaction, "你不在這桌上。");
+      return true;
     }
     if (doc.toActIdx !== idx) {
-      return interaction.reply({ content: "🕒 還沒輪到你。", ephemeral: true });
+      await pokerFollowUpEphemeral(interaction, "🕒 還沒輪到你。");
+      return true;
     }
     if (!Number.isFinite(raiseToAmount) || raiseToAmount <= 0) {
-      return interaction.reply({ content: "❌ 加注金額無效。", ephemeral: true });
+      await pokerFollowUpEphemeral(interaction, "❌ 加注金額無效。");
+      return true;
     }
-    await interaction.deferUpdate();
     const r = await applyPlayerAction(
       client,
       doc,
@@ -104,12 +158,7 @@ async function handleButton(client, interaction) {
       { raiseTo: raiseToAmount }
     );
     if (r.error) {
-      try {
-        await interaction.followUp({
-          content: `❌ 加注失敗：${r.error}`,
-          ephemeral: true,
-        });
-      } catch (_) {}
+      await pokerFollowUpEphemeral(interaction, `❌ 加注失敗：${r.error}`);
       return true;
     }
     const updated = await fetchByGameId(client, gameId);
@@ -119,7 +168,6 @@ async function handleButton(client, interaction) {
 
   // 重貼桌面：把舊訊息刪掉重發一張
   if (action === "resend") {
-    await interaction.deferReply({ ephemeral: true });
     const msg = await resendTableMessage(client, doc);
     if (!msg) return interaction.editReply("🔧 重貼失敗，可能執行緒被封存或權限不足。");
     return interaction.editReply("🔄 桌面已重貼，往下找新訊息。");
@@ -127,7 +175,6 @@ async function handleButton(client, interaction) {
 
   // 加入：waiting 才行
   if (action === "join") {
-    await interaction.deferReply({ ephemeral: true });
     const r = await joinTable(client, interaction);
     if (r.error) return interaction.editReply(r.error);
     const username =
@@ -146,19 +193,22 @@ async function handleButton(client, interaction) {
   // 開始下一局（waiting → preflop）
   if (action === "start") {
     if (doc.creatorId !== interaction.user.id) {
-      return interaction.reply({ content: "🚫 只有開桌者能開局。", ephemeral: true });
-    }
-    if (doc.status !== "waiting") {
-      return interaction.reply({ content: "現在不能開新局。", ephemeral: true });
-    }
-    if (doc.players.length < doc.minPlayers) {
-      await interaction.reply({
-        content: `🚫 人數不足，至少需 ${doc.minPlayers} 人，目前 ${doc.players.length} 人。請先邀請其他人按「🪑 加入」入座。`,
-        ephemeral: false,
-      });
+      await pokerFollowUpEphemeral(interaction, "🚫 只有開桌者能開局。");
       return true;
     }
-    await interaction.deferUpdate();
+    if (doc.status !== "waiting") {
+      await pokerFollowUpEphemeral(interaction, "現在不能開新局。");
+      return true;
+    }
+    if (doc.players.length < doc.minPlayers) {
+      try {
+        await interaction.followUp({
+          content: `🚫 人數不足，至少需 ${doc.minPlayers} 人，目前 ${doc.players.length} 人。請先邀請其他人按「🪑 加入」入座。`,
+          ephemeral: false,
+        });
+      } catch (_) { /* noop */ }
+      return true;
+    }
     const next = engine.startHand(doc);
     await persistEngineState(client, doc, next);
     const updated = await fetchByGameId(client, gameId);
@@ -170,12 +220,13 @@ async function handleButton(client, interaction) {
   // 下一局（settled → preflop）
   if (action === "next") {
     if (doc.creatorId !== interaction.user.id) {
-      return interaction.reply({ content: "🚫 只有開桌者能開新局。", ephemeral: true });
+      await pokerFollowUpEphemeral(interaction, "🚫 只有開桌者能開新局。");
+      return true;
     }
     if (doc.status !== "settled") {
-      return interaction.reply({ content: "牌局尚未結束。", ephemeral: true });
+      await pokerFollowUpEphemeral(interaction, "牌局尚未結束。");
+      return true;
     }
-    await interaction.deferUpdate();
     const r = await startNextHand(client, doc);
     if (r.closed) {
       await closeTable(client, doc, { reason: "underpopulated" });
@@ -190,16 +241,14 @@ async function handleButton(client, interaction) {
   // 解散
   if (action === "close") {
     if (doc.creatorId !== interaction.user.id) {
-      return interaction.reply({ content: "🚫 只有開桌者能解散。", ephemeral: true });
+      return interaction.editReply("🚫 只有開桌者能解散。");
     }
-    await interaction.deferReply({ ephemeral: true });
     await closeTable(client, doc, { reason: "creator_close" });
     return interaction.editReply("🛑 牌桌已解散，籌碼已退回各位錢包。");
   }
 
   // 離桌
   if (action === "leave") {
-    await interaction.deferReply({ ephemeral: true });
     const userId = interaction.user.id;
     const me = doc.players.find((p) => p.userId === userId);
     if (!me) return interaction.editReply("你不在這張桌上。");
@@ -246,18 +295,31 @@ async function handleButton(client, interaction) {
   // 行動：fold / callcheck / allin / raise(modal)
   if (["fold", "callcheck", "allin", "raise"].includes(action)) {
     if (doc.status !== "playing") {
-      return interaction.reply({ content: "現在不需要行動。", ephemeral: true });
+      // raise 沒事先 defer；其他都 deferUpdate 過了
+      if (action === "raise") {
+        return interaction.reply({ content: "現在不需要行動。", ephemeral: true });
+      }
+      await pokerFollowUpEphemeral(interaction, "現在不需要行動。");
+      return true;
     }
     const idx = doc.players.findIndex((p) => p.userId === interaction.user.id);
     if (idx < 0) {
-      return interaction.reply({ content: "你不在這桌上。", ephemeral: true });
+      if (action === "raise") {
+        return interaction.reply({ content: "你不在這桌上。", ephemeral: true });
+      }
+      await pokerFollowUpEphemeral(interaction, "你不在這桌上。");
+      return true;
     }
     if (doc.toActIdx !== idx) {
-      return interaction.reply({ content: "🕒 還沒輪到你。", ephemeral: true });
+      if (action === "raise") {
+        return interaction.reply({ content: "🕒 還沒輪到你。", ephemeral: true });
+      }
+      await pokerFollowUpEphemeral(interaction, "🕒 還沒輪到你。");
+      return true;
     }
 
     if (action === "raise") {
-      // 開 modal 收金額
+      // 開 modal 收金額（modal 必須是初始 response，不能在 defer 後出現）
       const me = doc.players[idx];
       const minRaiseTo = Math.max(
         doc.currentBet + doc.minRaise,
@@ -280,7 +342,6 @@ async function handleButton(client, interaction) {
       return true;
     }
 
-    await interaction.deferUpdate();
     let actEngine;
     if (action === "fold") actEngine = "fold";
     else if (action === "allin") actEngine = "allin";
@@ -291,9 +352,7 @@ async function handleButton(client, interaction) {
     }
     const r = await applyPlayerAction(client, doc, interaction.user.id, actEngine);
     if (r.error) {
-      try {
-        await interaction.followUp({ content: r.error, ephemeral: true });
-      } catch (_) {}
+      await pokerFollowUpEphemeral(interaction, r.error);
       return true;
     }
     const updated = await fetchByGameId(client, gameId);
@@ -307,35 +366,61 @@ async function handleButton(client, interaction) {
   return true;
 }
 
+async function pokerFollowUpEphemeral(interaction, content) {
+  try {
+    await interaction.followUp({ content, ephemeral: true });
+  } catch (_) { /* noop */ }
+}
+
+async function pokerSafeReply(interaction, content) {
+  try {
+    if (interaction.deferred || interaction.replied) {
+      await interaction.followUp({ content, ephemeral: true });
+    } else {
+      await interaction.reply({ content, ephemeral: true });
+    }
+  } catch (_) { /* noop */ }
+}
+
 async function handleModal(client, interaction) {
   if (!interaction.customId?.startsWith("pk_raisemodal_")) return false;
   if (!client.pokerGamesCollection) return true;
   const gameId = interaction.customId.slice("pk_raisemodal_".length);
+
+  // 先 deferUpdate，避免 DB 查詢讓 3 秒 token 過期觸發 10062
+  try {
+    await interaction.deferUpdate();
+  } catch (deferErr) {
+    if (deferErr?.code === 10062) {
+      logger.warn(
+        { source: "poker-interaction", gameId, kind: "raisemodal" },
+        "互動已逾期,無法 defer"
+      );
+      trackError("poker-interaction", deferErr, { kind: "raisemodal", reason: "expired" });
+      return true;
+    }
+    throw deferErr;
+  }
+
   const doc = await fetchByGameId(client, gameId);
   if (!doc) {
-    await interaction.reply({ content: "🃏 找不到這張桌。", ephemeral: true });
+    await pokerFollowUpEphemeral(interaction, "🃏 找不到這張桌。");
     return true;
   }
   const idx = doc.players.findIndex((p) => p.userId === interaction.user.id);
   if (idx < 0 || doc.toActIdx !== idx) {
-    await interaction.reply({ content: "🕒 還沒輪到你。", ephemeral: true });
+    await pokerFollowUpEphemeral(interaction, "🕒 還沒輪到你。");
     return true;
   }
   const raw = interaction.fields.getTextInputValue("amount");
   const raiseTo = parseInt(raw, 10);
   if (!Number.isFinite(raiseTo) || raiseTo <= 0) {
-    await interaction.reply({ content: "❌ 請輸入正整數。", ephemeral: true });
+    await pokerFollowUpEphemeral(interaction, "❌ 請輸入正整數。");
     return true;
   }
-  await interaction.deferUpdate();
   const r = await applyPlayerAction(client, doc, interaction.user.id, "raise", { raiseTo });
   if (r.error) {
-    try {
-      await interaction.followUp({
-        content: `❌ 加注失敗：${r.error}`,
-        ephemeral: true,
-      });
-    } catch (_) {}
+    await pokerFollowUpEphemeral(interaction, `❌ 加注失敗：${r.error}`);
     return true;
   }
   const updated = await fetchByGameId(client, gameId);

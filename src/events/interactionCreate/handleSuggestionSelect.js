@@ -58,6 +58,21 @@ module.exports = async (client, interaction) => {
       });
     }
 
+    // 先 defer，避免 loadPanels + 頻道建立讓 3 秒 token 過期觸發 10062
+    try {
+      await interaction.deferReply({ ephemeral: true });
+    } catch (deferErr) {
+      if (deferErr?.code === 10062) {
+        logger.warn(
+          { source: "suggestion-select", customId: interaction.customId },
+          "互動已逾期,無法 defer"
+        );
+        trackError("suggestion-select", deferErr, { reason: "expired" });
+        return;
+      }
+      throw deferErr;
+    }
+
     // 獲取此頻道的面板配置（如果存在）
     const panels = await loadPanels(client);
     const panelConfig = panels.panels[interaction.channel.id];
@@ -81,15 +96,13 @@ module.exports = async (client, interaction) => {
     );
 
     if (existingSuggestion) {
-      return interaction.reply({
+      return interaction.editReply({
         content: `❌ 您已經有一個開啟的建議頻道了！\n請前往 ${existingSuggestion} 或先關閉現有的建議。`,
-        ephemeral: true,
       });
     }
 
-    await interaction.reply({
+    await interaction.editReply({
       content: "⏳ 正在創建建議頻道...",
-      ephemeral: true,
     });
 
     // 驗證並獲取父類別
