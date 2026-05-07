@@ -17,7 +17,7 @@ async function run(client, interaction) {
     const foodNames = [
       ...new Set(
         foodListStr
-          .split(",")
+          .split(/[,，、;；]+/)
           .map((name) => name.trim())
           .filter((name) => name.length > 0)
       ),
