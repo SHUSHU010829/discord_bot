@@ -4,10 +4,10 @@ const { createHash } = require("node:crypto");
 const TTL_DAYS = 60;
 
 // 同一個遊戲在同平台的同一波限免應該只推一次。
-// 用 platform+appid+endTime 三件組成 key:
-//   - 同次贈送(end_time 不變)→ 同 key,不重推
-//   - 平台延長 / 換成不同遊戲 → 不同 key,推
-const buildKey = ({ platform, appid, endTime, name }) => {
+// GamerPower 每筆活動都有穩定的 id,優先用它組 key;
+// 沒 id 才退回 platform+appid/name+endTime (給未來擴充其他來源用)。
+const buildKey = ({ giveawayId, platform, appid, endTime, name }) => {
+  if (giveawayId) return `free:gp:${giveawayId}`;
   const id = appid && appid > 0
     ? String(appid)
     : "n" + createHash("md5").update(String(name || "unknown")).digest("hex").slice(0, 8);
@@ -48,6 +48,7 @@ const markPushed = async (collection, item) => {
     {
       $set: {
         platform: item.platform,
+        giveawayId: item.giveawayId || null,
         appid: item.appid || null,
         name: item.name || null,
         endTime: item.endTime || null,

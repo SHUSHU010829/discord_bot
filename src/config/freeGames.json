@@ -12,9 +12,6 @@
       "epic": true,
       "steam": true
     },
-    "feeds": {
-      "epic": "https://feed.eikowagenknecht.com/lootscraper_epic_game.xml",
-      "steam": "https://feed.eikowagenknecht.com/lootscraper_steam_game.xml"
-    }
+    "apiUrl": "https://www.gamerpower.com/api/giveaways"
   }
 }

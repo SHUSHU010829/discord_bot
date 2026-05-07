@@ -1,7 +1,7 @@
 require("colors");
 const { DateTime } = require("luxon");
 
-const { fetchFreeGamesList } = require("./rss");
+const { fetchFreeGamesList } = require("./gamerpower");
 const { fetchAppDetails } = require("../steamDeals/steam");
 const { isAlreadyPushed, markPushed, ensureIndexes } = require("./dedupe");
 const { buildFreeGameEmbed } = require("./embed");
@@ -24,7 +24,7 @@ const isInActiveHours = (cfg) => {
  * @param {string} opts.channelId
  * @param {object} opts.config
  * @param {string} opts.platform
- * @param {string} opts.feedUrl
+ * @param {string} [opts.apiUrl]  覆寫 GamerPower API base URL
  * @param {boolean} [opts.dryRun]
  */
 const runFreeGamesJob = async ({
@@ -32,7 +32,7 @@ const runFreeGamesJob = async ({
   channelId,
   config,
   platform,
-  feedUrl,
+  apiUrl,
   dryRun = false,
 }) => {
   const startedAt = Date.now();
@@ -53,11 +53,11 @@ const runFreeGamesJob = async ({
 
   let items;
   try {
-    items = await fetchFreeGamesList({ feedUrl, platform });
+    items = await fetchFreeGamesList({ apiUrl, platform });
     stats.fetched = items.length;
   } catch (error) {
     console.log(
-      `[ERROR] 喜加一 RSS 拉取失敗 (${platform}): ${error.message}`.red
+      `[ERROR] 喜加一 API 拉取失敗 (${platform}): ${error.message}`.red
     );
     return stats;
   }
