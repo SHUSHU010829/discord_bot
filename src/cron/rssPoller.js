@@ -16,6 +16,10 @@ const EXTRA_IMAGE_COUNT = 3;
 // picnob/threads gateway 偶爾會重新生成 guid,只記最新一筆會在 guid 漂移時整批重推。
 // 因此保留近 N 筆已處理過的識別子(guid / link 雙鍵)做 rolling dedup。
 const SEEN_HISTORY_LIMIT = 50;
+// 即使 dedup 漂移,pubDate 早於這個門檻的貼文一律不推播,避免倒灌數月前的舊文。
+// 設為 0 / 負數可關閉。
+const MAX_ITEM_AGE_MS =
+  (Number(process.env.RSS_MAX_ITEM_AGE_HOURS) || 72) * 60 * 60 * 1000;
 
 const readState = () => {
   const filePath = getDataFile(STATE_FILE);
@@ -67,6 +71,15 @@ const mergeSeen = (newKeys, oldKeys) => {
     if (merged.length >= SEEN_HISTORY_LIMIT) break;
   }
   return merged;
+};
+
+// pubDate 缺失或無法解析時不視為過舊,避免誤殺正常新文。
+const isItemTooOld = (item) => {
+  if (MAX_ITEM_AGE_MS <= 0) return false;
+  if (!item.pubDate) return false;
+  const ts = new Date(item.pubDate).getTime();
+  if (Number.isNaN(ts)) return false;
+  return Date.now() - ts > MAX_ITEM_AGE_MS;
 };
 
 const truncate = (text, max) => {
@@ -234,14 +247,22 @@ const pollFeed = async (client, feed) => {
   const ordered = [...newItems].reverse();
 
   const filterFn = compileFilter(feed.filter, feed.id);
-  const matchedCount = ordered.filter(filterFn).length;
+  const tooOldCount = ordered.filter(isItemTooOld).length;
+  const matchedCount = ordered.filter(
+    (it) => !isItemTooOld(it) && filterFn(it)
+  ).length;
   console.log(
-    `[INFO] RSS(${feed.id}): ${ordered.length} 則新貼文,過濾後 ${matchedCount} 則`.cyan
+    `[INFO] RSS(${feed.id}): ${ordered.length} 則新貼文,過舊略過 ${tooOldCount} 則,過濾後 ${matchedCount} 則`.cyan
   );
 
-  // 處理過(包含被 filter 略過)的識別子,等回寫時合併進 seen
+  // 處理過(包含被 filter 或時間護欄略過)的識別子,等回寫時合併進 seen
   const processedKeys = [];
   for (const item of ordered) {
+    if (isItemTooOld(item)) {
+      // 太舊的貼文直接略過但記入 seen,避免下輪 cron 又被當成新文評估
+      processedKeys.unshift(...itemKeys(item));
+      continue;
+    }
     if (!filterFn(item)) {
       // 不符合過濾條件也要記入 seen,避免下次重複比對
       processedKeys.unshift(...itemKeys(item));
