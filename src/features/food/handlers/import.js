@@ -25,7 +25,7 @@ async function run(client, interaction) {
 
     lines.forEach((line) => {
       const lineItems = line
-        .split(/[,;，；]+/)
+        .split(/[,;，；、]+/)
         .map((item) => item.trim())
         .filter((item) => item.length > 0);
       items.push(...lineItems);

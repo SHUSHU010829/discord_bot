@@ -9,6 +9,16 @@ const {
 } = require("../../constants/foodCategories");
 const autocompleteBeverageStore = require("../../utils/autocompleteBeverageStore");
 
+function pickOneName(name) {
+  if (typeof name !== "string") return name;
+  const parts = name
+    .split(/[、,，;；]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  if (parts.length <= 1) return name;
+  return parts[Math.floor(Math.random() * parts.length)];
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("吃什麼")
@@ -72,14 +82,16 @@ module.exports = {
         { $inc: { drawCount: 1 } }
       );
 
+      const pickedName = pickOneName(picked.name);
+
       let replyMessage = "逼逼機器人推薦你可以";
 
       if (picked.category === "beverage") {
         replyMessage += "喝... ";
         if (picked.beverageStore) {
-          replyMessage += `**${picked.beverageStore}** 的 **${picked.name}**！ ${commandEmojis.hiiiiii}`;
+          replyMessage += `**${picked.beverageStore}** 的 **${pickedName}**！ ${commandEmojis.hiiiiii}`;
         } else {
-          replyMessage += `**${picked.name}**！ ${commandEmojis.hiiiiii}`;
+          replyMessage += `**${pickedName}**！ ${commandEmojis.hiiiiii}`;
         }
       } else {
         if (category && category !== "beverage") {
@@ -87,7 +99,7 @@ module.exports = {
         } else {
           replyMessage += "吃... ";
         }
-        replyMessage += `**${picked.name}**！ ${commandEmojis.hiiiiii}`;
+        replyMessage += `**${pickedName}**！ ${commandEmojis.hiiiiii}`;
       }
 
       return interaction.editReply(replyMessage);
