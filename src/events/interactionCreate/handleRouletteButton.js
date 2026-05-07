@@ -13,6 +13,7 @@ const { spinWheel, settle, totalWagered } = require('../../features/casino/roule
 const { buildBettingRows, buildStatusContent } = require('../../commands/casino/roulette');
 const logger = require('../../utils/logger');
 const { trackError, trackSuccess } = require('../../utils/errorTracker');
+const { consume } = require('../../utils/rateLimiter');
 
 const RED_SET = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
 
@@ -39,6 +40,23 @@ module.exports = async (client, interaction) => {
 
     // UUID 不含底線，所以 parts 最後一個一定是 gameId
     const gameId = parts[parts.length - 1];
+
+    // 速率限制：擋連點。Modal submit 不限流（互動本身已是後續事件）
+    if (interaction.isButton()) {
+      const rl = consume(interaction.user.id, 'btn:roulette', {
+        windowMs: 1000,
+        max: 1,
+      });
+      if (!rl.allowed) {
+        try {
+          await interaction.reply({
+            content: `⏳ 點太快了，等 ${Math.ceil(rl.retryAfterMs / 1000)} 秒。`,
+            ephemeral: true,
+          });
+        } catch (_) { /* noop */ }
+        return;
+      }
+    }
 
     const game = await client.rouletteGamesCollection.findOne({ gameId });
     if (!game) {
