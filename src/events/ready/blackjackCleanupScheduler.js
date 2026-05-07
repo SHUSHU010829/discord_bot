@@ -24,7 +24,10 @@ async function sweepOnce(client) {
 
   while (await cursor.hasNext()) {
     const g = await cursor.next();
-    const refund = g.bet * (g.doubled ? 2 : 1);
+    // 分牌局退所有手的注（含各手 doubled 額度）；非分牌局退單手
+    const refund = Array.isArray(g.hands) && g.hands.length > 0
+      ? g.hands.reduce((s, h) => s + (h.bet || 0) * (h.doubled ? 2 : 1), 0)
+      : g.bet * (g.doubled ? 2 : 1);
 
     // 退錢：來源 payout 並標記 result=abandoned_refund，方便日後對帳
     await grantCoins(client, {
@@ -39,6 +42,7 @@ async function sweepOnce(client) {
         gameId: g.gameId,
         bet: g.bet,
         doubled: !!g.doubled,
+        isSplit: !!g.isSplit,
       },
     });
 

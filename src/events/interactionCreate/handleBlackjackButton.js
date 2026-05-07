@@ -1,6 +1,13 @@
 const { casino } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
-const { hit, stand, doubleDown } = require("../../features/casino/blackjack/engine");
+const {
+  hit,
+  stand,
+  doubleDown,
+  split,
+  canSplit,
+  ensureHandsShape,
+} = require("../../features/casino/blackjack/engine");
 const { renderMessage } = require("../../features/casino/blackjack/renderer");
 const logger = require("../../utils/logger");
 const { trackError, trackSuccess } = require("../../utils/errorTracker");
@@ -23,7 +30,7 @@ module.exports = async (client, interaction) => {
     const action = rest.slice(0, splitIdx);
     const gameId = rest.slice(splitIdx + 1);
 
-    if (!["hit", "stand", "double"].includes(action)) return;
+    if (!["hit", "stand", "double", "split"].includes(action)) return;
 
     // 速率限制：擋連點，避免製造 10062
     const rl = consume(interaction.user.id, "btn:blackjack", {
@@ -55,7 +62,8 @@ module.exports = async (client, interaction) => {
       throw deferErr;
     }
 
-    const state = await client.blackjackGamesCollection.findOne({ gameId });
+    const stateRaw = await client.blackjackGamesCollection.findOne({ gameId });
+    const state = stateRaw ? ensureHandsShape(stateRaw) : null;
     if (!state) {
       return interaction.followUp({
         content: "🃏 這局已過期或找不到了。",
@@ -80,9 +88,15 @@ module.exports = async (client, interaction) => {
     const username = state.username || interaction.user.username;
     const member = interaction.member;
 
-    // double 之前要先扣第二筆 bet
+    // double / split 之前要先扣第二筆 bet
     if (action === "double") {
-      if (state.playerHand.length !== 2 || state.doubled) {
+      const activeHand = state.hands[state.activeIndex];
+      if (
+        !activeHand ||
+        activeHand.cards.length !== 2 ||
+        activeHand.doubled ||
+        activeHand.fromSplitAces
+      ) {
         return interaction.followUp({
           content: "🚫 現在不能 Double。",
           ephemeral: true,
@@ -115,12 +129,47 @@ module.exports = async (client, interaction) => {
           ephemeral: true,
         });
       }
+    } else if (action === "split") {
+      if (!canSplit(state)) {
+        return interaction.followUp({
+          content: "🚫 現在不能分牌（需起手兩張同點數）。",
+          ephemeral: true,
+        });
+      }
+      const before = await client.userCoinsCollection.findOne({ userId, guildId });
+      const balance = before?.totalCoins || 0;
+      if (balance < state.bet) {
+        return interaction.followUp({
+          content: `💰 餘額 ${balance.toLocaleString()} 不足以分牌（需要 ${state.bet.toLocaleString()}）。`,
+          ephemeral: true,
+        });
+      }
+      const betResult = await grantCoins(client, {
+        userId,
+        guildId,
+        username,
+        amount: -state.bet,
+        source: "bet",
+        member,
+        meta: {
+          game: "blackjack",
+          gameId,
+          reason: "split",
+        },
+      });
+      if (!betResult) {
+        return interaction.followUp({
+          content: "🔧 分牌扣款失敗，請稍後再試。",
+          ephemeral: true,
+        });
+      }
     }
 
     // 套用動作
     let next;
     if (action === "hit") next = hit(state);
     else if (action === "stand") next = stand(state);
+    else if (action === "split") next = split(state);
     else next = doubleDown(state);
 
     const cfg = getBjConfig();
@@ -135,6 +184,9 @@ module.exports = async (client, interaction) => {
           playerHand: next.playerHand,
           dealerHand: next.dealerHand,
           doubled: next.doubled,
+          hands: next.hands,
+          activeIndex: next.activeIndex,
+          isSplit: next.isSplit,
           status: next.status,
           result: next.result,
           payout: next.payout,
@@ -160,6 +212,12 @@ module.exports = async (client, interaction) => {
           gameId,
           bet: next.bet,
           doubled: next.doubled,
+          isSplit: !!next.isSplit,
+          handResults: next.hands?.map((h) => ({
+            result: h.result,
+            payout: h.payout,
+            doubled: h.doubled,
+          })),
         },
       });
       balanceAfter = payoutResult?.doc?.totalCoins;

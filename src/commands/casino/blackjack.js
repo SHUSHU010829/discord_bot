@@ -29,18 +29,6 @@ module.exports = {
         .setDescription("一次押上目前全部餘額")
         .setRequired(false)
     )
-    .addIntegerOption((opt) =>
-      opt
-        .setName("副數")
-        .setDescription("使用幾副牌（預設 1，多副牌更接近真實賭場）")
-        .setRequired(false)
-        .addChoices(
-          { name: "1 副（預設）", value: 1 },
-          { name: "4 副", value: 4 },
-          { name: "6 副", value: 6 },
-          { name: "8 副", value: 8 },
-        )
-    )
     .toJSON(),
 
   run: async (client, interaction) => {
@@ -68,9 +56,6 @@ module.exports = {
 
       const betInput = interaction.options.getInteger("下注");
       const allIn = interaction.options.getBoolean("梭哈") === true;
-      const deckCountRaw = interaction.options.getInteger("副數");
-      const allowedDeckCounts = cfg.allowedDeckCounts || [1, 4, 6, 8];
-      const deckCount = allowedDeckCounts.includes(deckCountRaw) ? deckCountRaw : 1;
       if (!allIn && (!Number.isInteger(betInput) || betInput < minBet)) {
         return interaction.editReply(
           `下注金額至少需 ${minBet.toLocaleString()} credits（或勾選梭哈）。`
@@ -131,7 +116,7 @@ module.exports = {
       let balanceAfter = betResult.doc?.totalCoins ?? balance - bet;
 
       // 開局
-      const initial = startGame({ bet, deckCount });
+      const initial = startGame({ bet });
       const now = new Date();
       const doc = {
         gameId,
@@ -139,12 +124,14 @@ module.exports = {
         guildId,
         username,
         bet: initial.bet,
-        deckCount: initial.deckCount,
         doubled: initial.doubled,
         status: initial.status,
         deck: initial.deck,
         playerHand: initial.playerHand,
         dealerHand: initial.dealerHand,
+        hands: initial.hands,
+        activeIndex: initial.activeIndex,
+        isSplit: initial.isSplit,
         result: initial.result,
         payout: initial.payout,
         createdAt: now,
