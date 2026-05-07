@@ -9,7 +9,6 @@ require("colors");
 const { AttachmentBuilder } = require("discord.js");
 
 const grantCoins = require("../../economy/grantCoins");
-const { casino } = require("../../../config");
 const {
   HORSES,
   TRACK_LENGTH,
@@ -18,15 +17,12 @@ const {
   calcPayout,
 } = require("./engine");
 const {
-  renderRaceFrame,
+  renderRunningPhase,
   renderSettledPhase,
   renderCancelled,
 } = require("./renderer");
 const generateHorseRaceResultCard = require("../../../utils/generateHorseRaceResultCard");
-
-function getCfg() {
-  return casino?.horseRacing || {};
-}
+const generateHorseRaceGif = require("../../../utils/generateHorseRaceGif");
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -92,8 +88,6 @@ async function startRaceIfDue(client, gameId) {
 
 async function runRaceAnimation(client, state) {
   const coll = client.horseRaceGamesCollection;
-  const cfg = getCfg();
-  const frameDelayMs = cfg.frameDelayMs ?? 1200;
 
   const winnerId = pickWinnerWeighted();
   const { frames, rankings } = simulateRace(winnerId);
@@ -114,13 +108,33 @@ async function runRaceAnimation(client, state) {
 
   const message = await fetchMessage(client, state);
 
-  // 動畫：能拿到 message 就逐幀更新；不能就直接跳結算
+  // 動畫：能拿到 message 就產一張 GIF 貼出，等播完再走結算
   if (message) {
-    for (let i = 0; i < frames.length - 1; i++) {
-      const payload = renderRaceFrame(state, frames[i]);
-      await message.edit(payload).catch(() => {});
-      await sleep(frameDelayMs);
+    // GIF 編碼大約 3~5 秒，先做一次無附件 edit 讓按鈕消失、避免玩家對著舊 UI 戳。
+    const racingPayload = renderRunningPhase(state);
+    await message.edit(racingPayload).catch(() => {});
+
+    const totalPool = (state.bets || []).reduce((s, b) => s + b.amount, 0);
+    let waitMs = 5000;
+    try {
+      const { buffer, durationMs } = await generateHorseRaceGif({
+        gameId: state.gameId,
+        frames,
+        pool: totalPool,
+        betsCount: (state.bets || []).length,
+        trackLength: TRACK_LENGTH,
+      });
+      const attachment = new AttachmentBuilder(buffer, {
+        name: `race-${state.gameId}.gif`,
+      });
+      await message
+        .edit({ ...racingPayload, files: [attachment] })
+        .catch(() => {});
+      waitMs = durationMs;
+    } catch (err) {
+      console.log(`[HORSE] race gif render failed: ${err}`.yellow);
     }
+    await sleep(waitMs);
   }
 
   // 結算：派彩給押中贏家的玩家
@@ -207,7 +221,8 @@ async function runRaceAnimation(client, state) {
     console.log(`[HORSE] result card render failed: ${err}`.yellow);
   }
 
-  const finalPayload = { ...settledPayload, files: attachments };
+  // attachments: [] 清掉跑賽用的 GIF；files 換成結果卡。
+  const finalPayload = { ...settledPayload, attachments: [], files: attachments };
 
   if (message) {
     await message.edit(finalPayload).catch(() => {});

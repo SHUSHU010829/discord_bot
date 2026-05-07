@@ -44,7 +44,6 @@
       "maxBet": 1000,
       "bettingWindowSeconds": 600,
       "raceTtlSeconds": 1800,
-      "frameDelayMs": 1200,
       "announceChannelId": "1501770364982657084"
     },
     "poker": {
