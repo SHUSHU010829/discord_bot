@@ -9,7 +9,7 @@
 
 require("colors");
 const crypto = require("crypto");
-const { SlashCommandBuilder } = require("discord.js");
+const { SlashCommandBuilder, MessageFlags } = require("discord.js");
 
 const { coinSystem, casino } = require("../../config");
 const {
@@ -29,7 +29,7 @@ module.exports = {
     .toJSON(),
 
   run: async (client, interaction) => {
-    await interaction.deferReply();
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       if (!coinSystem?.enabled) {
@@ -48,19 +48,35 @@ module.exports = {
       }
 
       const guildId = interaction.guildId;
-      const channelId = interaction.channelId;
       const userId = interaction.user.id;
       const username =
         interaction.member?.displayName || interaction.user.username;
 
-      // 同頻道一次只能有一場 betting/running
+      // 取播報頻道（沒設定 / 抓不到就退回到指令當下頻道）
+      const announceChannelId = cfg.announceChannelId;
+      let announceChannel = null;
+      if (announceChannelId) {
+        announceChannel = await client.channels
+          .fetch(announceChannelId)
+          .catch(() => null);
+        if (!announceChannel?.isTextBased?.()) {
+          return interaction.editReply(
+            "🔧 賽馬播報頻道設定錯誤，請通知舒舒檢查 `casino.horseRacing.announceChannelId`。",
+          );
+        }
+      } else {
+        announceChannel = interaction.channel;
+      }
+      const channelId = announceChannel.id;
+
+      // 同（播報）頻道一次只能有一場 betting/running
       const existing = await client.horseRaceGamesCollection.findOne({
         channelId,
         status: { $in: ["betting", "running"] },
       });
       if (existing) {
         return interaction.editReply(
-          "🐎 這個頻道已經有一場賽馬在進行中，先等它跑完再開新場！",
+          `🐎 <#${channelId}> 已經有一場賽馬在進行中，先等它跑完再開新場！`,
         );
       }
 
@@ -90,12 +106,21 @@ module.exports = {
       await client.horseRaceGamesCollection.insertOne(state);
 
       const payload = renderBettingPhase(state);
-      const message = await interaction.editReply(payload);
+      const message = await announceChannel.send(payload);
 
       // 紀錄 messageId 供之後 edit
       await client.horseRaceGamesCollection.updateOne(
         { gameId },
         { $set: { messageId: message.id, updatedAt: new Date() } },
+      );
+
+      // 在原頻道給開盤者一個確認 + 連結
+      const sameChannel = interaction.channelId === announceChannel.id;
+      const link = `https://discord.com/channels/${guildId}/${announceChannel.id}/${message.id}`;
+      await interaction.editReply(
+        sameChannel
+          ? `🐎 已開盤！下方面板開放下注 10 分鐘。`
+          : `🐎 已在 <#${announceChannel.id}> 開盤！前往面板下注：${link}`,
       );
 
       // 安排 setTimeout 自動開賽（cron 也會撈，重複觸發靠 atomic update 防重）
