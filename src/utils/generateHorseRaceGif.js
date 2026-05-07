@@ -1,5 +1,6 @@
 // 賽馬比賽動畫 GIF。米色配色，與 generateHorseRaceResultCard 同調。
-// 把 simulateRace 的 keyframes 線性插值成 50 幀平滑動畫，再加 6 幀定格收尾。
+// 把 simulateRace 的 keyframes 線性插值成 30 幀平滑動畫，再加 4 幀定格收尾。
+// 尺寸刻意壓在 Discord 8 MB 上限內：640×400, 34 frames, neuquant quality 30。
 
 const path = require("path");
 const { createCanvas, registerFont } = require("canvas");
@@ -22,8 +23,8 @@ function ensureFonts() {
   fontsLoaded = true;
 }
 
-const W = 800;
-const H = 500;
+const W = 640;
+const H = 400;
 
 const PALETTE = {
   card: "#F4ECD8",
@@ -47,59 +48,59 @@ const HORSE_COLORS = {
   6: PALETTE.teal,
 };
 
-const LANE_TOP = 108;
-const LANE_HEIGHT = 54;
-const LANE_LABEL_X = 30;
-const TRACK_X0 = 156;
-const TRACK_X1 = 762;
+const LANE_TOP = 86;
+const LANE_HEIGHT = 43;
+const LANE_LABEL_X = 24;
+const TRACK_X0 = 125;
+const TRACK_X1 = W - 30;
 const TRACK_W = TRACK_X1 - TRACK_X0;
-const HORSE_RADIUS = 16;
+const HORSE_RADIUS = 13;
 
 function drawBackground(ctx) {
   ctx.fillStyle = PALETTE.card;
   ctx.fillRect(0, 0, W, H);
 
   ctx.strokeStyle = PALETTE.ink;
-  ctx.lineWidth = 3;
-  ctx.strokeRect(12, 12, W - 24, H - 24);
+  ctx.lineWidth = 2;
+  ctx.strokeRect(10, 10, W - 20, H - 20);
 }
 
 function drawHeader(ctx, { gameId, pool, betsCount }) {
   // 金色「馬」字 logo，呼應結果卡
   ctx.fillStyle = PALETTE.gold;
-  ctx.fillRect(28, 28, 48, 48);
+  ctx.fillRect(22, 22, 38, 38);
   ctx.strokeStyle = PALETTE.ink;
-  ctx.lineWidth = 3;
-  ctx.strokeRect(28, 28, 48, 48);
+  ctx.lineWidth = 2;
+  ctx.strokeRect(22, 22, 38, 38);
 
   ctx.fillStyle = PALETTE.card;
-  ctx.font = '900 30px NotoSans';
+  ctx.font = '900 24px NotoSans';
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("馬", 52, 54);
+  ctx.fillText("馬", 41, 42);
 
   ctx.fillStyle = PALETTE.ink;
-  ctx.font = '900 22px NotoSans';
+  ctx.font = '900 18px NotoSans';
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  ctx.fillText("賽馬大賽 ・ 比賽進行中", 88, 30);
+  ctx.fillText("賽馬大賽 ・ 比賽進行中", 70, 24);
 
   ctx.fillStyle = PALETTE.muted;
-  ctx.font = '500 12px NotoSans';
-  ctx.fillText(`RACE ${gameId}`, 88, 60);
+  ctx.font = '500 10px NotoSans';
+  ctx.fillText(`RACE ${gameId}`, 70, 48);
 
   // 右上彩池資訊
   ctx.fillStyle = PALETTE.muted;
-  ctx.font = '500 11px NotoSans';
+  ctx.font = '500 9px NotoSans';
   ctx.textAlign = "right";
   ctx.textBaseline = "top";
-  ctx.fillText("POOL", W - 122, 32);
-  ctx.fillText("BETS", W - 38, 32);
+  ctx.fillText("POOL", W - 96, 26);
+  ctx.fillText("BETS", W - 30, 26);
 
   ctx.fillStyle = PALETTE.ink;
-  ctx.font = '900 20px NotoSans';
-  ctx.fillText(pool.toLocaleString(), W - 122, 48);
-  ctx.fillText(String(betsCount), W - 38, 48);
+  ctx.font = '900 16px NotoSans';
+  ctx.fillText(pool.toLocaleString(), W - 96, 40);
+  ctx.fillText(String(betsCount), W - 30, 40);
 
   // 標題分隔虛線
   ctx.save();
@@ -107,16 +108,16 @@ function drawHeader(ctx, { gameId, pool, betsCount }) {
   ctx.strokeStyle = PALETTE.muted;
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(28, 92);
-  ctx.lineTo(W - 28, 92);
+  ctx.moveTo(22, 74);
+  ctx.lineTo(W - 22, 74);
   ctx.stroke();
   ctx.restore();
 }
 
 function drawFinishLine(ctx, x, top, height) {
-  // 黑白格旗：每格 5px 高
-  const cell = 5;
-  const w = 12;
+  // 黑白格旗：每格 4px 高
+  const cell = 4;
+  const w = 10;
   const rows = Math.floor(height / cell);
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < 2; c++) {
@@ -126,71 +127,71 @@ function drawFinishLine(ctx, x, top, height) {
     }
   }
   ctx.strokeStyle = PALETTE.ink;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 1;
   ctx.strokeRect(x, top, w, rows * cell);
 }
 
 function drawLane(ctx, idx, horse, position, trackLength, isLeader) {
   const top = LANE_TOP + idx * LANE_HEIGHT;
   const cy = top + LANE_HEIGHT / 2;
-  const railTop = cy - 14;
-  const railH = 28;
+  const railTop = cy - 11;
+  const railH = 22;
 
   // 跑道底色
   ctx.fillStyle = PALETTE.rail;
   ctx.fillRect(TRACK_X0, railTop, TRACK_W, railH);
   ctx.strokeStyle = PALETTE.ink;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.5;
   ctx.strokeRect(TRACK_X0, railTop, TRACK_W, railH);
 
   // 跑道中線
   ctx.save();
-  ctx.setLineDash([4, 6]);
+  ctx.setLineDash([3, 5]);
   ctx.strokeStyle = PALETTE.muted;
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(TRACK_X0 + 6, cy);
-  ctx.lineTo(TRACK_X1 - 18, cy);
+  ctx.moveTo(TRACK_X0 + 5, cy);
+  ctx.lineTo(TRACK_X1 - 14, cy);
   ctx.stroke();
   ctx.restore();
 
   // 終點旗
-  drawFinishLine(ctx, TRACK_X1 - 12, railTop + 1, railH - 2);
+  drawFinishLine(ctx, TRACK_X1 - 10, railTop + 1, railH - 2);
 
   // 左側馬號徽章
   const color = HORSE_COLORS[horse.id] || PALETTE.ink;
   ctx.fillStyle = color;
-  ctx.fillRect(LANE_LABEL_X, cy - 14, 28, 28);
+  ctx.fillRect(LANE_LABEL_X, cy - 11, 22, 22);
   ctx.strokeStyle = PALETTE.ink;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(LANE_LABEL_X, cy - 14, 28, 28);
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(LANE_LABEL_X, cy - 11, 22, 22);
   ctx.fillStyle = PALETTE.card;
-  ctx.font = '900 16px NotoSans';
+  ctx.font = '900 13px NotoSans';
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(String(horse.id), LANE_LABEL_X + 14, cy + 1);
+  ctx.fillText(String(horse.id), LANE_LABEL_X + 11, cy + 1);
 
   // 馬名
   ctx.fillStyle = PALETTE.ink;
-  ctx.font = '900 16px NotoSans';
+  ctx.font = '900 13px NotoSans';
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText(horse.name, LANE_LABEL_X + 36, cy + 1);
+  ctx.fillText(horse.name, LANE_LABEL_X + 30, cy - 4);
 
   // 賠率
   ctx.fillStyle = PALETTE.muted;
-  ctx.font = '500 11px NotoSans';
-  ctx.fillText(`×${horse.payout.toFixed(1)}`, LANE_LABEL_X + 36, cy + 16);
+  ctx.font = '500 9px NotoSans';
+  ctx.fillText(`×${horse.payout.toFixed(1)}`, LANE_LABEL_X + 30, cy + 9);
 
   // 馬匹本體：圓形徽章沿跑道滑動
   const ratio = Math.max(0, Math.min(1, position / trackLength));
   const travelStart = TRACK_X0 + HORSE_RADIUS + 2;
-  const travelEnd = TRACK_X1 - HORSE_RADIUS - 14;
+  const travelEnd = TRACK_X1 - HORSE_RADIUS - 12;
   const hx = travelStart + (travelEnd - travelStart) * ratio;
 
   // 陰影
   ctx.beginPath();
-  ctx.arc(hx + 2, cy + 2, HORSE_RADIUS, 0, Math.PI * 2);
+  ctx.arc(hx + 1.5, cy + 1.5, HORSE_RADIUS, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(0,0,0,0.20)";
   ctx.fill();
 
@@ -200,47 +201,47 @@ function drawLane(ctx, idx, horse, position, trackLength, isLeader) {
   ctx.fillStyle = color;
   ctx.fill();
   ctx.strokeStyle = PALETTE.ink;
-  ctx.lineWidth = isLeader ? 3 : 2;
+  ctx.lineWidth = isLeader ? 2.5 : 1.5;
   ctx.stroke();
 
   // 領先者外框再加一圈金光暈
   if (isLeader) {
     ctx.beginPath();
-    ctx.arc(hx, cy, HORSE_RADIUS + 4, 0, Math.PI * 2);
+    ctx.arc(hx, cy, HORSE_RADIUS + 3, 0, Math.PI * 2);
     ctx.strokeStyle = PALETTE.gold;
     ctx.lineWidth = 1.5;
     ctx.stroke();
   }
 
   ctx.fillStyle = PALETTE.card;
-  ctx.font = '900 14px NotoSans';
+  ctx.font = '900 12px NotoSans';
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(String(horse.id), hx, cy + 1);
 }
 
 function drawFooter(ctx) {
-  const y = H - 28;
+  const y = H - 22;
   ctx.save();
   ctx.setLineDash([3, 4]);
   ctx.beginPath();
-  ctx.moveTo(28, y - 12);
-  ctx.lineTo(W - 28, y - 12);
+  ctx.moveTo(22, y - 10);
+  ctx.lineTo(W - 22, y - 10);
   ctx.strokeStyle = PALETTE.muted;
   ctx.lineWidth = 1;
   ctx.stroke();
   ctx.restore();
 
   ctx.fillStyle = PALETTE.muted;
-  ctx.font = '500 12px NotoSans';
+  ctx.font = '500 10px NotoSans';
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText("看誰先衝過終點線…", 28, y);
+  ctx.fillText("看誰先衝過終點線…", 22, y);
 
   ctx.fillStyle = PALETTE.ink;
-  ctx.font = '500 12px NotoSans';
+  ctx.font = '500 10px NotoSans';
   ctx.textAlign = "right";
-  ctx.fillText("@SHUSHU CASINO", W - 28, y);
+  ctx.fillText("@SHUSHU CASINO", W - 22, y);
 }
 
 // 把 keyframes（每個是 6 個位置）等距內插成 totalFrames 幀。
@@ -285,10 +286,10 @@ async function generateHorseRaceGif({
 }) {
   ensureFonts();
 
-  const ANIM_FRAMES = 50;
-  const HOLD_FRAMES = 6;
+  const ANIM_FRAMES = 30;
+  const HOLD_FRAMES = 4;
   const TOTAL_FRAMES = ANIM_FRAMES + HOLD_FRAMES;
-  const FRAME_DELAY_MS = 100;
+  const FRAME_DELAY_MS = 120;
 
   const interpolated = interpolateFrames(frames || [], ANIM_FRAMES);
   const last = interpolated[interpolated.length - 1] || HORSES.map(() => 0);
@@ -300,7 +301,7 @@ async function generateHorseRaceGif({
   const encoder = new GIFEncoder(W, H, "neuquant", true, TOTAL_FRAMES);
   encoder.setDelay(FRAME_DELAY_MS);
   encoder.setRepeat(0);
-  encoder.setQuality(20);
+  encoder.setQuality(30);
   encoder.start();
 
   // 每 4 幀讓出一次 event loop，避免阻塞 Discord 互動 token。

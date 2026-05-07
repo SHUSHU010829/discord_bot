@@ -129,7 +129,11 @@ async function runRaceAnimation(client, state) {
       });
       await message
         .edit({ ...racingPayload, files: [attachment] })
-        .catch(() => {});
+        .catch((e) =>
+          console.log(
+            `[HORSE] race gif edit failed (size=${buffer.length}B): ${e}`.yellow,
+          ),
+        );
       waitMs = durationMs;
     } catch (err) {
       console.log(`[HORSE] race gif render failed: ${err}`.yellow);
