@@ -103,7 +103,7 @@ module.exports = {
           .catch(() => {});
       } else {
         await interaction
-          .reply({ content: "哎呀！今天籤筒休息了 💤", ephemeral: true })
+          .reply({ content: "哎呀！今天籤筒休息了 💤", flags: MessageFlags.Ephemeral })
           .catch(() => {});
       }
     }

@@ -4,6 +4,7 @@ const {
   PermissionFlagsBits,
   MessageFlags,
   EmbedBuilder,
+  InteractionContextType,
 } = require("discord.js");
 
 // 計算「全機器人」金幣流通量。
@@ -94,7 +95,7 @@ module.exports = {
     .setName("circulation")
     .setDescription("[ADMIN] Show total coin circulation across all guilds 💰")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .toJSON(),
 
   userPermissions: [PermissionFlagsBits.Administrator],

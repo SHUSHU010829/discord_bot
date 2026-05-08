@@ -1,6 +1,9 @@
 require("colors");
 const crypto = require("crypto");
-const { SlashCommandBuilder } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  InteractionContextType,
+} = require("discord.js");
 
 const { coinSystem, casino } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
@@ -15,7 +18,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("hilo")
     .setDescription("猜大小！下一張比底牌大、小、還是相同？🎴")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addIntegerOption((opt) =>
       opt
         .setName("下注")

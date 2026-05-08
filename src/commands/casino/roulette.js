@@ -5,7 +5,8 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-} = require('discord.js');
+  InteractionContextType,
+} = require("discord.js");
 
 const { coinSystem, casino } = require('../../config');
 const grantCoins = require('../../features/economy/grantCoins');
@@ -94,7 +95,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('輪盤')
     .setDescription('歐式輪盤，多押法組合 🎰')
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addIntegerOption(opt =>
       opt.setName('金額')
         .setDescription('投入籌碼總額（勾選梭哈時可省略）')

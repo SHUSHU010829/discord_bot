@@ -1,6 +1,10 @@
 require("colors");
 
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  MessageFlags,
+} = require("discord.js");
 
 const getCryptocurrency = require("../../utils/getCryptocurrency");
 
@@ -64,7 +68,7 @@ module.exports = {
     if (!coin) {
       return interaction.reply({
         content: "❌ 請輸入加密貨幣代碼（例：BTC）。",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 

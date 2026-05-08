@@ -6,6 +6,7 @@ const {
   AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
+  MessageFlags,
 } = require("discord.js");
 
 const { legalActions, totalPot } = require("./engine");
@@ -370,10 +371,10 @@ function preflopHint(holeCards) {
 function renderEphemeralHand(state, userId) {
   const p = state.players.find((pp) => pp.userId === userId);
   if (!p) {
-    return { content: "🂠 你不在這張桌上。", ephemeral: true };
+    return { content: "🂠 你不在這張桌上。", flags: MessageFlags.Ephemeral };
   }
   if (!p.holeCards || p.holeCards.length === 0) {
-    return { content: "🂠 還沒發牌喔。", ephemeral: true };
+    return { content: "🂠 還沒發牌喔。", flags: MessageFlags.Ephemeral };
   }
   const hand = formatCardLine(p.holeCards, 2);
   const community = formatCardLine(state.community || [], 5);
@@ -403,7 +404,7 @@ function renderEphemeralHand(state, userId) {
   );
   if (p.folded) lines.push("（你已棄牌）");
   if (p.allIn) lines.push("（你已 All-In）");
-  return { content: lines.join("\n"), ephemeral: true };
+  return { content: lines.join("\n"), flags: MessageFlags.Ephemeral };
 }
 
 function renderHelp() {
@@ -439,7 +440,7 @@ function renderHelp() {
     "",
     "**⏰ 倒數**：每回合 60 秒，逾時自動處理（沒人下注 → 過牌；有人下注 → 棄牌）",
   ];
-  return { content: lines.join("\n"), ephemeral: true };
+  return { content: lines.join("\n"), flags: MessageFlags.Ephemeral };
 }
 
 module.exports = {

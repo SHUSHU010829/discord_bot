@@ -7,6 +7,7 @@ const {
   SeparatorSpacingSize,
   ThumbnailBuilder,
   MessageFlags,
+  InteractionContextType,
 } = require("discord.js");
 const { DateTime } = require("luxon");
 
@@ -14,7 +15,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("stats")
     .setDescription("📊 查看統計資料")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addSubcommand((subcommand) =>
       subcommand
         .setName("user")

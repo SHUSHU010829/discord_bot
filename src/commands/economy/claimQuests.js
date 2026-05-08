@@ -5,6 +5,7 @@ const {
   TextDisplayBuilder,
   SeparatorBuilder,
   MessageFlags,
+  InteractionContextType,
 } = require("discord.js");
 
 const { questSystem } = require("../../config");
@@ -14,7 +15,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("領錢")
     .setDescription("領取所有已完成任務的獎勵 🪙")
-    .setDMPermission(false),
+    .setContexts(InteractionContextType.Guild),
 
   run: async (client, interaction) => {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });

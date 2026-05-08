@@ -3,6 +3,7 @@ const {
   SlashCommandBuilder,
   EmbedBuilder,
   MessageFlags,
+  InteractionContextType,
 } = require("discord.js");
 
 const { shop } = require("../../config");
@@ -153,7 +154,7 @@ async function handleSetTitle(client, interaction) {
 const data = new SlashCommandBuilder()
   .setName("商店")
   .setDescription("購買道具、主題、顏色身份組 🛒")
-  .setDMPermission(false)
+  .setContexts(InteractionContextType.Guild)
   .addSubcommand((sc) =>
     sc.setName("瀏覽").setDescription("瀏覽商店商品").addStringOption((o) => {
       o.setName("category").setDescription("分類").setRequired(false);

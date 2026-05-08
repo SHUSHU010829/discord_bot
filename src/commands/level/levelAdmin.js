@@ -1,5 +1,9 @@
 require("colors");
-const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  PermissionFlagsBits,
+  InteractionContextType,
+} = require("discord.js");
 
 const giveRoleXpHandler = require("../../features/level/handlers/giveRoleXp");
 const levelRolesHandler = require("../../features/level/handlers/levelRoles");
@@ -9,7 +13,7 @@ module.exports = {
     .setName("level-admin")
     .setDescription("[ADMIN] 等級系統管理（XP 發放、等級身分組）")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addSubcommand((sub) =>
       sub
         .setName("give-xp")

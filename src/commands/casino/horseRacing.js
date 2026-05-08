@@ -9,7 +9,11 @@
 
 require("colors");
 const crypto = require("crypto");
-const { SlashCommandBuilder, MessageFlags } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  MessageFlags,
+  InteractionContextType,
+} = require("discord.js");
 
 const { coinSystem, casino } = require("../../config");
 const {
@@ -25,7 +29,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("賽馬")
     .setDescription("🐎 開一場賽馬！售票期內大家進來押注，時間到自動開賽")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .toJSON(),
 
   run: async (client, interaction) => {

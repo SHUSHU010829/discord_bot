@@ -27,7 +27,7 @@ async function run(client, interaction) {
       if (!category || category.type !== 4) {
         return interaction.reply({
           content: "❌ 提供的類別 ID 無效！請確認類別存在並正確。",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
     }
@@ -78,7 +78,7 @@ async function run(client, interaction) {
 
     await interaction.reply({
       content: "✅ 建議系統面板已設置！",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
 
     const message = await interaction.channel.send({
@@ -104,7 +104,7 @@ async function run(client, interaction) {
     if (!interaction.replied && !interaction.deferred) {
       await interaction.reply({
         content: "❌ 設置建議面板時發生錯誤！",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }

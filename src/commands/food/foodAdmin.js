@@ -1,6 +1,10 @@
 require("colors");
 
-const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  PermissionFlagsBits,
+  InteractionContextType,
+} = require("discord.js");
 
 const {
   CATEGORY_CHOICES,
@@ -16,7 +20,7 @@ module.exports = {
     .setName("food-admin")
     .setDescription("[ADMIN] 食物資料管理（新增/批次/匯入/刪除）")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addSubcommand((sub) =>
       sub
         .setName("add")

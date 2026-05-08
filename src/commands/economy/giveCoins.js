@@ -4,6 +4,7 @@ const {
   PermissionFlagsBits,
   MessageFlags,
   EmbedBuilder,
+  InteractionContextType,
 } = require("discord.js");
 const { DateTime } = require("luxon");
 
@@ -15,7 +16,7 @@ module.exports = {
     .setName("give-coins")
     .setDescription("[ADMIN] Grant coins to a member (use a negative amount to deduct)")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addUserOption((opt) =>
       opt
         .setName("user")

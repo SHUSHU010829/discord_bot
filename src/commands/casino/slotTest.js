@@ -3,6 +3,7 @@ const {
   SlashCommandBuilder,
   AttachmentBuilder,
   MessageFlags,
+  InteractionContextType,
 } = require("discord.js");
 
 const { spin } = require("../../features/casino/slot/slotMachine");
@@ -39,7 +40,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("slottest")
     .setDescription("[DEV ONLY] 拉霸測試工具")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addSubcommand((sub) =>
       sub
         .setName("spin")

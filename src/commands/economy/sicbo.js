@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const {
   SlashCommandBuilder,
   AttachmentBuilder,
+  InteractionContextType,
 } = require("discord.js");
 const { coinSystem, casino } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
@@ -59,7 +60,7 @@ function buildBetOptionGroup(builder, idx) {
 const builder = new SlashCommandBuilder()
   .setName("骰寶")
   .setDescription("擲三顆骰子賭運氣 🎲（最多同時押 3 注）")
-  .setDMPermission(false);
+  .setContexts(InteractionContextType.Guild);
 for (let i = 1; i <= MAX_BETS; i += 1) buildBetOptionGroup(builder, i);
 builder.addBooleanOption((opt) =>
   opt

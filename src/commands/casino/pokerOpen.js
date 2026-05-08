@@ -1,5 +1,8 @@
 require("colors");
-const { SlashCommandBuilder } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  InteractionContextType,
+} = require("discord.js");
 
 const { casino } = require("../../config");
 const { createTable } = require("../../features/casino/poker/service");
@@ -12,7 +15,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("德州撲克")
     .setDescription("開一桌德州撲克 🃏（會自動建立執行緒，桌面在裡面跑）")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addSubcommand((sub) =>
       sub
         .setName("開桌")

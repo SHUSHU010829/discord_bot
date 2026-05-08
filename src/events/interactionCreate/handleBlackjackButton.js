@@ -1,5 +1,6 @@
 const { casino } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
+const { MessageFlags } = require("discord.js");
 const {
   hit,
   stand,
@@ -41,7 +42,7 @@ module.exports = async (client, interaction) => {
       try {
         await interaction.reply({
           content: `⏳ 點太快了，等 ${Math.ceil(rl.retryAfterMs / 1000)} 秒。`,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       } catch (_) { /* noop */ }
       return;
@@ -67,19 +68,19 @@ module.exports = async (client, interaction) => {
     if (!state) {
       return interaction.followUp({
         content: "🃏 這局已過期或找不到了。",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
     if (state.userId !== interaction.user.id) {
       return interaction.followUp({
         content: "🚫 這不是你的局！別亂按 ㄎㄎ",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
     if (state.status !== "playing") {
       return interaction.followUp({
         content: "🃏 這局已結束。",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -99,7 +100,7 @@ module.exports = async (client, interaction) => {
       ) {
         return interaction.followUp({
           content: "🚫 現在不能 Double。",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
       const before = await client.userCoinsCollection.findOne({ userId, guildId });
@@ -107,7 +108,7 @@ module.exports = async (client, interaction) => {
       if (balance < state.bet) {
         return interaction.followUp({
           content: `💰 餘額 ${balance.toLocaleString()} 不足以 Double（需要 ${state.bet.toLocaleString()}）。`,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
       const betResult = await grantCoins(client, {
@@ -126,14 +127,14 @@ module.exports = async (client, interaction) => {
       if (!betResult) {
         return interaction.followUp({
           content: "🔧 Double 扣款失敗，請稍後再試。",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
     } else if (action === "split") {
       if (!canSplit(state)) {
         return interaction.followUp({
           content: "🚫 現在不能分牌（需起手兩張同點數）。",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
       const before = await client.userCoinsCollection.findOne({ userId, guildId });
@@ -141,7 +142,7 @@ module.exports = async (client, interaction) => {
       if (balance < state.bet) {
         return interaction.followUp({
           content: `💰 餘額 ${balance.toLocaleString()} 不足以分牌（需要 ${state.bet.toLocaleString()}）。`,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
       const betResult = await grantCoins(client, {
@@ -160,7 +161,7 @@ module.exports = async (client, interaction) => {
       if (!betResult) {
         return interaction.followUp({
           content: "🔧 分牌扣款失敗，請稍後再試。",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
     }
@@ -248,12 +249,12 @@ module.exports = async (client, interaction) => {
       if (interaction.deferred || interaction.replied) {
         await interaction.followUp({
           content: "🔧 21 點按鈕處理失敗，請呼叫舒舒！",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       } else {
         await interaction.reply({
           content: "🔧 21 點按鈕處理失敗，請呼叫舒舒！",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
     } catch (_) {

@@ -1,7 +1,11 @@
 // /lotteryadmin — 開發者用樂透除錯工具。
 
 require("colors");
-const { SlashCommandBuilder } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  MessageFlags,
+  InteractionContextType,
+} = require("discord.js");
 
 const { runDraw, ensureNextDraw, getCurrentOpenDraw } = require("../../features/casino/lottery/runDraw");
 const { announceDrawResult } = require("../../features/casino/lottery/announceResult");
@@ -25,7 +29,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("lotteryadmin")
     .setDescription("[DEV ONLY] 樂透管理工具")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addSubcommand((s) =>
       s
         .setName("force-draw")
@@ -77,7 +81,7 @@ module.exports = {
     .toJSON(),
 
   run: async (client, interaction) => {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       const sub = interaction.options.getSubcommand();

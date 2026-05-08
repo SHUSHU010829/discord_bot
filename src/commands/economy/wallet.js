@@ -3,6 +3,7 @@ const {
   SlashCommandBuilder,
   AttachmentBuilder,
   MessageFlags,
+  InteractionContextType,
 } = require("discord.js");
 
 const { coinSystem } = require("../../config");
@@ -13,7 +14,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("錢包")
     .setDescription("查看你的金幣錢包 💰")
-    .setDMPermission(false),
+    .setContexts(InteractionContextType.Guild),
 
   run: async (client, interaction) => {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });

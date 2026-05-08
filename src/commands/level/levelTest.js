@@ -8,6 +8,7 @@ const {
   MediaGalleryBuilder,
   MediaGalleryItemBuilder,
   MessageFlags,
+  InteractionContextType,
 } = require("discord.js");
 
 const grantXp = require("../../features/leveling/grantXp");
@@ -20,7 +21,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("leveltest")
     .setDescription("[DEV ONLY] 等級系統測試工具")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addSubcommand((sub) =>
       sub
         .setName("givexp")

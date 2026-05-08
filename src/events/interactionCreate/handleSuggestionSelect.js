@@ -5,6 +5,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  MessageFlags,
 } = require("discord.js");
 const config = require("../../config");
 const { loadPanels } = require("../../utils/suggestionPanelsStore");
@@ -28,7 +29,7 @@ module.exports = async (client, interaction) => {
       logger.warn({ source: "suggestion-select" }, "interaction.guild 不存在,可能在 DM 中");
       return await interaction.reply({
         content: "❌ 此功能只能在伺服器中使用。",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -42,7 +43,7 @@ module.exports = async (client, interaction) => {
       trackError("suggestion-select", new Error("invalid interaction.values"));
       return await interaction.reply({
         content: "❌ 無法讀取你的選擇，請重試。",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -54,13 +55,13 @@ module.exports = async (client, interaction) => {
       trackError("suggestion-select", new Error(`invalid type: ${selectedType}`));
       return await interaction.reply({
         content: "❌ 無效的建議類型！",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
     // 先 defer，避免 loadPanels + 頻道建立讓 3 秒 token 過期觸發 10062
     try {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     } catch (deferErr) {
       if (deferErr?.code === 10062) {
         logger.warn(
@@ -207,7 +208,7 @@ module.exports = async (client, interaction) => {
 
     await interaction.editReply({
       content: `✅ 建議頻道已創建！\n請前往 ${suggestionChannel}`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     trackSuccess("suggestion-select");
   } catch (error) {
@@ -221,7 +222,7 @@ module.exports = async (client, interaction) => {
       try {
         await interaction.reply({
           content: "❌ 處理建議時發生錯誤！請聯絡管理員。",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       } catch (replyError) {
         logger.error({ source: "suggestion-select", err: replyError.message }, "回覆錯誤訊息失敗");
@@ -231,7 +232,7 @@ module.exports = async (client, interaction) => {
       try {
         await interaction.editReply({
           content: "❌ 創建建議頻道時發生錯誤！請聯絡管理員。",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       } catch (editError) {
         logger.error({ source: "suggestion-select", err: editError.message }, "編輯回覆失敗");

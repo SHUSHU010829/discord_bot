@@ -1,5 +1,6 @@
 require("colors");
 
+const { MessageFlags } = require("discord.js");
 const autocompleteBeverageStore = require("../../../utils/autocompleteBeverageStore");
 const { CATEGORY_LABEL } = require("../../../constants/foodCategories");
 
@@ -14,7 +15,7 @@ async function run(client, interaction) {
   if (!newFood) {
     await interaction.reply({
       content: "❌ 食物名稱不能為空白！",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }

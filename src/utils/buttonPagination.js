@@ -5,6 +5,7 @@ const {
   ButtonBuilder,
   ButtonStyle,
   ComponentType,
+  MessageFlags,
 } = require("discord.js");
 
 module.exports = async (interaction, pages, time = 30 * 1000) => {
@@ -56,7 +57,7 @@ module.exports = async (interaction, pages, time = 30 * 1000) => {
       if (i.user.id !== interaction.user.id)
         return i.reply({
           content: "只有發起者可以操作此按鈕！",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
 
       await i.deferUpdate();

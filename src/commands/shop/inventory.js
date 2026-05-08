@@ -3,6 +3,7 @@ const {
   SlashCommandBuilder,
   EmbedBuilder,
   MessageFlags,
+  InteractionContextType,
 } = require("discord.js");
 
 const { shop } = require("../../config");
@@ -17,7 +18,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("背包")
     .setDescription("查看你購買的道具與生效中的 buff 🎒")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .toJSON(),
 
   run: async (client, interaction) => {

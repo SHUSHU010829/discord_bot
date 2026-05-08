@@ -257,7 +257,7 @@ async function run(client, interaction) {
         return btnInteraction.reply({
           content:
             "這不是你的清單！請使用 /food list 查看你自己的清單。",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
 

@@ -1,6 +1,10 @@
 require("colors");
 
-const { EmbedBuilder, PermissionFlagsBits } = require("discord.js");
+const {
+  EmbedBuilder,
+  PermissionFlagsBits,
+  MessageFlags,
+} = require("discord.js");
 const { developersId, serverId } = require("../../config");
 const mConfig = require("../../messageConfig.json");
 const getLocalCommands = require("../../utils/getLocalCommands");
@@ -24,9 +28,9 @@ const UNKNOWN_INTERACTION = 10062;
 async function safeReply(interaction, payload) {
   try {
     if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({ ...payload, ephemeral: true });
+      await interaction.followUp({ ...payload, flags: MessageFlags.Ephemeral });
     } else {
-      await interaction.reply({ ...payload, ephemeral: true });
+      await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
     }
   } catch (replyErr) {
     if (replyErr?.code !== UNKNOWN_INTERACTION) {

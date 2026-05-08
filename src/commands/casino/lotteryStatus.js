@@ -1,7 +1,11 @@
 // /樂透資訊 — 查看當期彩池、開獎倒數、票數。
 
 require("colors");
-const { SlashCommandBuilder } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  MessageFlags,
+  InteractionContextType,
+} = require("discord.js");
 
 const { getLotteryConfig, listLotteryTypes } = require("../../features/casino/lottery/numbers");
 
@@ -9,11 +13,11 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("樂透資訊")
     .setDescription("查看當期樂透資訊 ℹ️")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .toJSON(),
 
   run: async (client, interaction) => {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       if (!client.lotteryDrawsCollection) {
