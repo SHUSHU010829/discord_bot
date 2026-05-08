@@ -9,10 +9,7 @@ const {
 
 const { welfareSystem } = require("../../config");
 const welfareService = require("../../features/welfare/welfareService");
-const {
-  checkServerTenure,
-  checkAccountAge,
-} = require("../../features/economy/eligibility");
+const { checkAccountAge } = require("../../features/economy/eligibility");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -31,10 +28,6 @@ module.exports = {
         return interaction.editReply("🔧 救濟金系統尚未啟動，請聯絡舒舒！");
       }
 
-      const tenure = checkServerTenure(interaction.member);
-      if (!tenure.ok) {
-        return interaction.editReply(tenure.message);
-      }
       const accountAge = checkAccountAge(interaction.user);
       if (!accountAge.ok) {
         return interaction.editReply(accountAge.message);

@@ -7,7 +7,6 @@ const {
 
 const { coinSystem } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
-const { checkServerTenure } = require("../../features/economy/eligibility");
 
 function getDepositCfg() {
   return coinSystem?.deposit || {};
@@ -88,13 +87,6 @@ module.exports = {
       const userId = interaction.user.id;
       const guildId = interaction.guildId;
       const username = interaction.member?.displayName || interaction.user.username;
-
-      if (sub !== "查詢") {
-        const tenure = checkServerTenure(interaction.member);
-        if (!tenure.ok) {
-          return interaction.editReply(tenure.message);
-        }
-      }
 
       if (sub === "開戶") {
         return openDeposit(client, interaction, { userId, guildId, username });
