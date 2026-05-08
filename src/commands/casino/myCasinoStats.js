@@ -16,6 +16,7 @@ const GAME_LABELS = {
   sicbo: "🎲 骰寶",
   blackjack: "🃏 21 點",
   hilo: "🔼 HI-LO",
+  dragonGate: "🐉 射龍門",
   roulette: "🎡 輪盤",
   poker: "🃏 德州撲克",
   lottery: "🎟️ 樂透",
