@@ -15,7 +15,8 @@ const MAX_DESCRIPTION_LENGTH = 280;
 const EXTRA_IMAGE_COUNT = 3;
 // picnob/threads gateway 偶爾會重新生成 guid,只記最新一筆會在 guid 漂移時整批重推。
 // 因此保留近 N 筆已處理過的識別子(guid / link 雙鍵)做 rolling dedup。
-const SEEN_HISTORY_LIMIT = 50;
+// 每筆 item 會塞 2 個 key(guid + link),200 ≒ 100 篇貼文窗口。
+const SEEN_HISTORY_LIMIT = 200;
 // 即使 dedup 漂移,pubDate 早於這個門檻的貼文一律不推播,避免倒灌數月前的舊文。
 // 設為 0 / 負數可關閉。
 const MAX_ITEM_AGE_MS =
@@ -255,23 +256,32 @@ const pollFeed = async (client, feed) => {
     `[INFO] RSS(${feed.id}): ${ordered.length} 則新貼文,過舊略過 ${tooOldCount} 則,過濾後 ${matchedCount} 則`.cyan
   );
 
-  // 處理過(包含被 filter 或時間護欄略過)的識別子,等回寫時合併進 seen
-  const processedKeys = [];
+  // 每處理一筆就立刻把識別子寫回 state,避免推播中途 crash / 重啟後重推。
+  // 重新讀 state 再合併,避免覆蓋其他 feed 期間的更新。
+  const persistSeen = (keys) => {
+    if (!keys.length) return;
+    const latest = readState();
+    const merged = mergeSeen(keys, getSeenList(latest, feed.id));
+    latest[feed.id] = { seen: merged };
+    writeState(latest);
+  };
+
   for (const item of ordered) {
     if (isItemTooOld(item)) {
       // 太舊的貼文直接略過但記入 seen,避免下輪 cron 又被當成新文評估
-      processedKeys.unshift(...itemKeys(item));
+      persistSeen(itemKeys(item));
       continue;
     }
     if (!filterFn(item)) {
       // 不符合過濾條件也要記入 seen,避免下次重複比對
-      processedKeys.unshift(...itemKeys(item));
+      persistSeen(itemKeys(item));
       continue;
     }
     try {
       const { embeds, files } = await buildEmbedsAndFiles({ item, feed });
       await channel.send({ embeds, files });
-      processedKeys.unshift(...itemKeys(item));
+      // 推完馬上落盤,即使下一筆失敗或進程被殺也不會重推這篇
+      persistSeen(itemKeys(item));
     } catch (err) {
       console.log(
         `[ERROR] RSS(${feed.id}) 推播失敗 guid=${item.guid}: ${err.message}`.red
@@ -280,14 +290,6 @@ const pollFeed = async (client, feed) => {
       break;
     }
   }
-
-  if (processedKeys.length === 0) return;
-
-  // 重新讀 state 再寫,避免覆蓋其他 feed 期間的更新
-  const latest = readState();
-  const merged = mergeSeen(processedKeys, getSeenList(latest, feed.id));
-  latest[feed.id] = { seen: merged };
-  writeState(latest);
 };
 
 const startRssPoller = (client) => {
