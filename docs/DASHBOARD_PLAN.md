@@ -12,6 +12,8 @@
 | Auth | Discord OAuth2（`identify` + `guilds`） |
 | 部署 | **Dashboard 獨立部署**（Vercel），Bot 留在現有 Docker |
 | 開發優先序 | **Admin 後台優先** → 一般使用者功能 |
+| Guild 範圍 | **單 guild**（dashboard 寫死主伺服器 ID，未來要擴再加 `:guildId`） |
+| Cron 監控 | **要做**（新增 `CronJobLog` collection + 排程監控頁） |
 
 ---
 
@@ -97,6 +99,9 @@ session → fetch Discord member from cache → check permission flag → allow/
 /api/v1/admin/push/feeds             GET / PATCH  (steam/free-games/twitch/rss)
 /api/v1/admin/shop/items             CRUD
 /api/v1/admin/logs/transactions      GET (分頁、篩選)
+/api/v1/admin/cron/jobs              GET   列出所有排程任務 + 上次/下次執行
+/api/v1/admin/cron/jobs/:name/runs   GET   單一任務的歷史紀錄（分頁）
+/api/v1/admin/cron/jobs/:name/run    POST  手動觸發（owner only）
 
 /api/v1/me/profile                   GET
 /api/v1/me/history                   GET
@@ -166,6 +171,10 @@ dashboard/
 - [ ] **商店管理**：上下架、改價格、看銷售量
 - [ ] **交易日誌**：CoinTransactions / ShopTransactions 查詢、匯出 CSV
 - [ ] **稽核日誌頁**：誰在 dashboard 做了什麼
+- [ ] **排程監控頁**：列出所有 cron 任務、上次執行時間 / 狀態 / 錯誤訊息、手動 [Run now] 按鈕
+  - 新增 `CronJobLog` collection（欄位：`name`, `startedAt`, `finishedAt`, `status`, `result`, `error`）
+  - 包一個 `withCronLog(name, fn)` helper，所有現有 cron 任務改用它包起來
+  - 影響的檔案：Steam deals push、Free Games push、Twitch check、RSS、daily 連勝重置、樂透開獎等
 
 ### W5 — 一般使用者 MVP
 - [ ] `/me`：等級、coin、連勝、徽章、本月訊息/語音
@@ -195,10 +204,12 @@ dashboard/
 
 ## 8. 待你決定（之後再開工亦可）
 
-1. **Dashboard 要不要支援多 guild**？（目前 Bot 主打單一伺服器，但程式上是支援多 guild 的）
-2. **Owner 級操作要不要再加一層 2FA / 確認碼**？（例如手動加 1 萬 coin 那種）
-3. **要不要曝光 Bot 的 cron 觸發紀錄頁**？（debug 推播很有用）
-4. **Logo / 主色** — UI 上線前要定，可後補
+1. **Owner 級操作要不要再加一層 2FA / 確認碼**？（例如手動加 1 萬 coin 那種）
+2. **Logo / 主色** — UI 上線前要定，可後補
+
+### 已決定
+- ✅ **單 guild** — Dashboard 寫死 `PRIMARY_GUILD_ID`，未來擴多 guild 是純加法
+- ✅ **Cron 監控頁** — 列出所有排程任務、狀態、可手動觸發（W4）
 
 ---
 
