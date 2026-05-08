@@ -1,10 +1,12 @@
 // 21 點核心引擎：純函數，不接觸 DB / Discord。
 //
-// 規則（一般賭場 RTP / Preset B）：
-//   - 6 副 52 張，每局重洗
+// 規則：
+//   - 1 副 52 張，每局重洗
 //   - 玩家可 hit / stand / double / split
-//   - 莊家 ≤16 必補；硬 17 停、軟 17 補（Hit on Soft 17, H17）
+//   - 莊家 ≥17 必停（含 soft 17，不 hit S17）
 //   - Blackjack（兩張 A+10/J/Q/K）賠率 3:2，一般贏 1:1，平手退本金
+//   - 過五關（Five-Card Charlie）：玩家持有 5 張未爆牌自動獲勝，賠率 2:1
+//   - 莊家過五關：莊家拿到 5 張未爆牌則莊家勝（玩家 BJ / 玩家過五關優先結算，不受影響）
 //   - 分牌（Split）：起手兩張同點數可分牌，需追加一筆等額注；
 //     分牌後的 21 不算 BJ；分對 A 只能各補一張且不能再要牌、不能加倍；
 //     不支援再分牌（最多兩手）
@@ -21,8 +23,8 @@
 //       cards: string[],
 //       bet: number,
 //       doubled: boolean,
-//       done: boolean,        // 玩家動作已結束（stand/bust/21/double/splitAce）
-//       result: string|null,  // 結算後填入：blackjack/win/push/lose
+//       done: boolean,        // 玩家動作已結束（stand/bust/21/double/fivecard/splitAce）
+//       result: string|null,  // 結算後填入：blackjack/win/push/lose/fivecard/dealerfivecard
 //       payout: number,       // 此手拿回的總額
 //       fromSplitAces: boolean,
 //     }>,
@@ -35,8 +37,10 @@
 const { freshShuffledDeck, drawOne, rankOf } = require("./deck");
 const { evaluateHand, rankValue } = require("./hand");
 
-// 一副牌張數（決定本局共用幾副；6 副為一般賭場標準）
-const DECK_COUNT = 6;
+// 過五關門檻：抽到第 N 張未爆牌即自動結算為過五關
+const FIVE_CARD_THRESHOLD = 5;
+// 過五關賠率倍數（拿回的總額 = 注額 × 此倍數）。2 = 1:1 賠率（本金 + 等額獎金）
+const FIVE_CARD_PAYOUT_MULTIPLIER = 2;
 
 // 把舊版（沒有 hands 欄位）的 state/doc 補成新結構，方便升級當下還在進行的局正常 resume。
 function ensureHandsShape(state) {
@@ -79,7 +83,7 @@ function syncActive(state) {
 }
 
 function startGame({ bet }) {
-  let deck = freshShuffledDeck(DECK_COUNT);
+  let deck = freshShuffledDeck(1);
   const playerHand = [];
   const dealerHand = [];
 
@@ -134,6 +138,8 @@ function hit(state) {
   const ev = evaluateHand(newCards);
   const newCur = { ...cur, cards: newCards };
   if (ev.isBust) {
+    newCur.done = true;
+  } else if (newCards.length >= FIVE_CARD_THRESHOLD) {
     newCur.done = true;
   } else if (ev.total === 21) {
     newCur.done = true;
@@ -215,15 +221,15 @@ function advanceOrSettle(state) {
   return syncActive({ ...state, activeIndex: idx });
 }
 
-// 跑莊家流程：硬 17 停、軟 17 補（Hit on Soft 17, H17）。
+// 跑莊家流程：≥17 停、否則繼續抽（含 soft 17 也停 = stand on all 17 / S17）。
 function playDealer(state) {
   let deck = state.deck;
   let dealerHand = [...state.dealerHand];
   while (true) {
     const ev = evaluateHand(dealerHand);
     if (ev.isBust) break;
-    if (ev.total > 17) break;
-    if (ev.total === 17 && !ev.isSoft) break;
+    if (ev.total >= 17) break;
+    if (dealerHand.length >= FIVE_CARD_THRESHOLD) break;
     const drawn = drawOne(deck);
     deck = drawn.deck;
     dealerHand = [...dealerHand, drawn.card];
@@ -231,14 +237,18 @@ function playDealer(state) {
   return { ...state, deck, dealerHand };
 }
 
-// 對單手（含 BJ / 比點）給出結果與 payout。
-function settleHand(hand, dealerEval, isSplit) {
+// 對單手（含 BJ / 過五關 / 比點）給出結果與 payout。
+function settleHand(hand, dealerEval, dealerCardCount, isSplit) {
   const ev = evaluateHand(hand.cards);
   const stake = hand.bet * (hand.doubled ? 2 : 1);
 
   // 玩家爆牌
   if (ev.isBust) {
     return { ...hand, result: "lose", payout: 0 };
+  }
+  // 玩家過五關 → 自動贏，不看莊家
+  if (hand.cards.length >= FIVE_CARD_THRESHOLD) {
+    return { ...hand, result: "fivecard", payout: stake * FIVE_CARD_PAYOUT_MULTIPLIER };
   }
   // BJ 只算在「未分牌」且第一手原始兩張就 21 的情況
   const isHandBJ =
@@ -256,6 +266,9 @@ function settleHand(hand, dealerEval, isSplit) {
   if (dealerEval.isBust) {
     return { ...hand, result: "win", payout: stake * 2 };
   }
+  if (dealerCardCount >= FIVE_CARD_THRESHOLD) {
+    return { ...hand, result: "dealerfivecard", payout: 0 };
+  }
   if (ev.total > dealerEval.total) {
     return { ...hand, result: "win", payout: stake * 2 };
   }
@@ -267,9 +280,11 @@ function settleHand(hand, dealerEval, isSplit) {
 
 // 多手結算的 headline：依「最佳結果」優先排序，方便畫面顯示一句話總結。
 const RESULT_RANK = {
-  blackjack: 4,
-  win: 3,
-  push: 2,
+  blackjack: 6,
+  fivecard: 5,
+  win: 4,
+  push: 3,
+  dealerfivecard: 2,
   lose: 1,
 };
 function pickHeadline(hands) {
@@ -291,7 +306,7 @@ function settle(state) {
   const dealerEval = evaluateHand(afterDealer.dealerHand);
 
   const settledHands = afterDealer.hands.map((h) =>
-    settleHand(h, dealerEval, state.isSplit)
+    settleHand(h, dealerEval, afterDealer.dealerHand.length, state.isSplit)
   );
   const totalPayout = settledHands.reduce((s, h) => s + h.payout, 0);
   const headline = pickHeadline(settledHands) || "lose";
@@ -317,7 +332,8 @@ module.exports = {
   split,
   canSplit,
   ensureHandsShape,
-  DECK_COUNT,
+  FIVE_CARD_THRESHOLD,
+  FIVE_CARD_PAYOUT_MULTIPLIER,
   // exposed for testing
   settle,
   playDealer,

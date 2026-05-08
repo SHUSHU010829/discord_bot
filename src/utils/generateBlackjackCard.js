@@ -6,6 +6,9 @@ const { Resvg } = require("@resvg/resvg-js");
 
 const { loadAdditionalAsset } = require("./satoriEmoji");
 const { evaluateHand } = require("../features/casino/blackjack/hand");
+const {
+  FIVE_CARD_THRESHOLD,
+} = require("../features/casino/blackjack/engine");
 
 const FONT_DIR = path.join(__dirname, "../../fonts");
 let fontsCache = null;
@@ -64,6 +67,10 @@ function pickAccent(state) {
   switch (state.result) {
     case "blackjack":
       return PALETTE.gold;
+    case "fivecard":
+      return PALETTE.gold;
+    case "dealerfivecard":
+      return PALETTE.muted;
     case "win":
       return PALETTE.teal;
     case "push":
@@ -76,16 +83,6 @@ function pickAccent(state) {
 
 const CARD_SIZE_DEFAULT = { w: 140, h: 200, suit: 72, rank: 80, rank2: 70, margin: 8, padding: 14, suitGap: 20, hiddenRank: 96 };
 const CARD_SIZE_SMALL   = { w: 84,  h: 120, suit: 44, rank: 48, rank2: 42, margin: 4, padding: 8,  suitGap: 10, hiddenRank: 58 };
-const CARD_SIZE_TINY    = { w: 58,  h: 84,  suit: 30, rank: 34, rank2: 30, margin: 3, padding: 6,  suitGap: 6,  hiddenRank: 40 };
-
-// 依手牌張數挑卡片尺寸，避免一排寬度超過 maxWidth 跑版。
-// 預設玩家/莊家單列可用寬度約 920px；分牌時每欄約 420px。
-function pickCardSize(count, maxWidth = 920) {
-  const fits = (sz) => count * (sz.w + 2 * sz.margin) <= maxWidth;
-  if (fits(CARD_SIZE_DEFAULT)) return CARD_SIZE_DEFAULT;
-  if (fits(CARD_SIZE_SMALL)) return CARD_SIZE_SMALL;
-  return CARD_SIZE_TINY;
-}
 
 function renderCard(card, sz = CARD_SIZE_DEFAULT) {
   const rank = card[0];
@@ -122,6 +119,10 @@ function buildResultLabel(state) {
   switch (state.result) {
     case "blackjack":
       return { text: "BLACKJACK", color: PALETTE.gold };
+    case "fivecard":
+      return { text: "過五關", color: PALETTE.gold };
+    case "dealerfivecard":
+      return { text: "莊家過五關", color: PALETTE.muted };
     case "win":
       return { text: "玩家獲勝", color: PALETTE.teal };
     case "push":
@@ -138,6 +139,7 @@ function renderBadge(text, bg, fg) {
 
 function handBadge(hand, ev, allowBJ) {
   if (ev.isBust) return renderBadge("BUST", PALETTE.red, PALETTE.cardWhite);
+  if (hand.cards.length >= FIVE_CARD_THRESHOLD) return renderBadge("5-CARD", PALETTE.gold, PALETTE.ink);
   if (allowBJ && ev.isBlackjack && hand.cards.length === 2) {
     return renderBadge("BJ", PALETTE.gold, PALETTE.ink);
   }
@@ -149,10 +151,14 @@ function handResultBadge(hand) {
   switch (hand.result) {
     case "blackjack":
       return { text: `BJ +${hand.payout.toLocaleString()}`, color: PALETTE.gold };
+    case "fivecard":
+      return { text: `5-CARD +${hand.payout.toLocaleString()}`, color: PALETTE.gold };
     case "win":
       return { text: `WIN +${hand.payout.toLocaleString()}`, color: PALETTE.teal };
     case "push":
       return { text: `PUSH 退 ${stake.toLocaleString()}`, color: PALETTE.neutral };
+    case "dealerfivecard":
+      return { text: `LOSE -${stake.toLocaleString()}`, color: PALETTE.muted };
     case "lose":
     default:
       return { text: `LOSE -${stake.toLocaleString()}`, color: PALETTE.muted };
@@ -187,14 +193,12 @@ function buildMarkup(data) {
     0
   );
 
-  const dealerCards = renderHandRow(
-    state.dealerHand,
-    isPlaying,
-    pickCardSize(state.dealerHand.length)
-  );
+  const dealerCards = renderHandRow(state.dealerHand, isPlaying);
 
   const dealerBadge = !isPlaying && dealerEval.isBust
     ? renderBadge("BUST", PALETTE.red, PALETTE.cardWhite)
+    : !isPlaying && state.dealerHand.length >= FIVE_CARD_THRESHOLD
+    ? renderBadge("5-CARD", PALETTE.muted, PALETTE.cardWhite)
     : !isPlaying && dealerEval.isBlackjack && state.dealerHand.length === 2
     ? renderBadge("BJ", PALETTE.gold, PALETTE.ink)
     : "";
@@ -205,7 +209,7 @@ function buildMarkup(data) {
     const hand = hands[0];
     const ev = evaluateHand(hand.cards);
     const badge = handBadge(hand, ev, true);
-    const cards = renderHandRow(hand.cards, false, pickCardSize(hand.cards.length));
+    const cards = renderHandRow(hand.cards, false, CARD_SIZE_DEFAULT);
     playerSection = `
       <div style="display:flex;width:100%;align-items:center;margin-top:14px;">
         <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:18px;letter-spacing:6px;color:${PALETTE.muted};line-height:1;padding-right:6px;">玩家</div>
@@ -218,7 +222,7 @@ function buildMarkup(data) {
     const cols = hands.map((hand, i) => {
       const ev = evaluateHand(hand.cards);
       const badge = handBadge(hand, ev, false); // split 後不認 BJ
-      const cards = renderHandRow(hand.cards, false, pickCardSize(hand.cards.length, 420));
+      const cards = renderHandRow(hand.cards, false, CARD_SIZE_SMALL);
       const isActive = isPlaying && i === activeIndex;
       const borderColor = isActive ? PALETTE.gold : PALETTE.muted;
       const borderWidth = isActive ? 3 : 2;
@@ -269,6 +273,9 @@ function buildMarkup(data) {
     settleAmountPrefix = "−";
   }
 
+  const playingActiveHand = hands[activeIndex] || hands[0];
+  const playingActiveEval = evaluateHand(playingActiveHand.cards);
+
   const resultBlock = resultLabel
     ? `
       <div style="display:flex;flex-direction:row;align-items:center;justify-content:center;width:100%;margin-top:${isSplit ? 16 : 28}px;margin-bottom:${isSplit ? 24 : 48}px;">
@@ -284,8 +291,18 @@ function buildMarkup(data) {
       </div>
     `
     : (() => {
-        const hintText = isSplit ? `輪到第 ${activeIndex + 1} 手` : "輪到你了";
-        const hintColor = PALETTE.muted;
+        const remain = FIVE_CARD_THRESHOLD - playingActiveHand.cards.length;
+        const showFiveCardHint =
+          remain > 0 && remain < FIVE_CARD_THRESHOLD - 2 && !playingActiveEval.isBust;
+        let hintText;
+        if (isSplit) {
+          hintText = `輪到第 ${activeIndex + 1} 手`;
+        } else if (showFiveCardHint) {
+          hintText = `再抽 ${remain} 張未爆牌即過五關`;
+        } else {
+          hintText = "輪到你了";
+        }
+        const hintColor = showFiveCardHint ? PALETTE.gold : PALETTE.muted;
         return `
       <div style="display:flex;flex-direction:column;align-items:center;width:100%;margin-top:${isSplit ? 16 : 28}px;margin-bottom:${isSplit ? 24 : 48}px;">
         <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:22px;color:${hintColor};letter-spacing:6px;line-height:1;padding-right:6px;">${hintText}</div>
