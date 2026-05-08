@@ -202,14 +202,12 @@ dashboard/
 
 ---
 
-## 8. 待你決定（之後再開工亦可）
+## 8. 已決定事項
 
-1. **Owner 級操作要不要再加一層 2FA / 確認碼**？（例如手動加 1 萬 coin 那種）
-2. **Logo / 主色** — UI 上線前要定，可後補
-
-### 已決定
 - ✅ **單 guild** — Dashboard 寫死 `PRIMARY_GUILD_ID`，未來擴多 guild 是純加法
 - ✅ **Cron 監控頁** — 列出所有排程任務、狀態、可手動觸發（W4）
+- ✅ **Owner 操作不加 2FA** — 信任 Discord OAuth + httpOnly cookie；高風險操作仍寫稽核日誌
+- ⏳ **Logo / 主色** — UI 上線前再決定，先用 shadcn 預設配色開發
 
 ---
 
