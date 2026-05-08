@@ -154,7 +154,7 @@ module.exports = {
         balanceAfter = payoutResult?.doc?.totalCoins ?? balanceAfter;
       }
 
-      const payload = renderMessage(
+      const payload = await renderMessage(
         { ...doc, gameId },
         { username, balance: balanceAfter }
       );

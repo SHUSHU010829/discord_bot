@@ -2,11 +2,13 @@
 
 const {
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
 } = require("discord.js");
 
 const { classifyDeck, valueOf } = require("./engine");
+const generateDragonGateCard = require("../../../utils/generateDragonGateCard");
 
 const SUIT_EMOJI = { S: "♠", H: "♥", D: "♦", C: "♣" };
 const RANK_LABEL = {
@@ -96,11 +98,34 @@ function renderText(state, { username, balance } = {}) {
   return lines.join("\n");
 }
 
-function renderMessage(state, { username, balance } = {}) {
+function buildSettleHeadlineLine(state) {
+  if (state.status !== "settled") return null;
+  return settleHeadline(state);
+}
+
+async function renderMessage(state, { username, balance } = {}) {
   const components =
     state.status === "playing" ? [buildButtons(state)] : [];
-  const content = renderText(state, { username, balance });
-  return { content, components, files: [] };
+
+  let content = "";
+  let files = [];
+  try {
+    const buf = await generateDragonGateCard({
+      username,
+      state,
+      balance: balance ?? 0,
+    });
+    files = [
+      new AttachmentBuilder(buf, { name: `dragon-gate-${state.gameId}.png` }),
+    ];
+    const settleLine = buildSettleHeadlineLine(state);
+    if (settleLine) content = settleLine;
+  } catch (e) {
+    console.log(`[WARN] dragonGate card render failed, falling back to text: ${e.message}`);
+    content = renderText(state, { username, balance });
+  }
+
+  return { content, components, files };
 }
 
 module.exports = {
