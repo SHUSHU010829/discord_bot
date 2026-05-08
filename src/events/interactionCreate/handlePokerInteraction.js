@@ -3,6 +3,7 @@ const {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
+  MessageFlags,
 } = require("discord.js");
 const logger = require("../../utils/logger");
 const { trackError, trackSuccess } = require("../../utils/errorTracker");
@@ -101,7 +102,7 @@ async function handleButton(client, interaction) {
     }
   } else if (POKER_ACTIONS_DEFER_REPLY.has(action)) {
     try {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     } catch (deferErr) {
       if (deferErr?.code === 10062) {
         logger.warn(
@@ -204,7 +205,6 @@ async function handleButton(client, interaction) {
       try {
         await interaction.followUp({
           content: `🚫 人數不足，至少需 ${doc.minPlayers} 人，目前 ${doc.players.length} 人。請先邀請其他人按「🪑 加入」入座。`,
-          ephemeral: false,
         });
       } catch (_) { /* noop */ }
       return true;
@@ -297,7 +297,7 @@ async function handleButton(client, interaction) {
     if (doc.status !== "playing") {
       // raise 沒事先 defer；其他都 deferUpdate 過了
       if (action === "raise") {
-        return interaction.reply({ content: "現在不需要行動。", ephemeral: true });
+        return interaction.reply({ content: "現在不需要行動。", flags: MessageFlags.Ephemeral });
       }
       await pokerFollowUpEphemeral(interaction, "現在不需要行動。");
       return true;
@@ -305,14 +305,14 @@ async function handleButton(client, interaction) {
     const idx = doc.players.findIndex((p) => p.userId === interaction.user.id);
     if (idx < 0) {
       if (action === "raise") {
-        return interaction.reply({ content: "你不在這桌上。", ephemeral: true });
+        return interaction.reply({ content: "你不在這桌上。", flags: MessageFlags.Ephemeral });
       }
       await pokerFollowUpEphemeral(interaction, "你不在這桌上。");
       return true;
     }
     if (doc.toActIdx !== idx) {
       if (action === "raise") {
-        return interaction.reply({ content: "🕒 還沒輪到你。", ephemeral: true });
+        return interaction.reply({ content: "🕒 還沒輪到你。", flags: MessageFlags.Ephemeral });
       }
       await pokerFollowUpEphemeral(interaction, "🕒 還沒輪到你。");
       return true;
@@ -368,16 +368,16 @@ async function handleButton(client, interaction) {
 
 async function pokerFollowUpEphemeral(interaction, content) {
   try {
-    await interaction.followUp({ content, ephemeral: true });
+    await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
   } catch (_) { /* noop */ }
 }
 
 async function pokerSafeReply(interaction, content) {
   try {
     if (interaction.deferred || interaction.replied) {
-      await interaction.followUp({ content, ephemeral: true });
+      await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
     } else {
-      await interaction.reply({ content, ephemeral: true });
+      await interaction.reply({ content, flags: MessageFlags.Ephemeral });
     }
   } catch (_) { /* noop */ }
 }
@@ -451,7 +451,7 @@ module.exports = async (client, interaction) => {
         try {
           await interaction.reply({
             content: `⏳ 點太快了，等 ${Math.ceil(rl.retryAfterMs / 1000)} 秒。`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         } catch (_) { /* noop */ }
         return;
@@ -476,12 +476,12 @@ module.exports = async (client, interaction) => {
       if (interaction.deferred || interaction.replied) {
         await interaction.followUp({
           content: "🔧 撲克處理失敗，請呼叫舒舒！",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       } else {
         await interaction.reply({
           content: "🔧 撲克處理失敗，請呼叫舒舒！",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
     } catch (_) {

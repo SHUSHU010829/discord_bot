@@ -5,6 +5,7 @@ const {
   TextDisplayBuilder,
   SeparatorBuilder,
   MessageFlags,
+  InteractionContextType,
 } = require("discord.js");
 
 const { welfareSystem } = require("../../config");
@@ -15,7 +16,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("乞討")
     .setDescription("破產時領取救濟金，符合資格直接發放，否則顯示狀態 🪙")
-    .setDMPermission(false),
+    .setContexts(InteractionContextType.Guild),
 
   run: async (client, interaction) => {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });

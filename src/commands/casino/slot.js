@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const {
   SlashCommandBuilder,
   AttachmentBuilder,
+  InteractionContextType,
 } = require("discord.js");
 const { coinSystem, casino } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
@@ -41,7 +42,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("拉霸")
     .setDescription("拉霸試手氣！🎰")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addIntegerOption((opt) =>
       opt
         .setName("下注")

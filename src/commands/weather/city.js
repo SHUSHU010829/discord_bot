@@ -2,7 +2,11 @@ require("colors");
 
 const axios = require("axios");
 
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  MessageFlags,
+} = require("discord.js");
 
 const VALID_LOCATIONS = [
   "臺北市",
@@ -107,7 +111,7 @@ module.exports = {
         content:
           `我找不到 [${locationName}] 這個縣市 <a:think:1196806259152789514>\n` +
           `💡 試試從輸入時跳出的建議清單中挑一個吧！`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 

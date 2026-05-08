@@ -1,4 +1,9 @@
-const { PermissionFlagsBits, ChannelType, EmbedBuilder } = require("discord.js");
+const {
+  PermissionFlagsBits,
+  ChannelType,
+  EmbedBuilder,
+  MessageFlags,
+} = require("discord.js");
 const config = require("../../config");
 const fs = require("fs");
 const { getDataFile } = require("../../utils/dataPaths");
@@ -42,7 +47,7 @@ module.exports = async (client, interaction) => {
         try {
           await interaction.reply({
             content: `⏳ 操作太頻繁，請 ${Math.ceil(rl.retryAfterMs / 1000)} 秒後再試。`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         } catch (_) { /* noop */ }
         return;
@@ -69,7 +74,7 @@ module.exports = async (client, interaction) => {
     if (!role) {
       return interaction.reply({
         content: "無法找到該身份組！",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -78,13 +83,13 @@ module.exports = async (client, interaction) => {
       await interaction.member.roles.remove(role);
       return interaction.reply({
         content: `已經移除了身份組：${role.name}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     } else {
       await interaction.member.roles.add(role);
       return interaction.reply({
         content: `已經成功給予身份組：${role.name}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   } catch (error) {
@@ -123,13 +128,13 @@ async function handleTicketCreation(client, interaction) {
     if (existingTicket) {
       return interaction.reply({
         content: ticketConfig.alreadyHasTicket,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
     await interaction.reply({
       content: ticketConfig.ticketCreating,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
 
     // 驗證並獲取父類別
@@ -218,7 +223,7 @@ async function handleTicketCreation(client, interaction) {
         "{channel}",
         ticketChannel.toString()
       ),
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     trackSuccess("ticket-create");
   } catch (error) {
@@ -230,7 +235,7 @@ async function handleTicketCreation(client, interaction) {
     try {
       await interaction.editReply({
         content: "❌ 創建票務時發生錯誤！請聯絡管理員。",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     } catch (replyError) {
       logger.error({ source: "ticket-create", err: replyError.message }, "回覆錯誤訊息失敗");
@@ -243,7 +248,7 @@ async function handleVoteButton(client, interaction) {
   try {
     // 先 defer，避免 DB 查詢 + 多次 updateOne 讓 3 秒 token 過期觸發 10062
     try {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     } catch (deferErr) {
       if (deferErr?.code === 10062) {
         logger.warn(
@@ -338,7 +343,7 @@ async function handleVoteButton(client, interaction) {
       } else {
         await interaction.reply({
           content: "❌ 處理投票時發生錯誤！",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
     } catch (replyError) {

@@ -1,5 +1,5 @@
 require("colors");
-const { PermissionFlagsBits, EmbedBuilder } = require("discord.js");
+const { PermissionFlagsBits, EmbedBuilder, MessageFlags } = require("discord.js");
 const config = require("../../../config");
 
 async function run(client, interaction) {
@@ -7,7 +7,7 @@ async function run(client, interaction) {
     if (!interaction.channel.name.startsWith("ticket-")) {
       return interaction.reply({
         content: "❌ 此指令只能在票務頻道中使用！",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -21,7 +21,7 @@ async function run(client, interaction) {
     if (!hasPermission) {
       return interaction.reply({
         content: "❌ 只有票務創建者或管理員可以關閉此票務！",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -49,7 +49,7 @@ async function run(client, interaction) {
     console.log(`[ERROR] 關閉票務時出錯：\n${error}`.red);
     await interaction.reply({
       content: "❌ 關閉票務時發生錯誤！",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 }

@@ -529,7 +529,7 @@ module.exports = {
               (hint
                 ? `你是不是要找：${hint}？`
                 : "使用 `/help` 看完整指令清單。"),
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
         return interaction.reply({
@@ -539,7 +539,7 @@ module.exports = {
       }
 
       // 瀏覽模式
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
       let currentCategory = null;
       const message = await interaction.editReply({
@@ -555,7 +555,7 @@ module.exports = {
         if (i.user.id !== interaction.user.id) {
           return i.reply({
             content: "🚫 只有發起者能操作這個選單！",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
 
@@ -609,7 +609,7 @@ module.exports = {
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({
           content: "❌ 載入幫助手冊時發生錯誤，請稍後再試。",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
     }

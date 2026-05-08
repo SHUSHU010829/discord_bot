@@ -1,5 +1,9 @@
 require("colors");
-const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  PermissionFlagsBits,
+  InteractionContextType,
+} = require("discord.js");
 
 const setupHandler = require("../../features/ticket/handlers/setup");
 const closeHandler = require("../../features/ticket/handlers/close");
@@ -12,7 +16,7 @@ module.exports = {
     .setName("ticket")
     .setDescription("[ADMIN] 票務、建議、投票管理 🎫")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addSubcommand((sub) =>
       sub
         .setName("setup")

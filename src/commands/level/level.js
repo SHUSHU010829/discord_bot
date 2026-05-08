@@ -1,5 +1,8 @@
 require("colors");
-const { SlashCommandBuilder } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  InteractionContextType,
+} = require("discord.js");
 
 const profileHandler = require("../../features/level/handlers/profile");
 const rankHandler = require("../../features/level/handlers/rank");
@@ -14,7 +17,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("level")
     .setDescription("等級系統：等級卡、排行榜、徽章、主題、稱號 🏅")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addSubcommand((sub) =>
       sub
         .setName("profile")

@@ -1,5 +1,9 @@
 require("colors");
-const { SlashCommandBuilder, MessageFlags } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  MessageFlags,
+  InteractionContextType,
+} = require("discord.js");
 
 const { levelSystem } = require("../../config");
 
@@ -7,7 +11,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("補簽卡")
     .setDescription("查看你的補簽卡庫存與規則 🛡️")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .toJSON(),
 
   run: async (client, interaction) => {

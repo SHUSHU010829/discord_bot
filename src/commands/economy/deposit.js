@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const {
   SlashCommandBuilder,
   MessageFlags,
+  InteractionContextType,
 } = require("discord.js");
 
 const { coinSystem } = require("../../config");
@@ -32,7 +33,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("存款")
     .setDescription("把金幣鎖進定期存款，到期領回本金 + 利息 🏦")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addSubcommand((sub) =>
       sub
         .setName("開戶")

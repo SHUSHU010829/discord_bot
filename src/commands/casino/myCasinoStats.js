@@ -8,6 +8,7 @@ const {
   SeparatorBuilder,
   SeparatorSpacingSize,
   MessageFlags,
+  InteractionContextType,
 } = require("discord.js");
 const { DateTime } = require("luxon");
 
@@ -28,7 +29,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("我的賭場紀錄")
     .setDescription("📊 查看你個人的賭場統計：下注、派彩、RTP、各遊戲分項")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addStringOption((option) =>
       option
         .setName("period")

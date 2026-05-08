@@ -2,6 +2,7 @@ require("colors");
 const {
   SlashCommandBuilder,
   MessageFlags,
+  InteractionContextType,
 } = require("discord.js");
 const { DateTime } = require("luxon");
 
@@ -61,7 +62,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("轉帳")
     .setDescription("把金幣轉給其他玩家 💸")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addUserOption((opt) =>
       opt
         .setName("對象")

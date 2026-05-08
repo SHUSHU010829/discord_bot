@@ -2,7 +2,11 @@
 
 require("colors");
 const crypto = require("crypto");
-const { SlashCommandBuilder } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  MessageFlags,
+  InteractionContextType,
+} = require("discord.js");
 
 const { coinSystem, casino } = require("../../config");
 const {
@@ -22,7 +26,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("樂透訂閱")
     .setDescription("訂閱未來 N 期自動買同組號碼 🔁")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addStringOption((o) =>
       o
         .setName("玩法")
@@ -58,7 +62,7 @@ module.exports = {
     .toJSON(),
 
   run: async (client, interaction) => {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       if (!coinSystem?.enabled) {

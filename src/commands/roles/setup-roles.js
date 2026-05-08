@@ -10,6 +10,7 @@ const {
   SeparatorBuilder,
   SeparatorSpacingSize,
   MessageFlags,
+  InteractionContextType,
 } = require("discord.js");
 require("colors");
 
@@ -94,7 +95,7 @@ module.exports = {
     .addSubcommand((subcommand) =>
       subcommand.setName("list").setDescription("列出所有已設定的遊戲角色"),
     )
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .toJSON(),
 
   userPermissions: [], // 移除全局管理員限制，改為在各子命令內檢查

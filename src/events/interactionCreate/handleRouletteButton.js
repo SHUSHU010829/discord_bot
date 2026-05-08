@@ -4,7 +4,8 @@ const {
   TextInputStyle,
   ActionRowBuilder,
   AttachmentBuilder,
-} = require('discord.js');
+  MessageFlags,
+} = require("discord.js");
 
 const grantCoins = require('../../features/economy/grantCoins');
 const { BET_TYPES, validateInsideBet, isOutside } = require('../../features/casino/roulette/numbers');
@@ -51,7 +52,7 @@ module.exports = async (client, interaction) => {
         try {
           await interaction.reply({
             content: `⏳ 點太快了，等 ${Math.ceil(rl.retryAfterMs / 1000)} 秒。`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         } catch (_) { /* noop */ }
         return;
@@ -60,13 +61,13 @@ module.exports = async (client, interaction) => {
 
     const game = await client.rouletteGamesCollection.findOne({ gameId });
     if (!game) {
-      return interaction.reply({ content: '🎰 找不到這局，可能已逾時。', ephemeral: true });
+      return interaction.reply({ content: '🎰 找不到這局，可能已逾時。', flags: MessageFlags.Ephemeral });
     }
     if (game.userId !== interaction.user.id) {
-      return interaction.reply({ content: '🚫 這不是你的局！', ephemeral: true });
+      return interaction.reply({ content: '🚫 這不是你的局！', flags: MessageFlags.Ephemeral });
     }
     if (game.status !== 'betting') {
-      return interaction.reply({ content: '🎰 這局已結束或逾時。', ephemeral: true });
+      return interaction.reply({ content: '🎰 這局已結束或逾時。', flags: MessageFlags.Ephemeral });
     }
 
     // ── 外圍按鈕 ───────────────────────────────────────────
@@ -74,14 +75,14 @@ module.exports = async (client, interaction) => {
       // rl_outside_<betType>_<gameId> → betType = parts[2]（可能是 red/black/col1/dozen1 等）
       const betType = `outside_${parts[2]}`;
       const def = BET_TYPES[betType];
-      if (!def) return interaction.reply({ content: '❌ 未知押法', ephemeral: true });
+      if (!def) return interaction.reply({ content: '❌ 未知押法', flags: MessageFlags.Ephemeral });
 
       const wagered = totalWagered(game.bets);
       const remaining = game.totalBudget - wagered;
       const amount = Math.floor(remaining / 3);
 
       if (amount <= 0) {
-        return interaction.reply({ content: '💰 籌碼不足，無法繼續外圍押注。', ephemeral: true });
+        return interaction.reply({ content: '💰 籌碼不足，無法繼續外圍押注。', flags: MessageFlags.Ephemeral });
       }
 
       const newBet = { type: betType, amount, numbers: def.numbers };
@@ -146,10 +147,10 @@ module.exports = async (client, interaction) => {
 
       const def = BET_TYPES[betType];
       if (!def || isOutside(betType)) {
-        return interaction.reply({ content: `❌ 無效押法「${betType}」`, ephemeral: true });
+        return interaction.reply({ content: `❌ 無效押法「${betType}」`, flags: MessageFlags.Ephemeral });
       }
       if (!Number.isInteger(amount) || amount <= 0) {
-        return interaction.reply({ content: '❌ 金額格式錯誤，請填正整數', ephemeral: true });
+        return interaction.reply({ content: '❌ 金額格式錯誤，請填正整數', flags: MessageFlags.Ephemeral });
       }
 
       const wagered = totalWagered(game.bets);
@@ -157,7 +158,7 @@ module.exports = async (client, interaction) => {
       if (amount > remaining) {
         return interaction.reply({
           content: `❌ 剩餘籌碼不足（剩 **${remaining.toLocaleString()}**，下注 **${amount.toLocaleString()}**）`,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
 
@@ -166,7 +167,7 @@ module.exports = async (client, interaction) => {
         numbers = BET_TYPES.basket.numbers;
       } else {
         const v = validateInsideBet(betType, rawNums);
-        if (!v.ok) return interaction.reply({ content: `❌ ${v.error}`, ephemeral: true });
+        if (!v.ok) return interaction.reply({ content: `❌ ${v.error}`, flags: MessageFlags.Ephemeral });
         numbers = v.numbers;
       }
 
@@ -178,7 +179,7 @@ module.exports = async (client, interaction) => {
 
       await interaction.reply({
         content: `✅ 已加入 **${def.label}** ${amount.toLocaleString()} credits（號碼：${numbers.join(', ')}）`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -186,7 +187,7 @@ module.exports = async (client, interaction) => {
     // ── 確認下注 → Spin ─────────────────────────────────────
     if (action === 'confirm' && interaction.isButton()) {
       if (game.bets.length === 0) {
-        return interaction.reply({ content: '❌ 還沒有任何押注！', ephemeral: true });
+        return interaction.reply({ content: '❌ 還沒有任何押注！', flags: MessageFlags.Ephemeral });
       }
 
       await interaction.deferUpdate();
@@ -318,9 +319,9 @@ module.exports = async (client, interaction) => {
     trackError("roulette-button", err, { userId: interaction.user?.id, customId: interaction.customId });
     try {
       if (interaction.deferred || interaction.replied) {
-        await interaction.followUp({ content: '🔧 輪盤按鈕處理失敗，請呼叫舒舒！', ephemeral: true });
+        await interaction.followUp({ content: '🔧 輪盤按鈕處理失敗，請呼叫舒舒！', flags: MessageFlags.Ephemeral });
       } else {
-        await interaction.reply({ content: '🔧 輪盤按鈕處理失敗，請呼叫舒舒！', ephemeral: true });
+        await interaction.reply({ content: '🔧 輪盤按鈕處理失敗，請呼叫舒舒！', flags: MessageFlags.Ephemeral });
       }
     } catch (_) { /* noop */ }
   }

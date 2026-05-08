@@ -9,6 +9,7 @@ const {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
+  MessageFlags,
 } = require("discord.js");
 
 const { casino } = require("../../config");
@@ -54,7 +55,7 @@ module.exports = async (client, interaction) => {
         try {
           await interaction.reply({
             content: `⏳ 點太快了，等 ${Math.ceil(rl.retryAfterMs / 1000)} 秒。`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         } catch (_) { /* noop */ }
         return;
@@ -92,12 +93,12 @@ module.exports = async (client, interaction) => {
       if (interaction.deferred || interaction.replied) {
         await interaction.followUp({
           content: "🔧 賽馬處理失敗，請呼叫舒舒！",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       } else {
         await interaction.reply({
           content: "🔧 賽馬處理失敗，請呼叫舒舒！",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
     } catch (_) { /* noop */ }
@@ -108,7 +109,7 @@ async function openBetModal(interaction, horseIdStr, gameId) {
   const horseId = Number(horseIdStr);
   const horse = getHorse(horseId);
   if (!horse) {
-    return interaction.reply({ content: "❌ 馬匹編號無效", ephemeral: true });
+    return interaction.reply({ content: "❌ 馬匹編號無效", flags: MessageFlags.Ephemeral });
   }
 
   // 先檢查局還在售票期、否則 modal 跳出來也只是浪費點擊
@@ -118,13 +119,13 @@ async function openBetModal(interaction, horseIdStr, gameId) {
   if (!game) {
     return interaction.reply({
       content: "🐎 找不到這場賽馬。",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
   if (game.status !== "betting") {
     return interaction.reply({
       content: "🐎 售票期已結束，無法再下注。",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
@@ -152,7 +153,7 @@ async function submitBet(client, interaction, horseIdStr, gameId) {
   const horseId = Number(horseIdStr);
   const horse = getHorse(horseId);
   if (!horse) {
-    return interaction.reply({ content: "❌ 馬匹編號無效", ephemeral: true });
+    return interaction.reply({ content: "❌ 馬匹編號無效", flags: MessageFlags.Ephemeral });
   }
 
   const raw = interaction.fields.getTextInputValue("amount").trim();
@@ -164,17 +165,17 @@ async function submitBet(client, interaction, horseIdStr, gameId) {
   if (!Number.isFinite(amount) || amount < minBet) {
     return interaction.reply({
       content: `❌ 至少下注 ${minBet.toLocaleString()} credits`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
   if (amount > maxBet) {
     return interaction.reply({
       content: `❌ 單筆最高 ${maxBet.toLocaleString()} credits`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const coll = client.horseRaceGamesCollection;
   const game = await coll.findOne({ gameId });
@@ -269,27 +270,27 @@ async function earlyStart(client, interaction, gameId) {
   const coll = client.horseRaceGamesCollection;
   const game = await coll.findOne({ gameId });
   if (!game) {
-    return interaction.reply({ content: "🐎 找不到這場賽馬。", ephemeral: true });
+    return interaction.reply({ content: "🐎 找不到這場賽馬。", flags: MessageFlags.Ephemeral });
   }
   if (game.status !== "betting") {
-    return interaction.reply({ content: "🐎 比賽已開始或結束。", ephemeral: true });
+    return interaction.reply({ content: "🐎 比賽已開始或結束。", flags: MessageFlags.Ephemeral });
   }
   if (game.hostUserId !== interaction.user.id) {
     return interaction.reply({
       content: "🚫 只有開盤者可以提早開賽。",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
   if (!game.bets || game.bets.length === 0) {
     return interaction.reply({
       content: "❌ 還沒有人下注，沒辦法提早開賽。",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
   await interaction.reply({
     content: "🚀 提早開賽！",
-    ephemeral: true,
+    flags: MessageFlags.Ephemeral,
   });
 
   startRaceIfDue(client, gameId).catch((e) =>
@@ -301,21 +302,21 @@ async function hostCancel(client, interaction, gameId) {
   const coll = client.horseRaceGamesCollection;
   const game = await coll.findOne({ gameId });
   if (!game) {
-    return interaction.reply({ content: "🐎 找不到這場賽馬。", ephemeral: true });
+    return interaction.reply({ content: "🐎 找不到這場賽馬。", flags: MessageFlags.Ephemeral });
   }
   if (game.status !== "betting") {
-    return interaction.reply({ content: "🐎 已經開賽，沒辦法取消了。", ephemeral: true });
+    return interaction.reply({ content: "🐎 已經開賽，沒辦法取消了。", flags: MessageFlags.Ephemeral });
   }
   if (game.hostUserId !== interaction.user.id) {
     return interaction.reply({
       content: "🚫 只有開盤者可以取消這場賽馬。",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
   await interaction.reply({
     content: "❌ 已取消這場賽馬，所有下注已退款。",
-    ephemeral: true,
+    flags: MessageFlags.Ephemeral,
   });
 
   cancelRace(client, gameId, "host_cancelled").catch((e) =>

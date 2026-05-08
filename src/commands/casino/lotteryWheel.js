@@ -2,7 +2,10 @@
 
 require("colors");
 const crypto = require("crypto");
-const { SlashCommandBuilder } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  InteractionContextType,
+} = require("discord.js");
 
 const { coinSystem, casino } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
@@ -27,7 +30,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("樂透包牌")
     .setDescription("包牌:選 7-N 個號碼自動展開所有組合 🎯")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addStringOption((o) =>
       o
         .setName("玩法")

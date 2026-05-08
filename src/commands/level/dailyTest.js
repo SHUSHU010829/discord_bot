@@ -8,6 +8,7 @@ const {
   MediaGalleryBuilder,
   MediaGalleryItemBuilder,
   MessageFlags,
+  InteractionContextType,
 } = require("discord.js");
 const { DateTime } = require("luxon");
 
@@ -21,7 +22,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("dailytest")
     .setDescription("[DEV ONLY] 簽到卡預覽 / 重置今日紀錄")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addSubcommand((sub) =>
       sub
         .setName("preview")

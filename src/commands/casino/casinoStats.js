@@ -9,6 +9,7 @@ const {
   SeparatorBuilder,
   SeparatorSpacingSize,
   MessageFlags,
+  InteractionContextType,
 } = require("discord.js");
 const { DateTime } = require("luxon");
 
@@ -43,7 +44,7 @@ module.exports = {
     .setName("casino-stats")
     .setDescription("[ADMIN] Server-wide casino stats: bets, payouts, RTP per game")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addStringOption((option) =>
       option
         .setName("game")

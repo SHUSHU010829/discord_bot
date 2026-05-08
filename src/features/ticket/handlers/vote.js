@@ -4,6 +4,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  MessageFlags,
 } = require("discord.js");
 const { randomUUID } = require("crypto");
 const config = require("../../../config");
@@ -31,7 +32,7 @@ async function handleVoteCreate(client, interaction) {
     if (!template) {
       return interaction.reply({
         content: "❌ 找不到指定的投票模板！",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -43,7 +44,7 @@ async function handleVoteCreate(client, interaction) {
       if (!votingChannelId || votingChannelId === "YOUR_VOTING_CHANNEL_ID") {
         return interaction.reply({
           content: "❌ 投票頻道尚未設置！請在 config.json 中設置 voting.votingChannelId 或使用 channel 參數指定頻道。",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
       votingChannel = await interaction.guild.channels.fetch(votingChannelId);
@@ -52,7 +53,7 @@ async function handleVoteCreate(client, interaction) {
     if (!votingChannel) {
       return interaction.reply({
         content: "❌ 找不到投票頻道！請檢查配置。",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -68,7 +69,7 @@ async function handleVoteCreate(client, interaction) {
       }
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const proposer = await interaction.guild.members.fetch(proposerId);
     const embedColor = getTemplateColor(templateKey);
@@ -181,7 +182,7 @@ async function run(client, interaction) {
     if (!interaction.replied && !interaction.deferred) {
       await interaction.reply({
         content: "❌ 執行指令時發生錯誤！",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }

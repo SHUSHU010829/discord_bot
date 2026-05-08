@@ -5,6 +5,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  MessageFlags,
 } = require("discord.js");
 const { randomUUID } = require("crypto");
 const config = require("../../../config");
@@ -25,7 +26,7 @@ function extractMessageId(url) {
 }
 
 async function handleProposalStart(client, interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const gameName = interaction.options.getString("game");
   const proposalType = interaction.options.getString("type");
@@ -152,11 +153,11 @@ async function handleProposalEndCommand(client, interaction) {
   if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
     return interaction.reply({
       content: "❌ 只有管理員才能使用此功能！",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const messageUrl = interaction.options.getString("message_url");
   const messageId = extractMessageId(messageUrl);
@@ -195,11 +196,11 @@ async function handleProposalCancelCommand(client, interaction) {
   if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
     return interaction.reply({
       content: "❌ 只有管理員才能使用此功能！",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const messageUrl = interaction.options.getString("message_url");
   const messageId = extractMessageId(messageUrl);
@@ -253,7 +254,7 @@ async function run(client, interaction) {
     } else {
       await interaction.reply({
         content: "❌ 執行指令時發生錯誤！",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       }).catch(() => {});
     }
   }

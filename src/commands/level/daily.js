@@ -8,6 +8,7 @@ const {
   MediaGalleryBuilder,
   MediaGalleryItemBuilder,
   MessageFlags,
+  InteractionContextType,
 } = require("discord.js");
 const { DateTime } = require("luxon");
 
@@ -21,7 +22,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("每日簽到")
     .setDescription("每日簽到領 XP 🗓️")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addBooleanOption((opt) =>
       opt
         .setName("押倍")

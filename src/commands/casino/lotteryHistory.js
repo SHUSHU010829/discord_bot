@@ -1,7 +1,11 @@
 // /樂透歷史 — 查看自己最近的樂透票券與開獎結果。
 
 require("colors");
-const { SlashCommandBuilder } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  MessageFlags,
+  InteractionContextType,
+} = require("discord.js");
 
 const { getLotteryConfig } = require("../../features/casino/lottery/numbers");
 
@@ -16,7 +20,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("樂透歷史")
     .setDescription("查看自己最近的樂透紀錄 📚")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addIntegerOption((o) =>
       o
         .setName("筆數")
@@ -28,7 +32,7 @@ module.exports = {
     .toJSON(),
 
   run: async (client, interaction) => {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       if (!client.lotteryTicketsCollection) {

@@ -6,6 +6,8 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  MessageFlags,
+  InteractionContextType,
 } = require("discord.js");
 
 const { getLotteryConfig } = require("../../features/casino/lottery/numbers");
@@ -14,11 +16,11 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("樂透訂閱列表")
     .setDescription("查看與管理自己的樂透訂閱 📋")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .toJSON(),
 
   run: async (client, interaction) => {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       if (!client.lotterySubscriptionsCollection) {

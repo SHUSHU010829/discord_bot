@@ -5,6 +5,7 @@ const { renderMessage } = require("../../features/casino/hilo/renderer");
 const logger = require("../../utils/logger");
 const { trackError, trackSuccess } = require("../../utils/errorTracker");
 const { consume } = require("../../utils/rateLimiter");
+const { MessageFlags } = require("discord.js");
 
 function getHiloConfig() {
   return casino?.hilo || {};
@@ -34,7 +35,7 @@ module.exports = async (client, interaction) => {
       try {
         await interaction.reply({
           content: `⏳ 點太快了，等 ${Math.ceil(rl.retryAfterMs / 1000)} 秒。`,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       } catch (_) { /* noop */ }
       return;
@@ -59,19 +60,19 @@ module.exports = async (client, interaction) => {
     if (!state) {
       return interaction.followUp({
         content: "🎴 這局已過期或找不到了。",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
     if (state.userId !== interaction.user.id) {
       return interaction.followUp({
         content: "🚫 這不是你的局！別亂按 ㄎㄎ",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
     if (state.status !== "playing") {
       return interaction.followUp({
         content: "🎴 這局已結束。",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -85,7 +86,7 @@ module.exports = async (client, interaction) => {
       if (!state.wins || state.wins <= 0) {
         return interaction.followUp({
           content: "🚫 至少要贏一把才能收手！",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
       next = cashOut(state);
@@ -159,12 +160,12 @@ module.exports = async (client, interaction) => {
       if (interaction.deferred || interaction.replied) {
         await interaction.followUp({
           content: "🔧 HI-LO 按鈕處理失敗，請呼叫舒舒！",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       } else {
         await interaction.reply({
           content: "🔧 HI-LO 按鈕處理失敗，請呼叫舒舒！",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
     } catch (_) {

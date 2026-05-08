@@ -2,7 +2,11 @@
 
 require("colors");
 const crypto = require("crypto");
-const { SlashCommandBuilder, MessageFlags } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  MessageFlags,
+  InteractionContextType,
+} = require("discord.js");
 
 const { coinSystem, casino } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
@@ -31,7 +35,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("樂透買")
     .setDescription("買樂透票 🎟")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addStringOption((o) =>
       o
         .setName("玩法")

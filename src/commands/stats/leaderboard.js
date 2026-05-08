@@ -5,6 +5,7 @@ const {
   SeparatorBuilder,
   SeparatorSpacingSize,
   MessageFlags,
+  InteractionContextType,
 } = require("discord.js");
 const { DateTime } = require("luxon");
 
@@ -18,7 +19,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("leaderboard")
     .setDescription("🏆 查看排行榜")
-    .setDMPermission(false)
+    .setContexts(InteractionContextType.Guild)
     .addStringOption((option) =>
       option
         .setName("type")
