@@ -125,7 +125,7 @@ module.exports = async (client, interaction) => {
       balanceAfter = after?.totalCoins || 0;
     }
 
-    const payload = renderMessage(
+    const payload = await renderMessage(
       { ...next, gameId },
       { username, balance: balanceAfter }
     );
