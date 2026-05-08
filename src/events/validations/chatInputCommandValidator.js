@@ -10,6 +10,7 @@ const { consume } = require("../../utils/rateLimiter");
 const CASINO_COMMANDS = new Set([
   "blackjack",
   "hilo",
+  "射龍門",
   "roulette",
   "slot",
   "slottest",

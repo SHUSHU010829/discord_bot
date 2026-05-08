@@ -38,6 +38,13 @@
       "houseEdge": 0.05,
       "maxRounds": 10
     },
+    "dragonGate": {
+      "enabled": true,
+      "minBet": 10,
+      "maxBet": 500,
+      "gameTtlSeconds": 300,
+      "houseEdge": 0.05
+    },
     "horseRacing": {
       "enabled": true,
       "minBet": 10,
