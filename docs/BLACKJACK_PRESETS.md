@@ -5,9 +5,7 @@
 
 ---
 
-> **目前套用：Preset B（一般賭場 RTP）**。如需切回 Preset A 請依下方原始碼錨點還原。
-
-## Preset A：早期規則（單副牌 / S17 / 含過五關）— *2026-05-08 前*
+## Preset A：目前線上規則（單副牌 / S17）— *截至 2026-05-08*
 
 | 項目 | 設定 |
 |---|---|
@@ -42,37 +40,23 @@
 
 ---
 
-## Preset B：一般賭場 RTP（6 副牌 / H17 / 無過五關）— *2026-05-08 起套用*
+## Preset B：一般賭場 RTP（6 副牌 / H17）— *待套用*
 
 | 項目 | 設定 |
 |---|---|
-| 副牌數 | **6 副**（`DECK_COUNT` 常數，每局重洗） |
-| 莊家 Soft 17 | **補牌（Hit on Soft 17, H17）** |
-| 莊家硬 17 | 停 |
-| Blackjack 賠率 | **3:2** |
-| 一般勝賠率 | 1:1 |
-| 平手 | 退本金 |
-| 過五關（Five-Card Charlie） | **已移除** |
-| 分牌（Split） | 起手同點數可分；最多 2 手 |
-| 分對 A | 各補 1 張即停，不可加倍 |
-| 分牌後 21 | 不算 BJ |
-| 加倍（Double） | 起手兩張可加倍 |
+| 副牌數 | **6 副** |
+| 莊家 Soft 17 | **必須補牌（Hit on Soft 17, H17）** |
+| Blackjack 賠率 | 3:2 |
 
-**RTP 估算（基本策略，無投降、無 DAS、無再分牌、分對 A 只補 1 張）：**
-- 莊家莊家邊際（house edge）約 **0.7%–0.8%** → **RTP ≈ 99.2%–99.3%**
-- 本機 mimic-dealer 模擬（玩家跟莊家一樣 <17 必補）約 ~93% RTP，
-  屬於對玩家最差打法的對照值。
+**切換到此 preset 的最小修改：**
+1. `engine.js:86` — `freshShuffledDeck(1)` → `freshShuffledDeck(6)`
+   （需確認 `deck.js:freshShuffledDeck` 支援 N 副牌參數，目前固定 1 副）
+2. `engine.js:231` — 莊家迴圈條件改為「硬 17 停、軟 17 補」：
+   ```js
+   if (ev.total > 17) break;
+   if (ev.total === 17 && !ev.isSoft) break;
+   ```
+   （需要 `evaluateHand` 回傳 `isSoft`，目前須確認是否已有此欄位）
+3. 規則註解 `engine.js:6` 同步更新為 H17。
 
-**切回 Preset A 的還原步驟：**
-1. `engine.js`：`DECK_COUNT = 6` → `1`
-2. `engine.js` `playDealer`：條件改回 `if (ev.total >= 17) break;`（S17）
-3. 重新加回 `FIVE_CARD_THRESHOLD` 常數與相關分支：
-   - `hit` 內：補牌後若達 5 張未爆 → `done = true`
-   - `playDealer`：莊家拿到 5 張即停止抽牌
-   - `settleHand`：玩家 5 張未爆 → `result: 'fivecard'`、莊家 5 張 → `dealerfivecard`
-   - `RESULT_RANK` 補上 `fivecard` / `dealerfivecard`
-   - 匯出 `FIVE_CARD_THRESHOLD` / `FIVE_CARD_PAYOUT_MULTIPLIER`
-4. `renderer.js` / `generateBlackjackCard.js`：
-   恢復 `fivecard` / `dealerfivecard` 文案、徽章、五關提示。
-
-> ⚠️ 還原時請一併把 git log 中本次 commit revert，比手動修改更穩。
+> ⚠️ 過五關（Five-Card Charlie）非標準賭場規則，套用 Preset B 時請確認是否一併移除。
