@@ -9,7 +9,6 @@ const {
 
 const { questSystem } = require("../../config");
 const questService = require("../../features/quests/questService");
-const { checkServerTenure } = require("../../features/economy/eligibility");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -26,11 +25,6 @@ module.exports = {
       }
       if (!client.questProgressCollection) {
         return interaction.editReply("🔧 任務系統尚未啟動，請聯絡舒舒！");
-      }
-
-      const tenure = checkServerTenure(interaction.member);
-      if (!tenure.ok) {
-        return interaction.editReply(tenure.message);
       }
 
       const result = await questService.claimAll(
