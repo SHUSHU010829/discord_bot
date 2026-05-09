@@ -1,36 +1,55 @@
-const fs = require("fs/promises");
 const path = require("path");
-const satori = require("satori").default || require("satori");
-const { html } = require("satori-html");
-const { Resvg } = require("@resvg/resvg-js");
+const { Worker } = require("worker_threads");
 const axios = require("axios");
 
 const { getTier } = require("./levelTier");
-const { loadAdditionalAsset } = require("./satoriEmoji");
 const LruCache = require("./lruCache");
 
 const levelUpCardCache = new LruCache(256);
 
-const FONT_DIR = path.join(__dirname, "../../fonts");
-let fontsCache = null;
+// 常駐 worker：把 satori + resvg 移出主執行緒，避免 CPU 阻塞 Discord 互動。
+let worker = null;
+let nextId = 1;
+const pending = new Map();
 
-async function loadFonts() {
-  if (fontsCache) return fontsCache;
-  const [tcBlack, tcMedium, jpBlack, jpMedium, mono] = await Promise.all([
-    fs.readFile(path.join(FONT_DIR, "NotoSansTC-Black.woff")),
-    fs.readFile(path.join(FONT_DIR, "NotoSansTC-Medium.woff")),
-    fs.readFile(path.join(FONT_DIR, "NotoSansJP-Black.otf")),
-    fs.readFile(path.join(FONT_DIR, "NotoSansJP-Medium.otf")),
-    fs.readFile(path.join(FONT_DIR, "SpaceMono-Regular.woff")),
-  ]);
-  fontsCache = [
-    { name: "SpaceMono", data: mono, weight: 400, style: "normal" },
-    { name: "NotoSansTC", data: tcMedium, weight: 500, style: "normal" },
-    { name: "NotoSansTC", data: tcBlack, weight: 900, style: "normal" },
-    { name: "NotoSansJP", data: jpMedium, weight: 500, style: "normal" },
-    { name: "NotoSansJP", data: jpBlack, weight: 900, style: "normal" },
-  ];
-  return fontsCache;
+function getWorker() {
+  if (worker) return worker;
+  worker = new Worker(path.join(__dirname, "levelUpCardWorker.js"));
+  worker.on("message", (msg) => {
+    const entry = pending.get(msg.id);
+    if (!entry) return;
+    pending.delete(msg.id);
+    if (msg.ok) {
+      entry.resolve(msg.buf);
+    } else {
+      const err = new Error(msg.error || "level up card worker error");
+      if (msg.stack) err.stack = msg.stack;
+      entry.reject(err);
+    }
+  });
+  worker.on("error", (err) => {
+    for (const entry of pending.values()) entry.reject(err);
+    pending.clear();
+    worker = null;
+  });
+  worker.on("exit", (code) => {
+    if (code !== 0) {
+      const err = new Error(`level up card worker exited with code ${code}`);
+      for (const entry of pending.values()) entry.reject(err);
+      pending.clear();
+    }
+    worker = null;
+  });
+  return worker;
+}
+
+function renderInWorker(payload) {
+  const w = getWorker();
+  const id = nextId++;
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    w.postMessage({ id, payload });
+  });
 }
 
 function detectImageMime(buffer, contentType) {
@@ -130,29 +149,10 @@ async function generateLevelUpCard(data) {
   const cached = levelUpCardCache.get(cacheKey);
   if (cached) return cached;
 
-  const fonts = await loadFonts();
   const avatarDataUri = await fetchAvatarDataUri(data.avatarUrl);
   const markup = buildMarkup({ ...data, avatarDataUri });
-  const element = html(markup);
 
-  const svg = await satori(element, {
-    width: 800,
-    height: 400,
-    fonts,
-    loadAdditionalAsset,
-  });
-
-  // Resvg.render() 是同步且 CPU-bound，在這之前讓 event loop 先排空
-  // 等待中的 Discord interaction callback、心跳等等才不會被整個 frame 卡住
-  await new Promise((resolve) => setImmediate(resolve));
-
-  const png = new Resvg(svg, {
-    fitTo: { mode: "width", value: 800 },
-  })
-    .render()
-    .asPng();
-
-  const buf = Buffer.from(png);
+  const buf = await renderInWorker({ markup, width: 800, height: 400 });
   levelUpCardCache.set(cacheKey, buf);
   return buf;
 }
