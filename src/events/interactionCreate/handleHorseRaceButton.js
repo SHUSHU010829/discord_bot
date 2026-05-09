@@ -63,18 +63,26 @@ module.exports = async (client, interaction) => {
     }
 
     if (action === "pick" && interaction.isButton()) {
-      return openBetModal(interaction, parts[2], gameId);
+      return await openBetModal(interaction, parts[2], gameId);
     }
     if (action === "modal" && interaction.isModalSubmit()) {
-      return submitBet(client, interaction, parts[2], gameId);
+      return await submitBet(client, interaction, parts[2], gameId);
     }
     if (action === "start" && interaction.isButton()) {
-      return earlyStart(client, interaction, gameId);
+      return await earlyStart(client, interaction, gameId);
     }
     if (action === "cancel" && interaction.isButton()) {
-      return hostCancel(client, interaction, gameId);
+      return await hostCancel(client, interaction, gameId);
     }
   } catch (error) {
+    // 互動已過期 / 已被回應，沒救了，直接丟掉
+    if (error?.code === 10062 || error?.code === 40060) {
+      logger.warn(
+        { source: "horse-button", code: error.code, customId: interaction.customId },
+        "賽馬互動已過期或已被回應，略過",
+      );
+      return;
+    }
     logger.error(
       {
         source: "horse-button",
@@ -175,7 +183,18 @@ async function submitBet(client, interaction, horseIdStr, gameId) {
     });
   }
 
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  try {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  } catch (e) {
+    if (e?.code === 10062) {
+      logger.warn(
+        { source: "horse-button", customId: interaction.customId },
+        "submitBet deferReply 已過期，略過",
+      );
+      return;
+    }
+    throw e;
+  }
 
   const coll = client.horseRaceGamesCollection;
   const game = await coll.findOne({ gameId });

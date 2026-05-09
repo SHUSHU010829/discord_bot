@@ -7,9 +7,24 @@ let cardErrorCount = 0;
 
 function classifyCardError(err) {
   const msg = err?.message || String(err);
+  if (/abort|timeout|ECONNABORTED|ETIMEDOUT/i.test(msg)) return "abort";
   if (/font|woff|ENOENT.*\.woff/i.test(msg)) return "font";
   if (/satori|resvg|render|svg/i.test(msg)) return "render";
   return "other";
+}
+
+const CARD_RENDER_TIMEOUT_MS = 4000;
+
+function withTimeout(promise, ms) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error("level up card render timeout");
+      err.code = "RENDER_TIMEOUT";
+      reject(err);
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -53,16 +68,19 @@ module.exports = async (client, opts) => {
 
     if (cfg.useCard !== false) {
       try {
-        const buf = await generateLevelUpCard({
-          username,
-          avatarUrl: member?.user?.displayAvatarURL?.({
-            extension: "png",
-            size: 256,
+        const buf = await withTimeout(
+          generateLevelUpCard({
+            username,
+            avatarUrl: member?.user?.displayAvatarURL?.({
+              extension: "png",
+              size: 256,
+            }),
+            beforeLevel,
+            afterLevel,
+            totalXp: after.totalXp || 0,
           }),
-          beforeLevel,
-          afterLevel,
-          totalXp: after.totalXp || 0,
-        });
+          CARD_RENDER_TIMEOUT_MS,
+        );
         const attachment = new AttachmentBuilder(buf, {
           name: `levelup-${afterLevel}.png`,
         });
@@ -81,6 +99,10 @@ module.exports = async (client, opts) => {
         } else if (kind === "render") {
           console.error(
             `[ERROR] level up card satori/resvg render failed (count=${cardErrorCount}): ${cardError.message}\n${cardError.stack || ""}`.red
+          );
+        } else if (kind === "abort") {
+          console.log(
+            `[WARNING] level up card render aborted/timeout (count=${cardErrorCount}), fallback to text: ${cardError.message}`.yellow
           );
         } else {
           console.log(

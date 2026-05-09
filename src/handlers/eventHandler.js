@@ -18,7 +18,15 @@ module.exports = (client) => {
       for (const eventFile of eventFiles) {
         const eventFunction = require(eventFile);
         if (typeof eventFunction === "function") {
-          await eventFunction(client, ...args);
+          try {
+            await eventFunction(client, ...args);
+          } catch (err) {
+            // 單一 handler 失敗不該讓整個 client 進 'error' 事件而 crash
+            console.error(
+              `[ERROR] event ${eventName} handler ${eventFile} threw:`.red,
+              err,
+            );
+          }
         } else {
           console.log(
             `[ERROR] File ${eventFile} does not export a function`.red
