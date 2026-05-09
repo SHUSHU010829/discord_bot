@@ -19,4 +19,14 @@ const client = new Client({
 eventHandlers(client);
 startHttpServer(client);
 
+client.on("error", (err) => {
+  console.error("[Client error]", err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err);
+});
+
 client.login(process.env.BOT_TOKEN);
