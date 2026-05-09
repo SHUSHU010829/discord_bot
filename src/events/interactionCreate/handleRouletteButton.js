@@ -59,49 +59,8 @@ module.exports = async (client, interaction) => {
       }
     }
 
-    const game = await client.rouletteGamesCollection.findOne({ gameId });
-    if (!game) {
-      return interaction.reply({ content: '🎰 找不到這局，可能已逾時。', flags: MessageFlags.Ephemeral });
-    }
-    if (game.userId !== interaction.user.id) {
-      return interaction.reply({ content: '🚫 這不是你的局！', flags: MessageFlags.Ephemeral });
-    }
-    if (game.status !== 'betting') {
-      return interaction.reply({ content: '🎰 這局已結束或逾時。', flags: MessageFlags.Ephemeral });
-    }
-
-    // ── 外圍按鈕 ───────────────────────────────────────────
-    if (action === 'outside' && interaction.isButton()) {
-      // rl_outside_<betType>_<gameId> → betType = parts[2]（可能是 red/black/col1/dozen1 等）
-      const betType = `outside_${parts[2]}`;
-      const def = BET_TYPES[betType];
-      if (!def) return interaction.reply({ content: '❌ 未知押法', flags: MessageFlags.Ephemeral });
-
-      const wagered = totalWagered(game.bets);
-      const remaining = game.totalBudget - wagered;
-      const amount = Math.floor(remaining / 3);
-
-      if (amount <= 0) {
-        return interaction.reply({ content: '💰 籌碼不足，無法繼續外圍押注。', flags: MessageFlags.Ephemeral });
-      }
-
-      const newBet = { type: betType, amount, numbers: def.numbers };
-      await client.rouletteGamesCollection.updateOne(
-        { _id: game._id, status: 'betting' },
-        { $push: { bets: newBet }, $set: { updatedAt: new Date() } }
-      );
-
-      const updatedGame = { ...game, bets: [...game.bets, newBet] };
-      const newRemaining = remaining - amount;
-
-      await interaction.update({
-        content: buildStatusContent(updatedGame),
-        components: buildBettingRows(gameId, newRemaining),
-      });
-      return;
-    }
-
-    // ── 內圍：開 Modal ──────────────────────────────────────
+    // ── 內圍：開 Modal（必須是 initial response，不能先 defer） ─────
+    // 先處理，避免 DB 查詢吃掉 3 秒 token
     if (action === 'inside' && interaction.isButton()) {
       const modal = new ModalBuilder()
         .setCustomId(`rl_modal_straight_${gameId}`)
@@ -134,7 +93,80 @@ module.exports = async (client, interaction) => {
         new ActionRowBuilder().addComponents(amountInput),
       );
 
-      await interaction.showModal(modal);
+      try {
+        await interaction.showModal(modal);
+      } catch (modalErr) {
+        if (modalErr?.code === 10062) {
+          logger.warn(
+            { source: "roulette-button", gameId },
+            "互動已逾期,無法 showModal"
+          );
+          trackError("roulette-button", modalErr, { gameId, reason: "expired" });
+          return;
+        }
+        throw modalErr;
+      }
+      return;
+    }
+
+    // 其他互動先 defer，避免 DB 查詢 + 驗證讓 3 秒 token 過期觸發 10062
+    try {
+      if (interaction.isButton()) {
+        await interaction.deferUpdate();
+      } else if (interaction.isModalSubmit()) {
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      }
+    } catch (deferErr) {
+      if (deferErr?.code === 10062) {
+        logger.warn(
+          { source: "roulette-button", gameId, customId: id },
+          "互動已逾期,無法 defer"
+        );
+        trackError("roulette-button", deferErr, { gameId, reason: "expired" });
+        return;
+      }
+      throw deferErr;
+    }
+
+    const game = await client.rouletteGamesCollection.findOne({ gameId });
+    if (!game) {
+      return interaction.followUp({ content: '🎰 找不到這局，可能已逾時。', flags: MessageFlags.Ephemeral });
+    }
+    if (game.userId !== interaction.user.id) {
+      return interaction.followUp({ content: '🚫 這不是你的局！', flags: MessageFlags.Ephemeral });
+    }
+    if (game.status !== 'betting') {
+      return interaction.followUp({ content: '🎰 這局已結束或逾時。', flags: MessageFlags.Ephemeral });
+    }
+
+    // ── 外圍按鈕 ───────────────────────────────────────────
+    if (action === 'outside' && interaction.isButton()) {
+      // rl_outside_<betType>_<gameId> → betType = parts[2]（可能是 red/black/col1/dozen1 等）
+      const betType = `outside_${parts[2]}`;
+      const def = BET_TYPES[betType];
+      if (!def) return interaction.followUp({ content: '❌ 未知押法', flags: MessageFlags.Ephemeral });
+
+      const wagered = totalWagered(game.bets);
+      const remaining = game.totalBudget - wagered;
+      const amount = Math.floor(remaining / 3);
+
+      if (amount <= 0) {
+        return interaction.followUp({ content: '💰 籌碼不足，無法繼續外圍押注。', flags: MessageFlags.Ephemeral });
+      }
+
+      const newBet = { type: betType, amount, numbers: def.numbers };
+      await client.rouletteGamesCollection.updateOne(
+        { _id: game._id, status: 'betting' },
+        { $push: { bets: newBet }, $set: { updatedAt: new Date() } }
+      );
+
+      const updatedGame = { ...game, bets: [...game.bets, newBet] };
+      const newRemaining = remaining - amount;
+
+      await interaction.editReply({
+        content: buildStatusContent(updatedGame),
+        components: buildBettingRows(gameId, newRemaining),
+      });
       return;
     }
 
@@ -147,18 +179,17 @@ module.exports = async (client, interaction) => {
 
       const def = BET_TYPES[betType];
       if (!def || isOutside(betType)) {
-        return interaction.reply({ content: `❌ 無效押法「${betType}」`, flags: MessageFlags.Ephemeral });
+        return interaction.editReply({ content: `❌ 無效押法「${betType}」` });
       }
       if (!Number.isInteger(amount) || amount <= 0) {
-        return interaction.reply({ content: '❌ 金額格式錯誤，請填正整數', flags: MessageFlags.Ephemeral });
+        return interaction.editReply({ content: '❌ 金額格式錯誤，請填正整數' });
       }
 
       const wagered = totalWagered(game.bets);
       const remaining = game.totalBudget - wagered;
       if (amount > remaining) {
-        return interaction.reply({
+        return interaction.editReply({
           content: `❌ 剩餘籌碼不足（剩 **${remaining.toLocaleString()}**，下注 **${amount.toLocaleString()}**）`,
-          flags: MessageFlags.Ephemeral,
         });
       }
 
@@ -167,7 +198,7 @@ module.exports = async (client, interaction) => {
         numbers = BET_TYPES.basket.numbers;
       } else {
         const v = validateInsideBet(betType, rawNums);
-        if (!v.ok) return interaction.reply({ content: `❌ ${v.error}`, flags: MessageFlags.Ephemeral });
+        if (!v.ok) return interaction.editReply({ content: `❌ ${v.error}` });
         numbers = v.numbers;
       }
 
@@ -177,9 +208,8 @@ module.exports = async (client, interaction) => {
         { $push: { bets: newBet }, $set: { updatedAt: new Date() } }
       );
 
-      await interaction.reply({
+      await interaction.editReply({
         content: `✅ 已加入 **${def.label}** ${amount.toLocaleString()} credits（號碼：${numbers.join(', ')}）`,
-        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -187,10 +217,8 @@ module.exports = async (client, interaction) => {
     // ── 確認下注 → Spin ─────────────────────────────────────
     if (action === 'confirm' && interaction.isButton()) {
       if (game.bets.length === 0) {
-        return interaction.reply({ content: '❌ 還沒有任何押注！', flags: MessageFlags.Ephemeral });
+        return interaction.followUp({ content: '❌ 還沒有任何押注！', flags: MessageFlags.Ephemeral });
       }
-
-      await interaction.deferUpdate();
 
       const result = spinWheel();
       const settlement = settle(game.bets, result);
@@ -286,8 +314,6 @@ module.exports = async (client, interaction) => {
 
     // ── 取消 ────────────────────────────────────────────────
     if (action === 'cancel' && interaction.isButton()) {
-      await interaction.deferUpdate();
-
       // 用 status 條件防 race（cron 同時掃不會雙退）
       const updated = await client.rouletteGamesCollection.findOneAndUpdate(
         { _id: game._id, status: 'betting' },
