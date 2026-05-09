@@ -142,6 +142,10 @@ async function generateLevelUpCard(data) {
     loadAdditionalAsset,
   });
 
+  // Resvg.render() 是同步且 CPU-bound，在這之前讓 event loop 先排空
+  // 等待中的 Discord interaction callback、心跳等等才不會被整個 frame 卡住
+  await new Promise((resolve) => setImmediate(resolve));
+
   const png = new Resvg(svg, {
     fitTo: { mode: "width", value: 800 },
   })
