@@ -11,6 +11,7 @@ const { generateWinningNumbers, buildDrawId } = require("./draw");
 const { countMatches } = require("./numbers");
 const { calculatePayout } = require("./payout");
 const { generateReminderSchedule } = require("./reminderScheduler");
+const { nextDrawTime } = require("./schedule");
 const grantCoins = require("../../economy/grantCoins");
 
 const TZ = "Asia/Taipei";
@@ -21,19 +22,6 @@ function getLotteryConfig() {
 
 function getTypeConfig(lotteryType) {
   return getLotteryConfig().types?.[lotteryType] || {};
-}
-
-/**
- * 計算下一個週日 21:00 (Asia/Taipei) 的時間。
- */
-function nextSundayDrawTime(after = DateTime.now().setZone(TZ)) {
-  // luxon weekday: 1=Mon, 7=Sun
-  let d = after.set({ hour: 21, minute: 0, second: 0, millisecond: 0 });
-  // 推到週日
-  while (d.weekday !== 7) d = d.plus({ days: 1 });
-  // 如果今天就是週日但已經過 21:00,推到下個週日
-  if (d <= after) d = d.plus({ weeks: 1 });
-  return d;
 }
 
 function formatDrawIdDate(scheduledAt) {
@@ -66,7 +54,7 @@ async function ensureNextDraw(client, lotteryType, options = {}) {
   const typeCfg = getTypeConfig(lotteryType);
   if (!typeCfg.enabled) return null;
 
-  const drawTime = nextSundayDrawTime();
+  const drawTime = nextDrawTime(lotteryType);
   const dateStr = formatDrawIdDate(drawTime.toJSDate());
   const drawId = buildDrawId(dateStr, lotteryType);
 
@@ -135,9 +123,9 @@ async function runDraw(client, lotteryType) {
     throw new Error("DB not ready");
   }
 
-  // 鎖期:open → drawing
+  // 鎖期:open → drawing(scheduledAt 已到才開,避免兩開週中誤開未到期的 draw)
   const lockResult = await client.lotteryDrawsCollection.findOneAndUpdate(
-    { lotteryType, status: "open" },
+    { lotteryType, status: "open", scheduledAt: { $lte: new Date() } },
     { $set: { status: "drawing", updatedAt: new Date() } },
     { returnDocument: "after" }
   );
@@ -310,5 +298,4 @@ module.exports = {
   getCurrentOpenDraw,
   ensureNextDraw,
   runDraw,
-  nextSundayDrawTime,
 };

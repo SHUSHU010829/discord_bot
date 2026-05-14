@@ -516,7 +516,8 @@ embed.js → 發送 Embed
 | `/lotteryadmin …` 🔒 | 開發者：強制開獎、補建期、跑訂閱扣款、補發提醒 |
 
 **獎池與排程**設定在 `casino.lottery`：
-- `drawCron` 預設每週日 21:00 開獎、`subscriptionCron` 每週日 20:30 結算訂閱、`reminderCron` 每小時檢查是否要寄期中提醒
+- 每個玩法在 `types.<玩法>` 用 `drawWeekdays`（1=Mon…7=Sun）+ `drawHour` 設開獎時段；訂閱在開獎前 30 分鐘扣款，`reminderCron` 每小時檢查期中提醒
+- 預設 `6_49` 每週日 21:00、`3_20` 每週三 + 週日 21:00 開獎
 - 支援多種玩法（預設 `6_49`、`3_20`），各自有獨立票價、系統種子金、wheeling 限制
 - 跨過 `poolMilestones` 門檻時可選擇推播到 `poolMilestoneChannelId`
 

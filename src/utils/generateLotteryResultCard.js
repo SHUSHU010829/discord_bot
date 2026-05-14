@@ -60,6 +60,25 @@ function buildPrizeRow(label, count, perWinner, color) {
   `;
 }
 
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[c]));
+}
+
+function formatWinnersLine(names) {
+  if (!names || names.length === 0) return "";
+  const MAX_SHOWN = 4;
+  const shown = names.slice(0, MAX_SHOWN);
+  const rest = names.length - shown.length;
+  const base = shown.map(escapeHtml).join("、");
+  return rest > 0 ? `${base} 等 ${names.length} 位` : base;
+}
+
 function buildMarkup(data) {
   const {
     lotteryType,
@@ -70,6 +89,7 @@ function buildMarkup(data) {
     pool,
     payout,
     totalTickets,
+    jackpotWinners,
   } = data;
 
   const isLarge = lotteryType === "6_49";
@@ -93,6 +113,15 @@ function buildMarkup(data) {
   }
 
   const rolledOver = payout.rolledOver?.amount || 0;
+  const winnersText = formatWinnersLine(jackpotWinners);
+  const winnersBlock = winnersText
+    ? `
+        <div style="display:flex;width:100%;margin-top:12px;align-items:center;padding:8px 12px;background:${PALETTE.reelBg};border:2px solid ${PALETTE.gold};box-sizing:border-box;">
+          <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:18px;color:${PALETTE.gold};letter-spacing:2px;line-height:1;padding-right:10px;">🏆 頭獎得主</div>
+          <div style="display:flex;flex:1;font-family:'NotoSansTC';font-weight:500;font-size:18px;color:${PALETTE.ink};line-height:1.2;padding-right:4px;overflow:hidden;">${winnersText}</div>
+        </div>
+      `
+    : "";
 
   return `
     <div style="display:flex;width:1080px;height:780px;background:${PALETTE.card};padding:24px;box-sizing:border-box;font-family:'NotoSansTC';">
@@ -135,6 +164,8 @@ function buildMarkup(data) {
           ${rows.join("")}
         </div>
 
+        ${winnersBlock}
+
         <div style="display:flex;width:100%;justify-content:space-between;align-items:center;margin-top:auto;padding-top:14px;border-top:2px dashed ${PALETTE.muted};">
           <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${PALETTE.muted};line-height:1;padding-right:5px;">DRAWN AT ${drawnAtLabel}</div>
           <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${PALETTE.ink};line-height:1;padding-right:5px;">@SHUSHU CASINO</div>
@@ -150,6 +181,7 @@ function buildCacheKey(data) {
     data.drawId,
     data.winningNumbers?.join(",") || "",
     data.totalTickets ?? "",
+    (data.jackpotWinners || []).join(","),
   ].join("|");
 }
 

@@ -159,11 +159,11 @@ async function processSubscription(client, sub) {
   };
 }
 
-async function processAllSubscriptions(client) {
+async function processAllSubscriptions(client, options = {}) {
   if (!client.lotterySubscriptionsCollection) return;
-  const subs = await client.lotterySubscriptionsCollection
-    .find({ status: "active" })
-    .toArray();
+  const filter = { status: "active" };
+  if (options.lotteryType) filter.lotteryType = options.lotteryType;
+  const subs = await client.lotterySubscriptionsCollection.find(filter).toArray();
   let successCount = 0;
   let failCount = 0;
   for (const sub of subs) {
@@ -176,8 +176,9 @@ async function processAllSubscriptions(client) {
       failCount++;
     }
   }
+  const tag = options.lotteryType ? `[${options.lotteryType}] ` : "";
   console.log(
-    `[LOTTERY] 訂閱排程完成。成功 ${successCount} / 失敗 ${failCount} / 總計 ${subs.length}`.cyan
+    `[LOTTERY] ${tag}訂閱排程完成。成功 ${successCount} / 失敗 ${failCount} / 總計 ${subs.length}`.cyan
   );
 }
 
