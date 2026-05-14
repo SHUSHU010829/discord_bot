@@ -69,8 +69,6 @@
       "enabled": true,
       "announceChannelId": "1501770364982657084",
       "poolMilestoneChannelId": "1501770364982657084",
-      "drawCron": "0 21 * * 0",
-      "subscriptionCron": "30 20 * * 0",
       "reminderCron": "0 * * * *",
       "timezone": "Asia/Taipei",
       "types": {
@@ -81,7 +79,9 @@
           "fourthPrizeFixed": 100,
           "maxTicketsPerOrder": 100,
           "wheelingEnabled": true,
-          "wheelingMaxBaseNumbers": 10
+          "wheelingMaxBaseNumbers": 10,
+          "drawWeekdays": [7],
+          "drawHour": 21
         },
         "3_20": {
           "enabled": true,
@@ -89,7 +89,9 @@
           "systemSeed": 500,
           "secondPrizeFixed": 50,
           "maxTicketsPerOrder": 100,
-          "wheelingEnabled": false
+          "wheelingEnabled": false,
+          "drawWeekdays": [3, 7],
+          "drawHour": 21
         }
       },
       "subscription": {

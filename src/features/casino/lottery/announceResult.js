@@ -33,6 +33,16 @@ async function announceDrawResult(client, drawResult) {
     .setZone(TZ)
     .toFormat("yyyy/MM/dd HH:mm");
 
+  const jackpotIds = draw.payout?.jackpot?.ticketIds || [];
+  const jackpotWinners = [
+    ...new Set(
+      jackpotIds
+        .map((tid) => tickets.find((t) => t.ticketId === tid))
+        .filter(Boolean)
+        .map((t) => t.username || `User-${String(t.userId || "").slice(-4)}`)
+    ),
+  ];
+
   const buf = await generateLotteryResultCard({
     lotteryType: draw.lotteryType,
     drawId: draw.drawId,
@@ -42,6 +52,7 @@ async function announceDrawResult(client, drawResult) {
     pool: draw.pool,
     payout: draw.payout,
     totalTickets: tickets.length,
+    jackpotWinners,
   });
 
   const attachment = new AttachmentBuilder(buf, {
@@ -70,7 +81,6 @@ async function announceDrawResult(client, drawResult) {
   });
 
   // DM 通知頭獎得主
-  const jackpotIds = draw.payout?.jackpot?.ticketIds || [];
   for (const tid of jackpotIds) {
     const t = tickets.find((x) => x.ticketId === tid);
     if (!t) continue;
