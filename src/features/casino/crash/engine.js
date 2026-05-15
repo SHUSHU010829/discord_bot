@@ -25,7 +25,7 @@ const MAX_DURATION_MS = 22_000;
 
 // 暖機期：剛升空時倍率固定 1.00x，這段時間秒按收手只能拿回本，不會白賺。
 // 注意：MIN_DURATION_MS 中前 WARMUP_MS 屬於暖機，剩下的才會開始爬升到 bust。
-const WARMUP_MS = 2_000;
+const WARMUP_MS = 1_000;
 
 // 抽到 bust=1.00 的「直接爆炸」局，會在 0~INSTANT_BUST_MAX_MS 之間隨機爆掉。
 // 不套用 MIN_DURATION_MS，這樣連暖機期內秒按收手也有機率輸錢。
@@ -119,6 +119,8 @@ function multiplierAt(state, now = Date.now()) {
   const m = Math.exp(state.growthRate * climbSec);
   // 飛行中倍率不能超過 bust（時間還沒到的話）
   const capped = Math.min(m, state.bust);
+  // 未達最低收手門檻時也視為 1.00x，避免秒按抓 1.01~1.09 的低倍率薅羊毛
+  if (capped < MIN_AUTOCASHOUT) return 1.0;
   return Math.max(1.0, floor2(capped));
 }
 
