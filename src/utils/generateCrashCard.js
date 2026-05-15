@@ -126,7 +126,7 @@ function buildMarkup(data) {
   //
   // 用 log 映射，避免高倍率被壓扁、低倍率沒高度。
   const reached = isWin ? cashoutAt : bust;
-  const scaleMax = Math.max(2, Math.max(bust, target));
+  const scaleMax = Math.max(2, bust, target ?? 0);
   const progress =
     Math.log(Math.max(1, reached)) / Math.log(Math.max(1.01, scaleMax));
   const ry = rocketY(progress, 96, 480);
@@ -134,13 +134,16 @@ function buildMarkup(data) {
   const stageW = 560;
   const stageH = 520;
 
-  const headline = isWin ? "成功收手！" : "火箭爆炸！";
+  const headline = isWin ? "成功收手" : "火箭爆炸";
   const headlineColor = P.accent;
 
   const settleAmount = isWin ? state.payout : state.bet;
   const settleAmountPrefix = isWin ? "+" : "−";
 
-  const targetLine = `自動收手 ×${target.toFixed(2)}`;
+  const targetLine =
+    target != null
+      ? `自動收手 ×${target.toFixed(2)}`
+      : "手動收手．無自動";
   const bustLine = `本局爆炸 ×${bust.toFixed(2)}`;
   const cashoutLine = isWin
     ? `成功收手於 ×${cashoutAt.toFixed(2)}`
@@ -181,10 +184,10 @@ function buildMarkup(data) {
               ${isWin ? rocketSvg(120, false) : explosionSvg(140)}
             </div>
 
-            <!-- 當前倍率大字（疊在上半段） -->
+            <!-- 當前倍率大字（疊在上半段）：贏顯示收手點，輸顯示爆炸點 -->
             <div style="display:flex;position:absolute;left:0;top:24px;width:${stageW}px;justify-content:center;">
               <div style="display:flex;align-items:flex-end;line-height:1;">
-                <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:88px;color:${P.accent};line-height:1;padding-right:6px;">×${bust.toFixed(2)}</div>
+                <div style="display:flex;font-family:'NotoSansTC';font-weight:900;font-size:88px;color:${P.accent};line-height:1;padding-right:6px;">×${(isWin ? cashoutAt : bust).toFixed(2)}</div>
               </div>
             </div>
           </div>
@@ -221,7 +224,7 @@ function buildMarkup(data) {
           </div>
           <div style="display:flex;align-items:flex-end;">
             <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${P.muted};line-height:1;padding-right:5px;">TARGET</div>
-            <div style="display:flex;margin-left:7px;font-family:'NotoSansTC';font-weight:900;font-size:22px;color:${P.ink};line-height:1;">×${target.toFixed(2)}</div>
+            <div style="display:flex;margin-left:7px;font-family:'NotoSansTC';font-weight:900;font-size:22px;color:${P.ink};line-height:1;">${target != null ? `×${target.toFixed(2)}` : "—"}</div>
           </div>
           <div style="display:flex;align-items:flex-end;">
             <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${P.muted};line-height:1;padding-right:5px;">BUST</div>

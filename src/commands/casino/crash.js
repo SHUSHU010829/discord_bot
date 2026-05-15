@@ -9,12 +9,12 @@ const { coinSystem, casino } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
 const parseBetAmount = require("../../utils/parseBetAmount");
 const {
-  resolveGame,
+  startGame,
   MIN_AUTOCASHOUT,
-  DEFAULT_AUTOCASHOUT,
   DEFAULT_HOUSE_EDGE,
 } = require("../../features/casino/crash/engine");
-const { renderMessage } = require("../../features/casino/crash/renderer");
+const { buildPlayingPayload } = require("../../features/casino/crash/renderer");
+const tickManager = require("../../features/casino/crash/tick");
 
 function getCrashConfig() {
   return casino?.crash || {};
@@ -23,7 +23,7 @@ function getCrashConfig() {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("火箭")
-    .setDescription("🚀 押注火箭！倍率衝多高就賺多少，爆炸就歸零")
+    .setDescription("🚀 押注火箭！倍率衝多高就賺多少，按收手鎖定派彩，慢一步就爆炸")
     .setContexts(InteractionContextType.Guild)
     .addStringOption((opt) =>
       opt
@@ -34,7 +34,7 @@ module.exports = {
     .addNumberOption((opt) =>
       opt
         .setName("自動收手")
-        .setDescription(`達到此倍率自動收手（最低 ${MIN_AUTOCASHOUT}，預設 ${DEFAULT_AUTOCASHOUT}）`)
+        .setDescription(`(選填) 達到此倍率自動收手，省去搶按鈕；最低 ${MIN_AUTOCASHOUT}`)
         .setMinValue(MIN_AUTOCASHOUT)
         .setRequired(false),
     )
@@ -49,7 +49,8 @@ module.exports = {
       }
       if (
         !client.userCoinsCollection ||
-        !client.coinTransactionsCollection
+        !client.coinTransactionsCollection ||
+        !client.crashGamesCollection
       ) {
         return interaction.editReply("🔧 金幣系統尚未啟動，請聯絡舒舒！");
       }
@@ -59,15 +60,27 @@ module.exports = {
         return interaction.editReply("🔧 火箭暫時關閉中！");
       }
 
-      const minBet = cfg.minBet ?? 10;
-      const maxBet = cfg.maxBet ?? 0; // 0 = 不設上限
-      const houseEdge = cfg.houseEdge ?? DEFAULT_HOUSE_EDGE;
-
       const userId = interaction.user.id;
       const guildId = interaction.guildId;
       const username =
         interaction.member?.displayName || interaction.user.username;
       const member = interaction.member;
+
+      // 同時只能有一局 playing
+      const existing = await client.crashGamesCollection.findOne({
+        userId,
+        guildId,
+        status: "playing",
+      });
+      if (existing) {
+        return interaction.editReply(
+          "🚀 你還有一支火箭在天上！等它落地（或爆炸）再開新局。",
+        );
+      }
+
+      const minBet = cfg.minBet ?? 10;
+      const maxBet = cfg.maxBet ?? 0;
+      const houseEdge = cfg.houseEdge ?? DEFAULT_HOUSE_EDGE;
 
       const before = await client.userCoinsCollection.findOne({
         userId,
@@ -99,10 +112,11 @@ module.exports = {
       }
 
       const autocashoutInput =
-        interaction.options.getNumber("自動收手") ?? DEFAULT_AUTOCASHOUT;
+        interaction.options.getNumber("自動收手") ?? null;
 
       const gameId = crypto.randomUUID();
 
+      // 扣下注
       const betResult = await grantCoins(client, {
         userId,
         guildId,
@@ -116,65 +130,58 @@ module.exports = {
       if (!betResult) {
         return interaction.editReply("🔧 下注失敗，請稍後再試。");
       }
-      let balanceAfter = betResult.doc?.totalCoins ?? balance - bet;
+      const balanceAfter = betResult.doc?.totalCoins ?? balance - bet;
 
-      const settled = resolveGame({
+      // 開局
+      const initial = startGame({
         bet,
         autocashout: autocashoutInput,
         houseEdge,
       });
+      const now = new Date();
+      const ttlSec = cfg.gameTtlSeconds ?? 300;
+      const doc = {
+        ...initial,
+        gameId,
+        userId,
+        guildId,
+        username,
+        channelId: interaction.channelId,
+        // messageId 之後拿到再回填
+        startedAt: new Date(initial.startedAt),
+        bustAt: new Date(initial.bustAt),
+        autocashoutAt:
+          initial.autocashoutAt != null
+            ? new Date(initial.autocashoutAt)
+            : null,
+        createdAt: now,
+        updatedAt: now,
+        expiresAt: new Date(now.getTime() + ttlSec * 1000),
+      };
 
-      if (settled.payout > 0) {
-        const payoutResult = await grantCoins(client, {
-          userId,
-          guildId,
-          username,
-          amount: settled.payout,
-          source: "payout",
-          member,
-          meta: {
-            game: "crash",
-            result: settled.result,
-            gameId,
-            bet: settled.bet,
-            autocashout: settled.autocashout,
-            cashoutAt: settled.cashoutAt,
-            bust: settled.bust,
-          },
-        });
-        balanceAfter = payoutResult?.doc?.totalCoins ?? balanceAfter;
-      }
+      await client.crashGamesCollection.insertOne(doc);
 
-      // 紀錄到資料庫供歷史查詢（如有設定 collection）
-      if (client.crashGamesCollection) {
-        const now = new Date();
-        try {
-          await client.crashGamesCollection.insertOne({
-            gameId,
-            userId,
-            guildId,
-            username,
-            bet: settled.bet,
-            autocashout: settled.autocashout,
-            bust: settled.bust,
-            cashoutAt: settled.cashoutAt,
-            houseEdge: settled.houseEdge,
-            status: settled.status,
-            result: settled.result,
-            payout: settled.payout,
-            createdAt: now,
-            updatedAt: now,
-          });
-        } catch (e) {
-          console.log(`[WARN] crash game insert failed: ${e.message}`.yellow);
-        }
-      }
-
-      const payload = await renderMessage(
-        { ...settled, gameId },
+      // 第一次回應：playing payload
+      const payload = buildPlayingPayload(
+        { ...initial, gameId },
         { username, balance: balanceAfter },
       );
-      await interaction.editReply(payload);
+      const msg = await interaction.editReply(payload);
+
+      // 回填 messageId，tick 才知道要 edit 哪則
+      const messageId = msg?.id;
+      if (messageId) {
+        await client.crashGamesCollection.updateOne(
+          { gameId },
+          { $set: { messageId, updatedAt: new Date() } },
+        );
+      }
+
+      // 撈剛才寫進去的 doc（包含 messageId）給 tick 用
+      const liveDoc = await client.crashGamesCollection.findOne({ gameId });
+      if (liveDoc && liveDoc.status === "playing") {
+        tickManager.start(client, liveDoc);
+      }
     } catch (error) {
       console.log(`[ERROR] /火箭:\n${error}\n${error.stack}`.red);
       await interaction
