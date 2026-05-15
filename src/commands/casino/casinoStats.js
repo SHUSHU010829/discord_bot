@@ -24,6 +24,7 @@ const GAME_LABELS = {
   poker: "🃏 德州撲克",
   lottery: "🎟️ 樂透",
   horseRacing: "🐎 賽馬",
+  crash: "🚀 火箭",
   unknown: "❓ 未分類",
 };
 
@@ -39,6 +40,7 @@ const GAME_CHOICES = [
   { name: "🎲 Sicbo", value: "sicbo" },
   { name: "🐎 Horse Racing", value: "horseRacing" },
   { name: "🎟️ Lottery", value: "lottery" },
+  { name: "🚀 火箭", value: "crash" },
 ];
 
 module.exports = {
