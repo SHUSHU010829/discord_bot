@@ -54,7 +54,14 @@ function isTie(g1, g2) {
 }
 
 function isAdjacent(g1, g2) {
-  return Math.abs(valueOf(g1) - valueOf(g2)) === 1;
+  const v1 = valueOf(g1);
+  const v2 = valueOf(g2);
+  if (Math.abs(v1 - v2) === 1) return true;
+  // A 與 K 視為連柱：A 在規則上可當 1 或 14，與 K(13) 相鄰。
+  // 否則 A+K 會讓「中間」涵蓋 2~Q 幾乎全部，造成倍率被 floor 到 1.01 而對玩家極度有利。
+  const set = new Set([rankOf(g1), rankOf(g2)]);
+  if (set.has("A") && set.has("K")) return true;
+  return false;
 }
 
 function classifyDeck(gateLow, gateHigh, deck) {
