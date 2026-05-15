@@ -23,40 +23,40 @@
     },
     "pool": [
       {
-        "symbol": "BIBI",
-        "name": "逼逼科技",
+        "symbol": "TSPP",
+        "name": "嗶積電",
         "initialPrice": 500,
         "sigma": 0.04,
         "floor": 100,
         "type": "tech"
       },
       {
-        "symbol": "TAPI",
-        "name": "TAPI 乳業",
+        "symbol": "UPPI",
+        "name": "統嗶超商",
         "initialPrice": 300,
         "sigma": 0.015,
         "floor": 60,
         "type": "blue"
       },
       {
-        "symbol": "MEME",
-        "name": "MEME 梗指數",
+        "symbol": "EGPP",
+        "name": "嗶嗶海運",
         "initialPrice": 120,
         "sigma": 0.08,
         "floor": 20,
         "type": "meme"
       },
       {
-        "symbol": "SHUAI",
-        "name": "帥氣控股",
+        "symbol": "CTPP",
+        "name": "嗶嗶金控",
         "initialPrice": 800,
         "sigma": 0.025,
         "floor": 160,
         "type": "blue"
       },
       {
-        "symbol": "NEKO",
-        "name": "貓貓科技",
+        "symbol": "MTKP",
+        "name": "嗶發科",
         "initialPrice": 200,
         "sigma": 0.055,
         "floor": 40,

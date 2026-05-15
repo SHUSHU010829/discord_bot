@@ -21,7 +21,7 @@ module.exports = {
     .setDescription("查詢單一股票的歷史走勢圖")
     .setContexts(InteractionContextType.Guild)
     .addStringOption((opt) =>
-      opt.setName("股票代號").setDescription("例如 BIBI / TAPI / MEME / SHUAI / NEKO").setRequired(true)
+      opt.setName("股票代號").setDescription("例如 TSPP / UPPI / EGPP / CTPP / MTKP").setRequired(true)
     )
     .addStringOption((opt) =>
       opt

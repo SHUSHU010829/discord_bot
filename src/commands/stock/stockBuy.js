@@ -15,7 +15,7 @@ module.exports = {
     .setDescription("以市價買入股票")
     .setContexts(InteractionContextType.Guild)
     .addStringOption((opt) =>
-      opt.setName("股票代號").setDescription("例如 BIBI / TAPI / MEME / SHUAI / NEKO").setRequired(true)
+      opt.setName("股票代號").setDescription("例如 TSPP / UPPI / EGPP / CTPP / MTKP").setRequired(true)
     )
     .addIntegerOption((opt) =>
       opt.setName("數量").setDescription("買入股數（正整數）").setRequired(true).setMinValue(1)
