@@ -60,7 +60,7 @@ module.exports = {
         );
       }
 
-      // above_threshold / already_claimed / race_lost → 一律改顯示狀態
+      // above_threshold / already_claimed / race_lost / has_stocks → 一律改顯示狀態
       return showStatus(client, interaction, userId, guildId);
     } catch (error) {
       console.log(`[ERROR] /乞討:\n${error}\n${error.stack}`.red);
@@ -99,7 +99,8 @@ function replyClaimSuccess(interaction, result) {
 
 async function showStatus(client, interaction, userId, guildId) {
   const status = await welfareService.getStatus(client, userId, guildId);
-  const eligible = status.eligibleByBalance && !status.claimedToday;
+  const eligible =
+    status.eligibleByBalance && !status.claimedToday && !status.hasStocks;
 
   const assetLine =
     status.depositTotal > 0
@@ -112,7 +113,12 @@ async function showStatus(client, interaction, userId, guildId) {
     `連續天數：**${status.streak}** 天 ・ 歷史最高：${status.longestStreak} 天 ・ 累計領取：${status.totalClaims} 次`,
   ];
 
-  if (status.claimedToday) {
+  if (status.hasStocks) {
+    const symList = status.stockSymbols.slice(0, 5).map((s) => `\`${s}\``).join("、");
+    lines.push(
+      `\n📈 持有 **${status.stockShares.toLocaleString()}** 股股票（${symList}${status.stockSymbols.length > 5 ? "…" : ""}），不算破產，先 \`/賣股\` 清倉再來乞討。`
+    );
+  } else if (status.claimedToday) {
     lines.push(
       `\n✅ 今日已領取，下次可領：<t:${status.resetEpoch}:R>（<t:${status.resetEpoch}:t>）`
     );
