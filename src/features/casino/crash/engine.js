@@ -15,8 +15,8 @@
 //   暖機期結束後 m(t) = exp(growthRate × (t - warmup)_sec)，直到時間到 bust。
 //   不同 bust 對應不同遊戲時長（短局 ~3s、長局 ~22s），用 log 平滑映射。
 
-const DEFAULT_HOUSE_EDGE = 0.01;
-const MIN_AUTOCASHOUT = 1.01;
+const DEFAULT_HOUSE_EDGE = 0.05;
+const MIN_AUTOCASHOUT = 1.1;
 const MAX_AUTOCASHOUT = 1_000_000;
 
 // 真的有飛起來的局（bust > 1）：3 秒 hard floor，留玩家反應時間，避免高倍率局秒爆。
