@@ -1,0 +1,139 @@
+require("colors");
+const { EmbedBuilder } = require("discord.js");
+const { stockSystem } = require("../../config");
+const grantCoins = require("../economy/grantCoins");
+
+function getDividendConfig() {
+  return stockSystem?.dividend || {};
+}
+
+function getPoolBySymbol(symbol) {
+  return (stockSystem?.pool || []).find((p) => p.symbol === symbol) || null;
+}
+
+// 計算單筆持倉的本週應發配息
+function computePayout(shares, currentPrice, annualYield, weeksPerYear, minPerHolder) {
+  if (shares <= 0 || annualYield <= 0 || currentPrice <= 0) return 0;
+  const raw = shares * currentPrice * annualYield / weeksPerYear;
+  const floored = Math.floor(raw);
+  if (floored >= 1) return floored;
+  return minPerHolder || 1;
+}
+
+async function payoutForStock(client, guildId, stockDoc) {
+  const cfg = getDividendConfig();
+  const weeksPerYear = cfg.weeksPerYear || 52;
+  const minPerHolder = cfg.minPayoutPerHolder ?? 1;
+
+  const poolEntry = getPoolBySymbol(stockDoc.symbol);
+  const annualYield = poolEntry?.dividendYield ?? 0;
+  if (annualYield <= 0) return null;
+
+  const holders = await client.userPortfolioCollection
+    .find({ guildId, symbol: stockDoc.symbol, shares: { $gt: 0 } })
+    .toArray();
+  if (holders.length === 0) return null;
+
+  const perSharePerWeek = (stockDoc.currentPrice * annualYield) / weeksPerYear;
+  let totalPaid = 0;
+  let recipients = 0;
+
+  for (const h of holders) {
+    const payout = computePayout(h.shares, stockDoc.currentPrice, annualYield, weeksPerYear, minPerHolder);
+    if (payout <= 0) continue;
+    try {
+      const result = await grantCoins(client, {
+        userId: h.userId,
+        guildId,
+        amount: payout,
+        source: "stock_dividend",
+        meta: {
+          symbol: stockDoc.symbol,
+          shares: h.shares,
+          perSharePerWeek: Number(perSharePerWeek.toFixed(4)),
+          annualYield,
+        },
+      });
+      if (result) {
+        totalPaid += result.granted;
+        recipients += 1;
+        await client.stockTransactionsCollection.insertOne({
+          userId: h.userId,
+          guildId,
+          symbol: stockDoc.symbol,
+          side: "dividend",
+          shares: h.shares,
+          price: stockDoc.currentPrice,
+          payout: result.granted,
+          annualYield,
+          timestamp: new Date(),
+        }).catch(() => {});
+      }
+    } catch (e) {
+      console.log(`[DIV] grantCoins failed user=${h.userId} symbol=${stockDoc.symbol}: ${e?.message || e}`.yellow);
+    }
+  }
+
+  return {
+    symbol: stockDoc.symbol,
+    name: stockDoc.name,
+    annualYield,
+    currentPrice: stockDoc.currentPrice,
+    perSharePerWeek: Number(perSharePerWeek.toFixed(4)),
+    recipients,
+    totalPaid,
+  };
+}
+
+async function payoutAll(client, guildId) {
+  if (!client.stockMarketCollection || !client.userPortfolioCollection) return [];
+  const stocks = await client.stockMarketCollection
+    .find({ guildId, enabled: { $ne: false } })
+    .toArray();
+  const summaries = [];
+  for (const s of stocks) {
+    const result = await payoutForStock(client, guildId, s);
+    if (result && result.recipients > 0) summaries.push(result);
+  }
+  return summaries;
+}
+
+async function announce(client, guildId, summaries) {
+  const channelId = stockSystem?.reportChannelId;
+  if (!channelId) return;
+  if (summaries.length === 0) return;
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+  if (!channel?.isTextBased?.()) return;
+
+  const totalAll = summaries.reduce((a, b) => a + b.totalPaid, 0);
+  const totalRecipientHits = summaries.reduce((a, b) => a + b.recipients, 0);
+
+  const lines = summaries.map((s) => {
+    const yieldPct = (s.annualYield * 100).toFixed(1);
+    return (
+      `\`${s.symbol}\` ${s.name}\n` +
+      `　每股 **${s.perSharePerWeek.toFixed(2)}** credits` +
+      `（年化 ${yieldPct}%・現價 ${s.currentPrice.toFixed(1)}）\n` +
+      `　共發放 ${s.recipients} 位股東 **${s.totalPaid.toLocaleString()}** credits`
+    );
+  });
+
+  const embed = new EmbedBuilder()
+    .setTitle("📨 逼逼股市｜本週配息派發")
+    .setColor(0x2ecc71)
+    .setDescription(lines.join("\n\n"))
+    .addFields({
+      name: "本週總配發",
+      value: `${totalAll.toLocaleString()} credits（累計 ${totalRecipientHits} 筆派息）`,
+    })
+    .setTimestamp(new Date());
+
+  await channel.send({ embeds: [embed] }).catch(() => {});
+}
+
+module.exports = {
+  payoutAll,
+  payoutForStock,
+  announce,
+  computePayout,
+};

@@ -21,6 +21,13 @@
     "chart": {
       "historyPoints": 20
     },
+    "dividend": {
+      "enabled": true,
+      "cronSchedule": "0 9 * * 1",
+      "timezone": "Asia/Taipei",
+      "weeksPerYear": 52,
+      "minPayoutPerHolder": 1
+    },
     "pool": [
       {
         "symbol": "TSPP",
@@ -28,7 +35,8 @@
         "initialPrice": 500,
         "sigma": 0.04,
         "floor": 100,
-        "type": "tech"
+        "type": "tech",
+        "dividendYield": 0.02
       },
       {
         "symbol": "UPPI",
@@ -36,7 +44,8 @@
         "initialPrice": 300,
         "sigma": 0.015,
         "floor": 60,
-        "type": "blue"
+        "type": "blue",
+        "dividendYield": 0.04
       },
       {
         "symbol": "EGPP",
@@ -44,7 +53,8 @@
         "initialPrice": 120,
         "sigma": 0.08,
         "floor": 20,
-        "type": "meme"
+        "type": "meme",
+        "dividendYield": 0
       },
       {
         "symbol": "CTPP",
@@ -52,7 +62,8 @@
         "initialPrice": 800,
         "sigma": 0.025,
         "floor": 160,
-        "type": "blue"
+        "type": "blue",
+        "dividendYield": 0.05
       },
       {
         "symbol": "MTKP",
@@ -60,7 +71,8 @@
         "initialPrice": 200,
         "sigma": 0.055,
         "floor": 40,
-        "type": "tech"
+        "type": "tech",
+        "dividendYield": 0.025
       }
     ]
   }
