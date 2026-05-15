@@ -37,6 +37,17 @@ const getActiveDepositTotal = async (client, userId, guildId) => {
   return agg[0]?.total || 0;
 };
 
+const getStockHoldings = async (client, userId, guildId) => {
+  if (!client.userPortfolioCollection) return { totalShares: 0, symbols: [] };
+  const docs = await client.userPortfolioCollection
+    .find({ userId, guildId, shares: { $gt: 0 } })
+    .project({ symbol: 1, shares: 1 })
+    .toArray();
+  const totalShares = docs.reduce((a, b) => a + (b.shares || 0), 0);
+  const symbols = docs.map((d) => d.symbol);
+  return { totalShares, symbols };
+};
+
 const getStatus = async (client, userId, guildId) => {
   const tz = getTz();
   const t = today();
@@ -44,6 +55,7 @@ const getStatus = async (client, userId, guildId) => {
   const coinDoc = await client.userCoinsCollection.findOne({ userId, guildId });
   const walletBalance = coinDoc?.totalCoins || 0;
   const depositTotal = await getActiveDepositTotal(client, userId, guildId);
+  const stocks = await getStockHoldings(client, userId, guildId);
   const totalAssets = walletBalance + depositTotal;
   const threshold = welfareSystem?.balanceThreshold ?? 100;
   const claimedToday = claim?.lastClaimDate === t;
@@ -68,6 +80,9 @@ const getStatus = async (client, userId, guildId) => {
     totalAssets,
     threshold,
     eligibleByBalance: totalAssets <= threshold,
+    hasStocks: stocks.totalShares > 0,
+    stockShares: stocks.totalShares,
+    stockSymbols: stocks.symbols,
     claimedToday,
     streak,
     longestStreak,
@@ -103,6 +118,17 @@ const claim = async (client, userId, guildId, member, username) => {
       depositTotal,
       totalAssets,
       threshold,
+    };
+  }
+
+  // 有持股則視為有資產，不發救濟金
+  const stocks = await getStockHoldings(client, userId, guildId);
+  if (stocks.totalShares > 0) {
+    return {
+      ok: false,
+      reason: "has_stocks",
+      stockShares: stocks.totalShares,
+      stockSymbols: stocks.symbols,
     };
   }
 

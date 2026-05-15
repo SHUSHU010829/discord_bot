@@ -52,8 +52,14 @@ module.exports = {
         })
       );
 
+      // 一個 tick = 15 分鐘；換算成人話讓圖上標題不用露 tick 這個字
+      const minutes = historyPoints * 15;
+      const timeLabel =
+        minutes >= 60
+          ? `${(minutes / 60).toFixed(minutes % 60 === 0 ? 0 : 1)} 小時`
+          : `${minutes} 分鐘`;
       const buf = renderMultiLine(series, {
-        title: `逼逼股市｜近 ${historyPoints} tick 走勢（以開首為基準）`,
+        title: `逼逼股市｜最近 ${timeLabel}各股漲跌`,
       });
       const attachment = new AttachmentBuilder(buf, { name: "stock_market.png" });
 
