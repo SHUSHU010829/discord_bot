@@ -11,17 +11,25 @@
 //   否則 bust = (1 - houseEdge) / (1 - r)，再 floor 至兩位小數
 //
 // 倍率成長函數：
-//   m(t) = exp(growthRate × t_sec)
-//   bust 對應時間：t_bust = ln(bust) / growthRate
+//   遊戲前 WARMUP_MS 是暖機期，倍率固定 1.00x，避免玩家秒按白賺。
+//   暖機期結束後 m(t) = exp(growthRate × (t - warmup)_sec)，直到時間到 bust。
 //   不同 bust 對應不同遊戲時長（短局 ~3s、長局 ~22s），用 log 平滑映射。
 
 const DEFAULT_HOUSE_EDGE = 0.01;
 const MIN_AUTOCASHOUT = 1.01;
 const MAX_AUTOCASHOUT = 1_000_000;
 
-// 3 秒是 hard floor：玩家剛叫出指令就按收手時，留足夠的反應時間避免秒爆。
+// 真的有飛起來的局（bust > 1）：3 秒 hard floor，留玩家反應時間，避免高倍率局秒爆。
 const MIN_DURATION_MS = 3_000;
 const MAX_DURATION_MS = 22_000;
+
+// 暖機期：剛升空時倍率固定 1.00x，這段時間秒按收手只能拿回本，不會白賺。
+// 注意：MIN_DURATION_MS 中前 WARMUP_MS 屬於暖機，剩下的才會開始爬升到 bust。
+const WARMUP_MS = 1_000;
+
+// 抽到 bust=1.00 的「直接爆炸」局，會在 0~INSTANT_BUST_MAX_MS 之間隨機爆掉。
+// 不套用 MIN_DURATION_MS，這樣連暖機期內秒按收手也有機率輸錢。
+const INSTANT_BUST_MAX_MS = 1_500;
 
 function round2(n) {
   return Math.round(n * 100) / 100;
@@ -50,7 +58,9 @@ function bustDurationMs(bust) {
 
 function growthRateFor(bust, durationMs) {
   if (bust <= 1) return 0;
-  return Math.log(bust) / (durationMs / 1000);
+  // 暖機期不算進爬升時間，所以分母要扣掉 WARMUP_MS。
+  const climbMs = Math.max(1, durationMs - WARMUP_MS);
+  return Math.log(bust) / (climbMs / 1000);
 }
 
 function clampAutocashout(x) {
@@ -64,18 +74,22 @@ function startGame({
   bet,
   autocashout = null,
   houseEdge = DEFAULT_HOUSE_EDGE,
-  rng,
+  rng = Math.random,
   now = Date.now(),
 }) {
   const target = autocashout != null ? clampAutocashout(autocashout) : null;
   const bust = drawBust({ houseEdge, rng });
-  const durationMs = bustDurationMs(bust);
+  // bust=1 的直接爆炸局走短隨機窗，其它局照常吃 MIN_DURATION_MS。
+  const durationMs =
+    bust <= 1
+      ? Math.floor(rng() * INSTANT_BUST_MAX_MS)
+      : bustDurationMs(bust);
   const k = growthRateFor(bust, durationMs);
   const autocashoutAt =
     target != null && k > 0
       ? Math.min(
           now + durationMs,
-          now + Math.ceil((Math.log(target) / k) * 1000),
+          now + WARMUP_MS + Math.ceil((Math.log(target) / k) * 1000),
         )
       : null;
   return {
@@ -97,9 +111,12 @@ function startGame({
 
 // 在 `now` 時間點玩家手上看到的倍率（floor 至兩位小數）。
 function multiplierAt(state, now = Date.now()) {
-  const elapsedSec = Math.max(0, (now - state.startedAt) / 1000);
+  const elapsedMs = Math.max(0, now - state.startedAt);
   if (state.growthRate <= 0) return 1.0;
-  const m = Math.exp(state.growthRate * elapsedSec);
+  // 暖機期內倍率固定 1.00x
+  if (elapsedMs < WARMUP_MS) return 1.0;
+  const climbSec = (elapsedMs - WARMUP_MS) / 1000;
+  const m = Math.exp(state.growthRate * climbSec);
   // 飛行中倍率不能超過 bust（時間還沒到的話）
   const capped = Math.min(m, state.bust);
   return Math.max(1.0, floor2(capped));
@@ -173,4 +190,6 @@ module.exports = {
   DEFAULT_HOUSE_EDGE,
   MIN_AUTOCASHOUT,
   MAX_AUTOCASHOUT,
+  WARMUP_MS,
+  INSTANT_BUST_MAX_MS,
 };
