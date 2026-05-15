@@ -31,6 +31,7 @@ const CATEGORY_META = {
   economy: { label: "經濟系統", emoji: "💰", order: 9, blurb: "錢包、轉帳、定期存款、骰寶" },
   casino: { label: "賭場", emoji: "🎰", order: 9.5, blurb: "拉霸、二十一點、HI-LO、樂透 等賭博遊戲，盈虧自負" },
   shop: { label: "商店", emoji: "🛍️", order: 9.7, blurb: "credits 商店：道具、稱號、限時 buff、背包管理" },
+  stock: { label: "股市", emoji: "📈", order: 9.8, blurb: "逼逼股市：報價、買賣、持股、走勢圖（虛擬合成價，手續費 1%）" },
   level: { label: "等級系統", emoji: "🏅", order: 5, blurb: "等級卡、徽章、稱號、排行榜（簽到/補簽卡 仍是獨立指令）" },
   stats: { label: "統計", emoji: "📊", order: 6, blurb: "訊息/語音統計與排行榜" },
   roles: { label: "身份組", emoji: "🎮", order: 7, blurb: "遊戲身份組選單管理" },
