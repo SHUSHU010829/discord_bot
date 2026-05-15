@@ -1,7 +1,7 @@
 // 射龍門核心引擎：純函數，不接觸 DB / Discord。
 //
 // 規則：
-//   - 1 副 52 張，每局重洗
+//   - 2 副 104 張，每局重洗
 //   - 莊家先翻兩張柱（gates）
 //   - 若兩柱「點數相同」(對柱) 或「點數相鄰」(連柱)
 //       → 直接和局退錢，本局結束（玩家不必開槍）
@@ -11,10 +11,10 @@
 //       碰柱 (與任一柱同點) → 派彩 = 0（輸 2× bet 雙倍）
 //   - 為了保證任何結果都付得起，下注時鎖 2×bet（含碰柱保證金）
 //
-// 賠率計算（含房費）：
-//   p_b = 中間張數 / 50
-//   p_o = 外面張數 / 50
-//   p_h = 碰柱張數 / 50
+// 賠率計算（含房費）：依剩餘牌堆即時統計
+//   p_b = 中間張數 / 剩餘張數
+//   p_o = 外面張數 / 剩餘張數
+//   p_h = 碰柱張數 / 剩餘張數
 //   m 解出 p_b·m − p_o − 2·p_h = −houseEdge
 //     ⇒ m = (p_o + 2·p_h − houseEdge) / p_b
 //   floor 至兩位小數，最低 1.01。
@@ -85,7 +85,7 @@ function isAdjacent(gateLow, gateHigh) {
 }
 
 function startGame({ bet, houseEdge = DEFAULT_HOUSE_EDGE }) {
-  let deck = freshShuffledDeck(1);
+  let deck = freshShuffledDeck(2);
   let g1, g2;
   ({ card: g1, deck } = drawOne(deck));
   ({ card: g2, deck } = drawOne(deck));
