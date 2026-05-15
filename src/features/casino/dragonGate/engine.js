@@ -1,35 +1,37 @@
-// 射龍門核心引擎：純函數，不接觸 DB / Discord。
+// 射龍門核心引擎（單人版）：純函數，不接觸 DB / Discord。
 //
 // 規則：
 //   - 2 副 104 張，每局重洗
-//   - 莊家先翻兩張柱（gates）
-//   - 若兩柱「點數相同」(對柱) 或「點數相鄰」(連柱)
-//       → 直接和局退錢，本局結束（玩家不必開槍）
-//   - 否則玩家可選擇「射」開第三張：
-//       中間 (在兩柱點數之間)  → 派彩 = 鎖倉 (2×bet) + bet × 中間倍率
-//       外面 (大於高柱或小於低柱) → 派彩 = bet  （等同輸 1× bet）
-//       碰柱 (與任一柱同點) → 派彩 = 0（輸 2× bet 雙倍）
-//   - 為了保證任何結果都付得起，下注時鎖 2×bet（含碰柱保證金）
+//   - 入場費 ante（預設 50）開局即扣，做為房費，不論結果一律不退
+//   - 莊家翻兩張柱；若「對柱」或「連柱」則紀錄並從同副牌堆繼續重抽，
+//     直到取得「有效柱」（兩柱點數不同且不相鄰）為止
+//   - 取得有效柱後玩家抉擇：
+//       不補 (fold) → 直接結束，僅損失 ante
+//       要補 (bet)  → 玩家指定下注金額 X ∈ [minBet, maxBet]，
+//                      鎖倉 2X 後開第三張
+//   - 第三張：
+//       中間 → 退回 2X + X × 倍率（淨贏 X × 倍率）
+//       外面 → 退回 X（淨輸 X，外加 ante）
+//       碰柱 → 退回 0（淨輸 2X，外加 ante）
 //
-// 賠率計算（含房費）：依剩餘牌堆即時統計
-//   p_b = 中間張數 / 剩餘張數
-//   p_o = 外面張數 / 剩餘張數
-//   p_h = 碰柱張數 / 剩餘張數
-//   m 解出 p_b·m − p_o − 2·p_h = −houseEdge
+// 倍率計算（同原本，依柱牌後剩餘牌堆）：
+//   p_b·m − p_o − 2·p_h = −houseEdge
 //     ⇒ m = (p_o + 2·p_h − houseEdge) / p_b
 //   floor 至兩位小數，最低 1.01。
 //
 // State：
 //   {
-//     bet, lock,                 // 鎖倉 = 2 × bet
-//     status: "playing"|"settled",
-//     deck: string[],            // 剩餘牌堆（已扣兩柱）
-//     gateLow, gateHigh,         // 兩柱（依點數小→大；對柱時 low===high）
-//     thirdCard: string|null,    // 開出的第三張
+//     ante,                           // 入場費（已從玩家餘額扣除）
+//     bet, lock,                      // 補注時設定；lock = 2 × bet
+//     status: "awaitingChoice"|"settled",
+//     deck: string[],                 // 剩餘牌堆
+//     gateLow, gateHigh,              // 最終有效柱（依點數小→大）
+//     pushHistory: Array<{gateLow,gateHigh,reason:"tie"|"adjacent"}>,
+//     thirdCard: string|null,
 //     houseEdge,
-//     multiplier,                // 命中「中間」會拿到的倍率
-//     result: "between"|"outside"|"hitGate"|"push"|null,
-//     payout,                    // 玩家最終取回的金額（含解除鎖倉）
+//     multiplier,                     // 中間命中倍率（淨贏倍數）
+//     result: "fold"|"between"|"outside"|"hitGate"|null,
+//     payout,                         // 玩家最終取回的金額（不含 ante）
 //   }
 
 const { freshShuffledDeck, drawOne, rankOf } = require("../blackjack/deck");
@@ -40,12 +42,21 @@ const RANK_VALUE = {
 };
 
 const DEFAULT_HOUSE_EDGE = 0.05;
+const DEFAULT_ANTE = 50;
+const MAX_REDRAWS = 50;
 
 function valueOf(card) {
   return RANK_VALUE[rankOf(card)];
 }
 
-// 依兩柱與剩餘牌堆，回傳 {between, outside, hit, total} 數量及各情況機率。
+function isTie(g1, g2) {
+  return valueOf(g1) === valueOf(g2);
+}
+
+function isAdjacent(g1, g2) {
+  return Math.abs(valueOf(g1) - valueOf(g2)) === 1;
+}
+
 function classifyDeck(gateLow, gateHigh, deck) {
   const lo = Math.min(valueOf(gateLow), valueOf(gateHigh));
   const hi = Math.max(valueOf(gateLow), valueOf(gateHigh));
@@ -61,7 +72,6 @@ function classifyDeck(gateLow, gateHigh, deck) {
   return { between, outside, hit, total: deck.length };
 }
 
-// 依 EV = -houseEdge 解出「中間」應給的倍率。
 function calcMultiplier(gateLow, gateHigh, deck, houseEdge = DEFAULT_HOUSE_EDGE) {
   const { between, outside, hit, total } = classifyDeck(gateLow, gateHigh, deck);
   if (total <= 0 || between <= 0) return 0;
@@ -74,80 +84,92 @@ function calcMultiplier(gateLow, gateHigh, deck, houseEdge = DEFAULT_HOUSE_EDGE)
   return Math.floor(m * 100) / 100;
 }
 
-// 兩柱是否相同點數（對柱）
-function isTie(gateLow, gateHigh) {
-  return valueOf(gateLow) === valueOf(gateHigh);
-}
-
-// 兩柱是否相鄰（差 1）
-function isAdjacent(gateLow, gateHigh) {
-  return Math.abs(valueOf(gateLow) - valueOf(gateHigh)) === 1;
-}
-
-function startGame({ bet, houseEdge = DEFAULT_HOUSE_EDGE }) {
+function startGame({ ante = DEFAULT_ANTE, houseEdge = DEFAULT_HOUSE_EDGE } = {}) {
   let deck = freshShuffledDeck(2);
-  let g1, g2;
-  ({ card: g1, deck } = drawOne(deck));
-  ({ card: g2, deck } = drawOne(deck));
+  const pushHistory = [];
 
-  // 依點數排序：低柱在左，高柱在右（純展示用；同點時誰先誰後皆可）
+  let g1;
+  let g2;
+  let attempts = 0;
+  // 重抽直到取得有效柱（非對柱、非連柱）。
+  // 理論上 2 副牌 + 12/13 點不衝突的機率夠高，幾乎不會逼近上限。
+  // 為了保險仍加上 MAX_REDRAWS 與 deck 長度檢查。
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    if (deck.length < 3) break;
+    ({ card: g1, deck } = drawOne(deck));
+    ({ card: g2, deck } = drawOne(deck));
+    if (!isTie(g1, g2) && !isAdjacent(g1, g2)) break;
+    pushHistory.push({
+      gateLow: valueOf(g1) <= valueOf(g2) ? g1 : g2,
+      gateHigh: valueOf(g1) <= valueOf(g2) ? g2 : g1,
+      reason: isTie(g1, g2) ? "tie" : "adjacent",
+    });
+    attempts += 1;
+    if (attempts >= MAX_REDRAWS) break;
+  }
+
   const [gateLow, gateHigh] =
     valueOf(g1) <= valueOf(g2) ? [g1, g2] : [g2, g1];
 
-  const lock = bet * 2;
-  const state = {
-    bet,
-    lock,
-    status: "playing",
+  const multiplier = calcMultiplier(gateLow, gateHigh, deck, houseEdge);
+
+  return {
+    ante,
+    bet: 0,
+    lock: 0,
+    status: "awaitingChoice",
     deck,
     gateLow,
     gateHigh,
+    pushHistory,
     thirdCard: null,
     houseEdge,
-    multiplier: 0,
+    multiplier,
     result: null,
     payout: 0,
   };
-
-  // 對柱或連柱：直接和局退錢
-  if (isTie(gateLow, gateHigh) || isAdjacent(gateLow, gateHigh)) {
-    return finalize(state, "push", lock);
-  }
-
-  state.multiplier = calcMultiplier(gateLow, gateHigh, deck, houseEdge);
-  // 倍率算不出來（理論上不會走到，因為對柱／連柱已先 push）→ 也視為和局
-  if (state.multiplier <= 0) {
-    return finalize(state, "push", lock);
-  }
-  return state;
 }
 
-// 玩家「射」一槍
-function shoot(state) {
-  if (state.status !== "playing") return state;
-  const { card: drawn, deck } = drawOne(state.deck);
-  const next = { ...state, deck, thirdCard: drawn };
+// 玩家「不補」：棄權，僅損失 ante。
+function fold(state) {
+  if (state.status !== "awaitingChoice") return state;
+  return { ...state, status: "settled", result: "fold", payout: 0 };
+}
 
+// 玩家「補」：下注 bet 並開第三張結算。
+function shoot(state, bet) {
+  if (state.status !== "awaitingChoice") return state;
+  if (!Number.isInteger(bet) || bet <= 0) {
+    throw new Error("shoot: bet must be a positive integer");
+  }
+
+  const { card: drawn, deck } = drawOne(state.deck);
   const lo = Math.min(valueOf(state.gateLow), valueOf(state.gateHigh));
   const hi = Math.max(valueOf(state.gateLow), valueOf(state.gateHigh));
   const v = valueOf(drawn);
+  const lock = bet * 2;
 
+  let result;
+  let payout;
   if (v === lo || v === hi) {
-    // 碰柱：輸 2×bet（鎖倉全沒）
-    return finalize(next, "hitGate", 0);
+    result = "hitGate";
+    payout = 0;
+  } else if (v > lo && v < hi) {
+    result = "between";
+    const winnings = Math.floor(bet * state.multiplier + 1e-9);
+    payout = lock + winnings;
+  } else {
+    result = "outside";
+    payout = bet;
   }
-  if (v > lo && v < hi) {
-    // 中間：派彩 = 解除鎖倉 + 中間倍率獎金
-    const winnings = Math.floor(state.bet * state.multiplier + 1e-9);
-    return finalize(next, "between", state.lock + winnings);
-  }
-  // 外面：派彩 = bet（解除鎖倉一半 → 等同輸 1×bet）
-  return finalize(next, "outside", state.bet);
-}
 
-function finalize(state, result, payout) {
   return {
     ...state,
+    bet,
+    lock,
+    deck,
+    thirdCard: drawn,
     status: "settled",
     result,
     payout,
@@ -156,6 +178,7 @@ function finalize(state, result, payout) {
 
 module.exports = {
   startGame,
+  fold,
   shoot,
   classifyDeck,
   calcMultiplier,
@@ -164,4 +187,5 @@ module.exports = {
   valueOf,
   RANK_VALUE,
   DEFAULT_HOUSE_EDGE,
+  DEFAULT_ANTE,
 };

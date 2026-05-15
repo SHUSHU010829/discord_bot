@@ -17,15 +17,8 @@ function getDragonGateConfig() {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("射龍門")
-    .setDescription("🐉 開兩柱，第三張射進中間就贏！碰柱賠雙倍。")
+    .setDescription("🐉 入場費 50。看完柱牌再決定要不要補注射第三張！")
     .setContexts(InteractionContextType.Guild)
-    .addIntegerOption((opt) =>
-      opt
-        .setName("下注")
-        .setDescription("下注 credits（會鎖倉 2× 含碰柱保證金）")
-        .setRequired(true)
-        .setMinValue(getDragonGateConfig().minBet ?? 10)
-    )
     .toJSON(),
 
   run: async (client, interaction) => {
@@ -48,22 +41,9 @@ module.exports = {
         return interaction.editReply("🔧 射龍門暫時關閉中！");
       }
 
-      const minBet = cfg.minBet ?? 10;
-      const maxBet = cfg.maxBet ?? 500;
+      const ante = cfg.ante ?? 50;
       const ttlSec = cfg.gameTtlSeconds ?? 300;
       const houseEdge = cfg.houseEdge ?? 0.05;
-
-      const bet = interaction.options.getInteger("下注");
-      if (!Number.isInteger(bet) || bet < minBet) {
-        return interaction.editReply(
-          `下注金額至少需 ${minBet.toLocaleString()} credits。`
-        );
-      }
-      if (bet > maxBet) {
-        return interaction.editReply(
-          `下注金額上限為 ${maxBet.toLocaleString()} credits。`
-        );
-      }
 
       const userId = interaction.user.id;
       const guildId = interaction.guildId;
@@ -71,11 +51,11 @@ module.exports = {
         interaction.member?.displayName || interaction.user.username;
       const member = interaction.member;
 
-      // 同時只能有一局 playing
+      // 同時只能有一局未結算
       const existing = await client.dragonGateGamesCollection.findOne({
         userId,
         guildId,
-        status: "playing",
+        status: { $in: ["awaitingChoice", "playing"] },
       });
       if (existing) {
         return interaction.editReply(
@@ -88,43 +68,44 @@ module.exports = {
         guildId,
       });
       const balance = before?.totalCoins || 0;
-      const lock = bet * 2;
-      if (balance < lock) {
+      if (balance < ante) {
         return interaction.editReply(
-          `💰 餘額不足！射龍門需鎖 2× 下注（${lock.toLocaleString()}）含碰柱保證金，目前 **${balance.toLocaleString()}** credits。`
+          `💰 餘額不足！射龍門入場費 **${ante.toLocaleString()}** credits，目前 **${balance.toLocaleString()}**。`
         );
       }
 
       const gameId = crypto.randomUUID();
 
-      const betResult = await grantCoins(client, {
+      const anteResult = await grantCoins(client, {
         userId,
         guildId,
         username,
         avatarHash: interaction.user.avatar,
-        amount: -lock,
+        amount: -ante,
         source: "bet",
         member,
-        meta: { game: "dragonGate", gameId, bet, lock },
+        meta: { game: "dragonGate", gameId, ante, stage: "ante" },
       });
-      if (!betResult) {
-        return interaction.editReply("🔧 下注失敗，請稍後再試。");
+      if (!anteResult) {
+        return interaction.editReply("🔧 入場費扣款失敗，請稍後再試。");
       }
-      let balanceAfter = betResult.doc?.totalCoins ?? balance - lock;
+      const balanceAfter = anteResult.doc?.totalCoins ?? balance - ante;
 
-      const initial = startGame({ bet, houseEdge });
+      const initial = startGame({ ante, houseEdge });
       const now = new Date();
       const doc = {
         gameId,
         userId,
         guildId,
         username,
+        ante: initial.ante,
         bet: initial.bet,
         lock: initial.lock,
         status: initial.status,
         deck: initial.deck,
         gateLow: initial.gateLow,
         gateHigh: initial.gateHigh,
+        pushHistory: initial.pushHistory,
         thirdCard: initial.thirdCard,
         houseEdge: initial.houseEdge,
         multiplier: initial.multiplier,
@@ -136,26 +117,6 @@ module.exports = {
       };
 
       await client.dragonGateGamesCollection.insertOne(doc);
-
-      // 開局即和局（對柱／連柱）→ 直接退錢結算
-      if (doc.status === "settled" && doc.payout > 0) {
-        const payoutResult = await grantCoins(client, {
-          userId,
-          guildId,
-          username,
-          amount: doc.payout,
-          source: "payout",
-          member,
-          meta: {
-            game: "dragonGate",
-            result: doc.result,
-            gameId,
-            bet,
-            lock: doc.lock,
-          },
-        });
-        balanceAfter = payoutResult?.doc?.totalCoins ?? balanceAfter;
-      }
 
       const payload = await renderMessage(
         { ...doc, gameId },

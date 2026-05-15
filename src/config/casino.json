@@ -40,7 +40,8 @@
     },
     "dragonGate": {
       "enabled": true,
-      "minBet": 10,
+      "ante": 50,
+      "minBet": 50,
       "maxBet": 1000,
       "gameTtlSeconds": 300,
       "houseEdge": 0.05

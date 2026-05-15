@@ -5,8 +5,9 @@ const cron = require("node-cron");
 const { casino } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
 
-// 射龍門中途離場：expiresAt 過了還是 playing → 退回鎖倉（2×bet）。
-// 玩家還沒射就離開不應該被罰，全額退錢即可。
+// 射龍門中途離場：expiresAt 過了還在 awaitingChoice → 退回入場費 ante。
+// 玩家根本還沒決定要不要補，視為不該被罰；ante 全額退還。
+// （已進入 settled 的不會被掃到。）
 // 連續錯誤計數，超過 5 次自動關閉。
 
 let consecutiveErrors = 0;
@@ -18,13 +19,13 @@ async function sweepOnce(client) {
 
   const now = new Date();
   const cursor = client.dragonGateGamesCollection.find({
-    status: "playing",
+    status: { $in: ["awaitingChoice", "playing"] },
     expiresAt: { $lt: now },
   });
 
   while (await cursor.hasNext()) {
     const g = await cursor.next();
-    const refund = g.lock || (g.bet || 0) * 2;
+    const refund = g.ante || 0;
     const resultTag = "abandoned_refund";
 
     if (refund > 0) {
@@ -38,6 +39,7 @@ async function sweepOnce(client) {
           game: "dragonGate",
           result: resultTag,
           gameId: g.gameId,
+          ante: g.ante,
           bet: g.bet,
           lock: g.lock,
         },
@@ -45,7 +47,7 @@ async function sweepOnce(client) {
     }
 
     await client.dragonGateGamesCollection.updateOne(
-      { _id: g._id, status: "playing" },
+      { _id: g._id, status: { $in: ["awaitingChoice", "playing"] } },
       {
         $set: {
           status: "abandoned",

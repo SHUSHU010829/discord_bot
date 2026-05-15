@@ -23,59 +23,56 @@ function formatCard(card) {
 
 function buildButtons(state) {
   const gameId = state.gameId;
-  const playing = state.status === "playing";
+  if (state.status !== "awaitingChoice") return null;
 
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`dg_shoot_${gameId}`)
-      .setLabel(playing ? `射 ×${state.multiplier.toFixed(2)}` : "射")
+      .setCustomId(`dg_bet_${gameId}`)
+      .setLabel(`補（×${(state.multiplier || 0).toFixed(2)}）`)
       .setEmoji("🐉")
-      .setStyle(ButtonStyle.Danger)
-      .setDisabled(!playing)
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`dg_fold_${gameId}`)
+      .setLabel("不補（棄權）")
+      .setEmoji("🏳️")
+      .setStyle(ButtonStyle.Secondary)
   );
 }
 
 function settleHeadline(state) {
-  const total = state.bet * 2;
   switch (state.result) {
     case "between": {
-      const profit = state.payout - total;
+      const profit = state.payout - state.lock;
       return `🎯 **射中龍門！** ＋${profit.toLocaleString()} credits（×${state.multiplier.toFixed(2)}）`;
     }
     case "outside":
       return `💨 **射出柱外！** －${state.bet.toLocaleString()} credits`;
     case "hitGate":
       return `💥 **碰柱！** 賠雙倍 －${(state.bet * 2).toLocaleString()} credits`;
-    case "push":
-      return `🤝 **和局退錢** ${describePush(state)}`;
+    case "fold":
+      return `🏳️ **棄權不補** －${(state.ante || 0).toLocaleString()} credits（入場費）`;
     default:
       return "";
   }
 }
 
-function describePush(state) {
-  if (valueOf(state.gateLow) === valueOf(state.gateHigh)) {
-    return "（對柱）";
-  }
-  if (Math.abs(valueOf(state.gateLow) - valueOf(state.gateHigh)) === 1) {
-    return "（連柱）";
-  }
-  return "";
-}
-
 function renderText(state, { username, balance } = {}) {
-  const isPlaying = state.status === "playing";
+  const awaiting = state.status === "awaitingChoice";
   const handle = username ? `@${username}` : "";
+  const tieCount = state.pushHistory?.length || 0;
 
   const lines = [
-    `🐉 **射龍門** ・ Bet: **${state.bet.toLocaleString()}**${handle ? ` ・ ${handle}` : ""}`,
-    `-# 下注時鎖倉 ${(state.bet * 2).toLocaleString()} credits（含碰柱保證金）`,
-    "─────────────────────",
-    `龍門：[ ${formatCard(state.gateLow)} ] ─── [ ${formatCard(state.gateHigh)} ]`,
-    `點數：${valueOf(state.gateLow)}  ─  ${valueOf(state.gateHigh)}`,
+    `🐉 **射龍門** ・ 入場費 **${(state.ante || 0).toLocaleString()}**${handle ? ` ・ ${handle}` : ""}`,
+    `-# 入場費為房費，不論結果一律不退`,
   ];
+  if (tieCount > 0) {
+    lines.push(`-# 開局重抽 ${tieCount} 次（對柱/連柱）`);
+  }
+  lines.push("─────────────────────");
+  lines.push(`龍門：[ ${formatCard(state.gateLow)} ] ─── [ ${formatCard(state.gateHigh)} ]`);
+  lines.push(`點數：${valueOf(state.gateLow)}  ─  ${valueOf(state.gateHigh)}`);
 
-  if (isPlaying) {
+  if (awaiting) {
     const cls = classifyDeck(state.gateLow, state.gateHigh, state.deck);
     lines.push(
       `機率：中間 ${cls.between}/${cls.total}　外面 ${cls.outside}/${cls.total}　碰柱 ${cls.hit}/${cls.total}`
@@ -83,7 +80,7 @@ function renderText(state, { username, balance } = {}) {
     lines.push(
       `賠率：中間 **×${state.multiplier.toFixed(2)}**　外面 −1×　碰柱 −2×`
     );
-    lines.push("按下 🐉 開第三張！");
+    lines.push("補：下注後開第三張；不補：棄權，損失入場費");
   } else {
     if (state.thirdCard) {
       lines.push(`開牌：[ ${formatCard(state.thirdCard)} ] ＝ ${valueOf(state.thirdCard)}`);
@@ -104,8 +101,8 @@ function buildSettleHeadlineLine(state) {
 }
 
 async function renderMessage(state, { username, balance } = {}) {
-  const components =
-    state.status === "playing" ? [buildButtons(state)] : [];
+  const buttons = buildButtons(state);
+  const components = buttons ? [buttons] : [];
 
   let content = "";
   let files = [];
