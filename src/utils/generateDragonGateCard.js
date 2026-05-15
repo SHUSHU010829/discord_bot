@@ -85,7 +85,7 @@ function renderHiddenCard() {
 function renderEmptySlot() {
   return `
     <div style="display:flex;width:${CARD_DIMS.w}px;height:${CARD_DIMS.h}px;background:${PALETTE.card};border:3px dashed ${PALETTE.muted};box-sizing:border-box;margin:0 8px;align-items:center;justify-content:center;">
-      <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:22px;color:${PALETTE.muted};letter-spacing:4px;line-height:1;padding-right:4px;">和 局</div>
+      <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:22px;color:${PALETTE.muted};letter-spacing:4px;line-height:1;padding-right:4px;">棄 權</div>
     </div>
   `;
 }
@@ -95,21 +95,15 @@ function pickAccent(state) {
   switch (state.result) {
     case "between":
       return PALETTE.gold;
-    case "push":
-      return PALETTE.neutral;
     case "outside":
       return PALETTE.muted;
     case "hitGate":
       return PALETTE.red;
+    case "fold":
+      return PALETTE.neutral;
     default:
       return PALETTE.muted;
   }
-}
-
-function describePush(state) {
-  if (valueOf(state.gateLow) === valueOf(state.gateHigh)) return "對柱";
-  if (Math.abs(valueOf(state.gateLow) - valueOf(state.gateHigh)) === 1) return "連柱";
-  return "和局";
 }
 
 function buildResultLabel(state) {
@@ -121,8 +115,8 @@ function buildResultLabel(state) {
       return { text: "射出柱外", color: PALETTE.muted };
     case "hitGate":
       return { text: "碰柱賠雙", color: PALETTE.red };
-    case "push":
-      return { text: `${describePush(state)}退錢`, color: PALETTE.neutral };
+    case "fold":
+      return { text: "棄權不補", color: PALETTE.neutral };
     default:
       return null;
   }
@@ -155,7 +149,7 @@ function renderProbsBlock(state) {
 
 function buildMarkup(data) {
   const { username, state, balance } = data;
-  const isPlaying = state.status === "playing";
+  const awaiting = state.status === "awaitingChoice";
   const accent = pickAccent(state);
   const resultLabel = buildResultLabel(state);
   const handle = `@${(username || "shushu").toUpperCase()}`;
@@ -163,9 +157,9 @@ function buildMarkup(data) {
   const lowVal = valueOf(state.gateLow);
   const highVal = valueOf(state.gateHigh);
 
-  // 中央第三張：playing → ?；settled 且有 thirdCard → 該牌；push 無第三張 → 空槽
+  // 中央第三張：awaitingChoice → ?；有 thirdCard → 該牌；fold → 空槽
   let middleSlot;
-  if (isPlaying) {
+  if (awaiting) {
     middleSlot = renderHiddenCard();
   } else if (state.thirdCard) {
     middleSlot = renderCard(state.thirdCard);
@@ -182,7 +176,7 @@ function buildMarkup(data) {
         <div style="display:flex;margin-top:10px;font-family:'SpaceMono';font-size:18px;letter-spacing:2px;color:${PALETTE.ink};line-height:1;padding-right:2px;">${lowVal}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:center;margin:0 8px;">
-        <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:16px;letter-spacing:6px;color:${PALETTE.muted};line-height:1;padding-right:6px;">${isPlaying ? "第三張" : (state.thirdCard ? "開牌" : "—")}</div>
+        <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:16px;letter-spacing:6px;color:${PALETTE.muted};line-height:1;padding-right:6px;">${awaiting ? "第三張" : (state.thirdCard ? "開牌" : "—")}</div>
         <div style="display:flex;margin-top:10px;">${middleSlot}</div>
         <div style="display:flex;margin-top:10px;font-family:'SpaceMono';font-size:18px;letter-spacing:2px;color:${PALETTE.ink};line-height:1;padding-right:2px;">${state.thirdCard ? valueOf(state.thirdCard) : "?"}</div>
       </div>
@@ -194,8 +188,8 @@ function buildMarkup(data) {
     </div>
   `;
 
-  // 機率 / 賠率區（playing 才顯示）
-  const probsBlock = isPlaying && state.deck && state.deck.length > 0
+  // 機率 / 賠率區（awaitingChoice 才顯示）
+  const probsBlock = awaiting && state.deck && state.deck.length > 0
     ? renderProbsBlock(state)
     : "";
 
@@ -203,7 +197,7 @@ function buildMarkup(data) {
   let settleAmount = 0;
   let settleAmountPrefix = "";
   if (state.result === "between") {
-    const profit = (state.payout || 0) - state.bet * 2;
+    const profit = (state.payout || 0) - (state.lock || state.bet * 2);
     settleAmount = profit;
     settleAmountPrefix = "+";
   } else if (state.result === "outside") {
@@ -212,9 +206,9 @@ function buildMarkup(data) {
   } else if (state.result === "hitGate") {
     settleAmount = state.bet * 2;
     settleAmountPrefix = "−";
-  } else if (state.result === "push") {
-    settleAmount = state.bet * 2;
-    settleAmountPrefix = "退回 ";
+  } else if (state.result === "fold") {
+    settleAmount = state.ante || 0;
+    settleAmountPrefix = "−";
   }
 
   const resultBlock = resultLabel
@@ -233,7 +227,7 @@ function buildMarkup(data) {
     `
     : `
       <div style="display:flex;flex-direction:column;align-items:center;width:100%;margin-top:18px;">
-        <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:20px;color:${PALETTE.muted};letter-spacing:6px;line-height:1;padding-right:6px;">按下 🐉 開第三張，落在兩柱之間就贏</div>
+        <div style="display:flex;font-family:'NotoSansTC';font-weight:500;font-size:20px;color:${PALETTE.muted};letter-spacing:6px;line-height:1;padding-right:6px;">補：下注後開第三張　不補：棄權損失入場費</div>
       </div>
     `;
 
@@ -263,12 +257,12 @@ function buildMarkup(data) {
 
         <div style="display:flex;width:100%;justify-content:space-between;align-items:center;margin-top:auto;padding-top:20px;border-top:2px dashed ${PALETTE.muted};">
           <div style="display:flex;align-items:flex-end;">
-            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${PALETTE.muted};line-height:1;padding-right:5px;">BET</div>
-            <div style="display:flex;margin-left:7px;font-family:'NotoSansTC';font-weight:900;font-size:22px;color:${PALETTE.ink};line-height:1;">${state.bet.toLocaleString()}</div>
+            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${PALETTE.muted};line-height:1;padding-right:5px;">ANTE</div>
+            <div style="display:flex;margin-left:7px;font-family:'NotoSansTC';font-weight:900;font-size:22px;color:${PALETTE.ink};line-height:1;">${(state.ante || 0).toLocaleString()}</div>
           </div>
           <div style="display:flex;align-items:flex-end;">
-            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${PALETTE.muted};line-height:1;padding-right:5px;">LOCK</div>
-            <div style="display:flex;margin-left:7px;font-family:'NotoSansTC';font-weight:900;font-size:22px;color:${PALETTE.ink};line-height:1;">${(state.bet * 2).toLocaleString()}</div>
+            <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${PALETTE.muted};line-height:1;padding-right:5px;">BET</div>
+            <div style="display:flex;margin-left:7px;font-family:'NotoSansTC';font-weight:900;font-size:22px;color:${PALETTE.ink};line-height:1;">${(state.bet || 0).toLocaleString()}</div>
           </div>
           <div style="display:flex;align-items:flex-end;">
             <div style="display:flex;font-family:'SpaceMono';font-size:13px;letter-spacing:5px;color:${PALETTE.muted};line-height:1;padding-right:5px;">MULT</div>
