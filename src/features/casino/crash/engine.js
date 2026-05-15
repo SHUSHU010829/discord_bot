@@ -1,96 +1,175 @@
 // Crash / 火箭 核心引擎：純函數，不接觸 DB / Discord。
 //
-// 規則：
-//   - 玩家下注 bet，並可指定自動收手倍率 autocashout (≥ 1.01)
-//   - 系統用 provably-fair 風格的分布抽出當局 bust 倍率：
-//       r ~ Uniform(0, 1)
-//       若 r < houseEdge → bust = 1.00x（莊家通吃，代表房費）
-//       否則 bust = (1 - houseEdge) / (1 - r)，再 floor 至兩位小數
-//     在此分布下，玩家以倍率 m 收手的中獎機率 = (1-edge)/m，
-//     期望淨值 = bet × m × (1-edge)/m − bet = −bet × edge。
+// 互動式版本：
+//   - 玩家下注後遊戲進入 "playing" 狀態，倍率隨時間上升直到 bust。
+//   - 玩家可隨時按「收手」鎖定當前倍率派彩；按晚了就跟著爆炸。
+//   - 也可預設自動收手倍率，達到後系統自動結算。
 //
-//   - 若 autocashout < bust  → 玩家成功收手，payout = floor(bet × autocashout)
-//     若 autocashout ≥ bust  → 火箭先爆炸，payout = 0
+// Bust 抽法（provably-fair 風格）：
+//   r ~ Uniform(0, 1)
+//   若 r < houseEdge → bust = 1.00x（直接爆炸）
+//   否則 bust = (1 - houseEdge) / (1 - r)，再 floor 至兩位小數
 //
-// State：
-//   {
-//     bet, autocashout, houseEdge,
-//     bust,                              // 當局爆炸倍率（≥ 1.00）
-//     cashoutAt,                         // 玩家最後收手的倍率（贏時 = autocashout、輸時 = null）
-//     status: "settled",
-//     result: "cashout" | "crashed",
-//     payout,                            // 最終派彩（含本金）；輸 = 0
-//   }
+// 倍率成長函數：
+//   m(t) = exp(growthRate × t_sec)
+//   bust 對應時間：t_bust = ln(bust) / growthRate
+//   不同 bust 對應不同遊戲時長（短局 ~3s、長局 ~22s），用 log 平滑映射。
 
 const DEFAULT_HOUSE_EDGE = 0.01;
-const DEFAULT_AUTOCASHOUT = 2.0;
 const MIN_AUTOCASHOUT = 1.01;
-const MAX_AUTOCASHOUT = 1_000_000; // 任意上限；實際幾乎打不到
+const MAX_AUTOCASHOUT = 1_000_000;
+
+const MIN_DURATION_MS = 3_000;
+const MAX_DURATION_MS = 22_000;
 
 function round2(n) {
   return Math.round(n * 100) / 100;
 }
-
 function floor2(n) {
   return Math.floor(n * 100) / 100;
 }
 
-// 抽出當局 bust 倍率。可注入 rng 方便測試。
 function drawBust({ houseEdge = DEFAULT_HOUSE_EDGE, rng = Math.random } = {}) {
   const edge = Math.max(0, Math.min(0.5, houseEdge));
-  // r 不能恰好 0（避免 div by 0）
   let r = rng();
   if (!Number.isFinite(r) || r <= 0) r = 1e-12;
   if (r >= 1) r = 1 - 1e-12;
-
-  if (r < edge) return 1.0; // 直接爆炸（莊家通吃）
+  if (r < edge) return 1.0;
   const raw = (1 - edge) / (1 - r);
-  // floor 到 2 位小數，最低 1.00
   return Math.max(1.0, floor2(raw));
 }
 
-function resolveGame({
-  bet,
-  autocashout = DEFAULT_AUTOCASHOUT,
-  houseEdge = DEFAULT_HOUSE_EDGE,
-  rng,
-}) {
-  const target = clampAutocashout(autocashout);
-  const bust = drawBust({ houseEdge, rng });
+// bust 越大遊戲越久；但要避免低 bust 一閃而過、高 bust 拖太久。
+function bustDurationMs(bust) {
+  const safeBust = Math.max(1.01, bust);
+  const sec = 3 * Math.log2(safeBust + 1); // bust=1.01→~3s, 2→4.75s, 10→10.4s, 100→20s
+  const ms = Math.round(sec * 1000);
+  return Math.max(MIN_DURATION_MS, Math.min(MAX_DURATION_MS, ms));
+}
 
-  // autocashout ≤ bust 算贏。bust 已 floor 到兩位小數，
-  // 用 ≤ 才能讓 EV = -bet × houseEdge 對齊（嚴格 < 會額外吃半個 tick 的房費）。
-  const won = target <= bust;
-  const cashoutAt = won ? target : null;
-  const payout = won ? Math.floor(bet * target + 1e-9) : 0;
-
-  return {
-    bet,
-    autocashout: target,
-    houseEdge,
-    bust,
-    cashoutAt,
-    status: "settled",
-    result: won ? "cashout" : "crashed",
-    payout,
-  };
+function growthRateFor(bust, durationMs) {
+  if (bust <= 1) return 0;
+  return Math.log(bust) / (durationMs / 1000);
 }
 
 function clampAutocashout(x) {
-  if (typeof x !== "number" || !Number.isFinite(x)) return DEFAULT_AUTOCASHOUT;
+  if (typeof x !== "number" || !Number.isFinite(x)) return null;
   if (x < MIN_AUTOCASHOUT) return MIN_AUTOCASHOUT;
   if (x > MAX_AUTOCASHOUT) return MAX_AUTOCASHOUT;
   return round2(x);
 }
 
+function startGame({
+  bet,
+  autocashout = null,
+  houseEdge = DEFAULT_HOUSE_EDGE,
+  rng,
+  now = Date.now(),
+}) {
+  const target = autocashout != null ? clampAutocashout(autocashout) : null;
+  const bust = drawBust({ houseEdge, rng });
+  const durationMs = bustDurationMs(bust);
+  const k = growthRateFor(bust, durationMs);
+  const autocashoutAt =
+    target != null && k > 0
+      ? Math.min(
+          now + durationMs,
+          now + Math.ceil((Math.log(target) / k) * 1000),
+        )
+      : null;
+  return {
+    bet,
+    autocashout: target,
+    houseEdge,
+    bust,
+    durationMs,
+    growthRate: k,
+    startedAt: now,
+    bustAt: now + durationMs,
+    autocashoutAt,
+    status: "playing",
+    cashoutAt: null,
+    result: null,
+    payout: 0,
+  };
+}
+
+// 在 `now` 時間點玩家手上看到的倍率（floor 至兩位小數）。
+function multiplierAt(state, now = Date.now()) {
+  const elapsedSec = Math.max(0, (now - state.startedAt) / 1000);
+  if (state.growthRate <= 0) return 1.0;
+  const m = Math.exp(state.growthRate * elapsedSec);
+  // 飛行中倍率不能超過 bust（時間還沒到的話）
+  const capped = Math.min(m, state.bust);
+  return Math.max(1.0, floor2(capped));
+}
+
+// 嘗試手動收手。若已過 bust 時間則 null（call site 用 DB CAS 才是真正的鎖定）。
+function settleCashout(state, now = Date.now()) {
+  if (state.status !== "playing") return null;
+  if (now >= state.bustAt) return null;
+  const m = multiplierAt(state, now);
+  return {
+    ...state,
+    status: "settled",
+    result: "cashout",
+    cashoutAt: m,
+    payout: Math.floor(state.bet * m + 1e-9),
+  };
+}
+
+// 自動收手結算（系統定時 / 重啟修復都用同一條路徑）。
+function settleAutoCashout(state) {
+  if (state.status !== "playing") return null;
+  if (state.autocashout == null) return null;
+  const m = round2(state.autocashout);
+  return {
+    ...state,
+    status: "settled",
+    result: "cashout",
+    cashoutAt: m,
+    payout: Math.floor(state.bet * m + 1e-9),
+  };
+}
+
+function settleCrashed(state) {
+  return {
+    ...state,
+    status: "settled",
+    result: "crashed",
+    cashoutAt: null,
+    payout: 0,
+  };
+}
+
+// 給離線重啟用：以遊戲時間軸跑完一輪後該得到的結果。
+//   有 autocashout 且 autocashoutAt < bustAt → 視為自動收手成功
+//   否則 → 視為爆炸
+function settleRetroactive(state) {
+  if (
+    state.autocashout != null &&
+    state.autocashoutAt != null &&
+    state.autocashoutAt < state.bustAt
+  ) {
+    return settleAutoCashout(state);
+  }
+  return settleCrashed(state);
+}
+
 module.exports = {
   drawBust,
-  resolveGame,
+  startGame,
+  settleCashout,
+  settleAutoCashout,
+  settleCrashed,
+  settleRetroactive,
+  multiplierAt,
   clampAutocashout,
+  bustDurationMs,
+  growthRateFor,
   round2,
   floor2,
   DEFAULT_HOUSE_EDGE,
-  DEFAULT_AUTOCASHOUT,
   MIN_AUTOCASHOUT,
   MAX_AUTOCASHOUT,
 };

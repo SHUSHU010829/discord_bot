@@ -310,18 +310,26 @@ module.exports = async (client) => {
         { expireAfterSeconds: 30 * 24 * 60 * 60, name: "hl_ttl_30d" }
       );
 
-      // 火箭對局紀錄索引：每筆一局，純歷史 + 90 天 TTL
+      // 火箭對局索引：邏輯與 hilo 相同，同 guild 同人同時只能有一局 playing
       await crashGamesCollection.createIndex(
         { gameId: 1 },
         { unique: true, name: "uniq_crash_gameId" }
+      );
+      await crashGamesCollection.createIndex(
+        { userId: 1, guildId: 1, status: 1 },
+        { name: "crash_user_guild_status" }
+      );
+      await crashGamesCollection.createIndex(
+        { status: 1, bustAt: 1 },
+        { name: "crash_status_bust" }
       );
       await crashGamesCollection.createIndex(
         { userId: 1, guildId: 1, createdAt: -1 },
         { name: "crash_user_guild_time" }
       );
       await crashGamesCollection.createIndex(
-        { createdAt: 1 },
-        { expireAfterSeconds: 90 * 24 * 60 * 60, name: "crash_ttl_90d" }
+        { updatedAt: 1 },
+        { expireAfterSeconds: 30 * 24 * 60 * 60, name: "crash_ttl_30d" }
       );
 
       // 射龍門對局索引：每位玩家同 guild 同時只能有一局 playing
