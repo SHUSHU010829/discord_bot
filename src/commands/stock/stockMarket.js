@@ -59,7 +59,7 @@ module.exports = {
           ? `${(minutes / 60).toFixed(minutes % 60 === 0 ? 0 : 1)} 小時`
           : `${minutes} 分鐘`;
       const buf = renderMultiLine(series, {
-        title: `逼逼股市｜最近 ${timeLabel}各股漲跌（以最早一筆為起點）`,
+        title: `逼逼股市｜最近 ${timeLabel}各股漲跌`,
       });
       const attachment = new AttachmentBuilder(buf, { name: "stock_market.png" });
 
