@@ -42,8 +42,9 @@ function renderPlayingText(state, { username, balance } = {}) {
   const big = `## 🚀 火箭升空中... ×${m.toFixed(2)}`;
   const meta = `Bet **${state.bet.toLocaleString()}**${handle ? ` ・ ${handle}` : ""}${target}${tail}`;
   const hint = "按下「💰 收手」鎖定當下倍率，慢一步火箭就炸了！";
+  const note = "⚠️ DC 訊息更新太快會被限流，畫面上的倍率每隔幾秒才會跳一次，實際數字以伺服器為準（你按下去那一刻的倍率才是真的）";
 
-  return `${big}\n${meta}\n${hint}`;
+  return `${big}\n${meta}\n${hint}\n${note}`;
 }
 
 function settleHeadline(state) {
