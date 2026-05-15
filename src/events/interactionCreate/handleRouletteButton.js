@@ -1,14 +1,10 @@
 const {
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
-  ActionRowBuilder,
   AttachmentBuilder,
   MessageFlags,
 } = require("discord.js");
 
 const grantCoins = require('../../features/economy/grantCoins');
-const { BET_TYPES, validateInsideBet, isOutside } = require('../../features/casino/roulette/numbers');
+const { BET_TYPES } = require('../../features/casino/roulette/numbers');
 const generateRouletteGif = require('../../utils/generateRouletteGif');
 const { spinWheel, settle, totalWagered } = require('../../features/casino/roulette/engine');
 const { buildBettingRows, buildStatusContent } = require('../../commands/casino/roulette');
@@ -25,97 +21,39 @@ function resultEmoji(n) {
 
 module.exports = async (client, interaction) => {
   try {
-    if (!interaction.isButton() && !interaction.isModalSubmit()) return;
+    if (!interaction.isButton()) return;
     const id = interaction.customId;
     if (!id?.startsWith('rl_')) return;
     if (!client.rouletteGamesCollection) return;
 
     // 解析 customId：
     // rl_outside_<betType>_<gameId>
-    // rl_inside_<gameId>
     // rl_confirm_<gameId>
     // rl_cancel_<gameId>
-    // rl_modal_straight_<gameId>  (Modal submit)
     const parts = id.split('_');
-    const action = parts[1]; // outside / inside / confirm / cancel / modal
+    const action = parts[1]; // outside / confirm / cancel
 
     // UUID 不含底線，所以 parts 最後一個一定是 gameId
     const gameId = parts[parts.length - 1];
 
-    // 速率限制：擋連點。Modal submit 不限流（互動本身已是後續事件）
-    if (interaction.isButton()) {
-      const rl = consume(interaction.user.id, 'btn:roulette', {
-        windowMs: 1000,
-        max: 1,
-      });
-      if (!rl.allowed) {
-        try {
-          await interaction.reply({
-            content: `⏳ 點太快了，等 ${Math.ceil(rl.retryAfterMs / 1000)} 秒。`,
-            flags: MessageFlags.Ephemeral,
-          });
-        } catch (_) { /* noop */ }
-        return;
-      }
-    }
-
-    // ── 內圍：開 Modal（必須是 initial response，不能先 defer） ─────
-    // 先處理，避免 DB 查詢吃掉 3 秒 token
-    if (action === 'inside' && interaction.isButton()) {
-      const modal = new ModalBuilder()
-        .setCustomId(`rl_modal_straight_${gameId}`)
-        .setTitle('內圍押注');
-
-      const typeInput = new TextInputBuilder()
-        .setCustomId('bet_type')
-        .setLabel('押法（straight/split/street/corner/line/basket）')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('例：straight')
-        .setRequired(true);
-
-      const numsInput = new TextInputBuilder()
-        .setCustomId('bet_nums')
-        .setLabel('號碼（街押/角押/雙街填起始號）')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('例：17  或  1,2  或  1')
-        .setRequired(true);
-
-      const amountInput = new TextInputBuilder()
-        .setCustomId('bet_amount')
-        .setLabel('下注金額')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('例：100')
-        .setRequired(true);
-
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(typeInput),
-        new ActionRowBuilder().addComponents(numsInput),
-        new ActionRowBuilder().addComponents(amountInput),
-      );
-
+    // 速率限制：擋連點
+    const rl = consume(interaction.user.id, 'btn:roulette', {
+      windowMs: 1000,
+      max: 1,
+    });
+    if (!rl.allowed) {
       try {
-        await interaction.showModal(modal);
-      } catch (modalErr) {
-        if (modalErr?.code === 10062) {
-          logger.warn(
-            { source: "roulette-button", gameId },
-            "互動已逾期,無法 showModal"
-          );
-          trackError("roulette-button", modalErr, { gameId, reason: "expired" });
-          return;
-        }
-        throw modalErr;
-      }
+        await interaction.reply({
+          content: `⏳ 點太快了，等 ${Math.ceil(rl.retryAfterMs / 1000)} 秒。`,
+          flags: MessageFlags.Ephemeral,
+        });
+      } catch (_) { /* noop */ }
       return;
     }
 
-    // 其他互動先 defer，避免 DB 查詢 + 驗證讓 3 秒 token 過期觸發 10062
+    // 先 defer，避免 DB 查詢讓 3 秒 token 過期觸發 10062
     try {
-      if (interaction.isButton()) {
-        await interaction.deferUpdate();
-      } else if (interaction.isModalSubmit()) {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-      }
+      await interaction.deferUpdate();
     } catch (deferErr) {
       if (deferErr?.code === 10062) {
         logger.warn(
@@ -139,9 +77,9 @@ module.exports = async (client, interaction) => {
       return interaction.followUp({ content: '🎰 這局已結束或逾時。', flags: MessageFlags.Ephemeral });
     }
 
-    // ── 外圍按鈕 ───────────────────────────────────────────
-    if (action === 'outside' && interaction.isButton()) {
-      // rl_outside_<betType>_<gameId> → betType = parts[2]（可能是 red/black/col1/dozen1 等）
+    // ── 押注按鈕 ───────────────────────────────────────────
+    if (action === 'outside') {
+      // rl_outside_<betType>_<gameId> → betType = parts[2]
       const betType = `outside_${parts[2]}`;
       const def = BET_TYPES[betType];
       if (!def) return interaction.followUp({ content: '❌ 未知押法', flags: MessageFlags.Ephemeral });
@@ -151,7 +89,7 @@ module.exports = async (client, interaction) => {
       const amount = Math.floor(remaining / 3);
 
       if (amount <= 0) {
-        return interaction.followUp({ content: '💰 籌碼不足，無法繼續外圍押注。', flags: MessageFlags.Ephemeral });
+        return interaction.followUp({ content: '💰 籌碼不足。', flags: MessageFlags.Ephemeral });
       }
 
       const newBet = { type: betType, amount, numbers: def.numbers };
@@ -170,52 +108,8 @@ module.exports = async (client, interaction) => {
       return;
     }
 
-    // ── Modal Submit ────────────────────────────────────────
-    if (action === 'modal' && interaction.isModalSubmit()) {
-      const betType = interaction.fields.getTextInputValue('bet_type').trim().toLowerCase();
-      const rawNums = interaction.fields.getTextInputValue('bet_nums');
-      const rawAmount = interaction.fields.getTextInputValue('bet_amount');
-      const amount = parseInt(rawAmount, 10);
-
-      const def = BET_TYPES[betType];
-      if (!def || isOutside(betType)) {
-        return interaction.editReply({ content: `❌ 無效押法「${betType}」` });
-      }
-      if (!Number.isInteger(amount) || amount <= 0) {
-        return interaction.editReply({ content: '❌ 金額格式錯誤，請填正整數' });
-      }
-
-      const wagered = totalWagered(game.bets);
-      const remaining = game.totalBudget - wagered;
-      if (amount > remaining) {
-        return interaction.editReply({
-          content: `❌ 剩餘籌碼不足（剩 **${remaining.toLocaleString()}**，下注 **${amount.toLocaleString()}**）`,
-        });
-      }
-
-      let numbers;
-      if (betType === 'basket') {
-        numbers = BET_TYPES.basket.numbers;
-      } else {
-        const v = validateInsideBet(betType, rawNums);
-        if (!v.ok) return interaction.editReply({ content: `❌ ${v.error}` });
-        numbers = v.numbers;
-      }
-
-      const newBet = { type: betType, amount, numbers };
-      await client.rouletteGamesCollection.updateOne(
-        { _id: game._id, status: 'betting' },
-        { $push: { bets: newBet }, $set: { updatedAt: new Date() } }
-      );
-
-      await interaction.editReply({
-        content: `✅ 已加入 **${def.label}** ${amount.toLocaleString()} credits（號碼：${numbers.join(', ')}）`,
-      });
-      return;
-    }
-
-    // ── 確認下注 → Spin ─────────────────────────────────────
-    if (action === 'confirm' && interaction.isButton()) {
+    // ── 開轉 ─────────────────────────────────────
+    if (action === 'confirm') {
       if (game.bets.length === 0) {
         return interaction.followUp({ content: '❌ 還沒有任何押注！', flags: MessageFlags.Ephemeral });
       }
@@ -278,11 +172,9 @@ module.exports = async (client, interaction) => {
         : netResult.toLocaleString();
 
       const textContent =
-        `🎰 **開出：${result}** ${resultEmoji(result)}\n\n` +
+        `🎰 **${result}** ${resultEmoji(result)}\n\n` +
         `${winLines}\n\n` +
-        `淨利：**${netStr}** credits　` +
-        (refund > 0 ? `退回未押：**${refund.toLocaleString()}**　` : '') +
-        `餘額：**${balanceAfter.toLocaleString()}**`;
+        `淨利 **${netStr}**　餘額 **${balanceAfter.toLocaleString()}**`;
 
       // 生成 GIF（失敗不影響派彩，降級為純文字）
       let gifAttachment = null;
@@ -313,7 +205,7 @@ module.exports = async (client, interaction) => {
     }
 
     // ── 取消 ────────────────────────────────────────────────
-    if (action === 'cancel' && interaction.isButton()) {
+    if (action === 'cancel') {
       // 用 status 條件防 race（cron 同時掃不會雙退）
       const updated = await client.rouletteGamesCollection.findOneAndUpdate(
         { _id: game._id, status: 'betting' },
@@ -321,7 +213,7 @@ module.exports = async (client, interaction) => {
       );
       if (!updated) {
         // 已被 cron 搶先取消
-        await interaction.editReply({ content: '🎰 已取消，籌碼全額退回。', components: [] });
+        await interaction.editReply({ content: '🎰 已取消，籌碼退回。', components: [] });
         return;
       }
 
@@ -334,7 +226,7 @@ module.exports = async (client, interaction) => {
         meta: { game: 'roulette', gameId, reason: 'cancelled' },
       });
 
-      await interaction.editReply({ content: '🎰 已取消，籌碼全額退回。', components: [] });
+      await interaction.editReply({ content: '🎰 已取消，籌碼退回。', components: [] });
     }
     trackSuccess("roulette-button");
   } catch (err) {

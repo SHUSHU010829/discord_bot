@@ -21,45 +21,38 @@ function unitAmount(remaining) {
   return Math.floor(remaining / 3);
 }
 
-/** 外圍及操作按鈕列 */
 function buildBettingRows(gameId, remainingBudget) {
-  const unitDisabled = unitAmount(remainingBudget) <= 0;
-  const budgetEmpty = remainingBudget <= 0;
+  const disabled = unitAmount(remainingBudget) <= 0;
 
-  const unitBtn = (type, label, style = ButtonStyle.Secondary) =>
+  const btn = (type, label, style = ButtonStyle.Secondary) =>
     new ButtonBuilder()
       .setCustomId(`rl_outside_${type}_${gameId}`)
       .setLabel(label)
       .setStyle(style)
-      .setDisabled(unitDisabled);
+      .setDisabled(disabled);
 
   const row1 = new ActionRowBuilder().addComponents(
-    unitBtn('red',   '🔴 紅色', ButtonStyle.Danger),
-    unitBtn('black', '⚫ 黑色'),
-    unitBtn('odd',   '奇數'),
-    unitBtn('even',  '偶數'),
-    unitBtn('low',   '1–18'),
+    btn('red',   '🔴 紅', ButtonStyle.Danger),
+    btn('black', '⚫ 黑'),
+    btn('odd',   '奇'),
+    btn('even',  '偶'),
   );
   const row2 = new ActionRowBuilder().addComponents(
-    unitBtn('high',   '19–36'),
-    unitBtn('dozen1', '第一打'),
-    unitBtn('dozen2', '第二打'),
-    unitBtn('dozen3', '第三打'),
+    btn('low',  '1–18'),
+    btn('high', '19–36'),
   );
   const row3 = new ActionRowBuilder().addComponents(
-    unitBtn('col1', '第一列'),
-    unitBtn('col2', '第二列'),
-    unitBtn('col3', '第三列'),
-    new ButtonBuilder()
-      .setCustomId(`rl_inside_${gameId}`)
-      .setLabel('🎯 內圍押注')
-      .setStyle(ButtonStyle.Primary)
-      .setDisabled(budgetEmpty),
+    btn('dozen1', '第一打'),
+    btn('dozen2', '第二打'),
+    btn('dozen3', '第三打'),
   );
   const row4 = new ActionRowBuilder().addComponents(
+    btn('col1', '第一列'),
+    btn('col2', '第二列'),
+    btn('col3', '第三列'),
     new ButtonBuilder()
       .setCustomId(`rl_confirm_${gameId}`)
-      .setLabel('✅ 確認下注')
+      .setLabel('✅ 開轉')
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(`rl_cancel_${gameId}`)
@@ -76,25 +69,23 @@ function buildStatusContent(game) {
   const unit = unitAmount(remaining);
 
   const betLines = game.bets.length === 0
-    ? '（尚未押注）'
+    ? '_尚未押注_'
     : game.bets.map(b => {
         const def = BET_TYPES[b.type];
-        return `・${def?.label ?? b.type} — **${b.amount.toLocaleString()}** credits (x${def?.payout ?? '?'})`;
+        return `・${def?.label ?? b.type} **${b.amount.toLocaleString()}** (x${def?.payout ?? '?'})`;
       }).join('\n');
 
   return (
-    `🎰 **歐式輪盤**\n` +
-    `籌碼：**${game.totalBudget.toLocaleString()}** ・ 已押：**${wagered.toLocaleString()}** ・ 剩餘：**${remaining.toLocaleString()}**\n` +
-    `每次外圍押法下注單位：**${unit.toLocaleString()}**\n\n` +
-    `**目前押注：**\n${betLines}\n\n` +
-    `-# 90 秒內確認，逾時自動退款`
+    `🎰 **輪盤**　剩 **${remaining.toLocaleString()}** / ${game.totalBudget.toLocaleString()}　每押 **${unit.toLocaleString()}**\n\n` +
+    `${betLines}\n\n` +
+    `-# 90 秒未開轉自動退款`
   );
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('輪盤')
-    .setDescription('歐式輪盤，多押法組合 🎰')
+    .setDescription('輪盤 🎰 押紅黑、奇偶、大小、打、列')
     .setContexts(InteractionContextType.Guild)
     .addIntegerOption(opt =>
       opt.setName('金額')
@@ -129,7 +120,7 @@ module.exports = {
 
       if (!allIn && (!Number.isInteger(budgetInput) || budgetInput < minBudget)) {
         return interaction.editReply(
-          `投入籌碼總額至少需 ${minBudget.toLocaleString()} credits（或勾選梭哈）。`
+          `金額至少 ${minBudget.toLocaleString()} credits（或勾選梭哈）`
         );
       }
 
@@ -138,7 +129,7 @@ module.exports = {
         userId, guildId, status: 'betting',
       });
       if (existing) {
-        return interaction.editReply('🎰 你還有一局輪盤在押注中！先完成或取消再開新局。');
+        return interaction.editReply('🎰 你還有一局在進行中！');
       }
 
       // 餘額檢查
