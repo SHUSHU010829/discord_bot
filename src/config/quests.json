@@ -40,6 +40,13 @@
         "description": "完成任意賭博遊戲一局（不論輸贏）",
         "reward": 300,
         "target": 1
+      },
+      {
+        "id": "daily_stock",
+        "name": "股市初探",
+        "description": "完成任意一筆股票交易（買或賣）",
+        "reward": 250,
+        "target": 1
       }
     ],
     "weekly": [

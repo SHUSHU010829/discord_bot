@@ -1,0 +1,67 @@
+{
+  "stockSystem": {
+    "enabled": true,
+    "timezone": "Asia/Taipei",
+    "marketOpenHour": 9,
+    "marketCloseHour": 21,
+    "tickCronSchedule": "*/15 * * * *",
+    "openCronSchedule": "0 9 * * *",
+    "closeCronSchedule": "0 21 * * *",
+    "announceChannelId": "1501770364982657084",
+    "reportChannelId": "1501770364982657084",
+    "feeRate": 0.01,
+    "minFee": 5,
+    "maxSharesPerUser": 500,
+    "defaultMarketSentiment": "sideways",
+    "marketDrift": {
+      "bull": 0.001,
+      "bear": -0.001,
+      "sideways": 0
+    },
+    "chart": {
+      "historyPoints": 20
+    },
+    "pool": [
+      {
+        "symbol": "BIBI",
+        "name": "逼逼科技",
+        "initialPrice": 500,
+        "sigma": 0.04,
+        "floor": 100,
+        "type": "tech"
+      },
+      {
+        "symbol": "TAPI",
+        "name": "TAPI 乳業",
+        "initialPrice": 300,
+        "sigma": 0.015,
+        "floor": 60,
+        "type": "blue"
+      },
+      {
+        "symbol": "MEME",
+        "name": "MEME 梗指數",
+        "initialPrice": 120,
+        "sigma": 0.08,
+        "floor": 20,
+        "type": "meme"
+      },
+      {
+        "symbol": "SHUAI",
+        "name": "帥氣控股",
+        "initialPrice": 800,
+        "sigma": 0.025,
+        "floor": 160,
+        "type": "blue"
+      },
+      {
+        "symbol": "NEKO",
+        "name": "貓貓科技",
+        "initialPrice": 200,
+        "sigma": 0.055,
+        "floor": 40,
+        "type": "tech"
+      }
+    ]
+  }
+}
