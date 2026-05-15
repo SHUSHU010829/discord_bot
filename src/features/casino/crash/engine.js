@@ -13,13 +13,14 @@
 // 倍率成長函數：
 //   m(t) = exp(growthRate × t_sec)
 //   bust 對應時間：t_bust = ln(bust) / growthRate
-//   不同 bust 對應不同遊戲時長（短局 ~3s、長局 ~22s），用 log 平滑映射。
+//   不同 bust 對應不同遊戲時長（短局 ~1.3s、長局 ~22s），用 log 平滑映射。
 
 const DEFAULT_HOUSE_EDGE = 0.01;
 const MIN_AUTOCASHOUT = 1.01;
 const MAX_AUTOCASHOUT = 1_000_000;
 
-const MIN_DURATION_MS = 3_000;
+// 1.3 秒是 hard floor：再短玩家根本來不及看到火箭起飛就被秒爆。
+const MIN_DURATION_MS = 1_300;
 const MAX_DURATION_MS = 22_000;
 
 function round2(n) {
@@ -40,9 +41,11 @@ function drawBust({ houseEdge = DEFAULT_HOUSE_EDGE, rng = Math.random } = {}) {
 }
 
 // bust 越大遊戲越久；但要避免低 bust 一閃而過、高 bust 拖太久。
+// 公式對 log2(bust+1) 線性縮放後再扣常數，讓 instant bust 落在 ~1.3s，
+// 大 bust 仍維持十幾秒讓玩家有時間掙扎。
 function bustDurationMs(bust) {
   const safeBust = Math.max(1.01, bust);
-  const sec = 3 * Math.log2(safeBust + 1); // bust=1.01→~3s, 2→4.75s, 10→10.4s, 100→20s
+  const sec = 3 * Math.log2(safeBust + 1) - 1.7; // bust=1.01→~1.3s, 2→3.0s, 10→8.7s, 100→18.3s
   const ms = Math.round(sec * 1000);
   return Math.max(MIN_DURATION_MS, Math.min(MAX_DURATION_MS, ms));
 }
