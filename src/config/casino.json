@@ -38,6 +38,13 @@
       "houseEdge": 0.05,
       "maxRounds": 10
     },
+    "keno": {
+      "enabled": true,
+      "minBet": 10,
+      "maxBet": 1000,
+      "gameTtlSeconds": 300,
+      "paytable": [0, 0, 2, 5, 12, 100]
+    },
     "crash": {
       "enabled": true,
       "minBet": 10,
