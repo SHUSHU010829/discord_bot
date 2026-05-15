@@ -23,6 +23,7 @@ const GAME_LABELS = {
   poker: "🃏 德州撲克",
   lottery: "🎟️ 樂透",
   horseRacing: "🐎 賽馬",
+  crash: "🚀 火箭",
   unknown: "❓ 未分類",
 };
 
