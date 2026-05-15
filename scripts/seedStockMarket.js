@@ -11,6 +11,7 @@ const { stockSystem, serverId } = require("../src/config");
  *   node scripts/seedStockMarket.js                  # dry run，列出計畫
  *   node scripts/seedStockMarket.js seed             # 執行 seed（僅補上缺少的，不覆蓋）
  *   node scripts/seedStockMarket.js seed --force     # 強制覆蓋現有 currentPrice/openPrice 回到初始值
+ *   node scripts/seedStockMarket.js seed --prune     # 同時把不在 pool 的舊 symbol 設為 enabled=false（保留持倉可參照的文件）
  *   node scripts/seedStockMarket.js seed --guild=<guildId>  # 指定 guildId（預設讀 config.serverId）
  */
 
@@ -18,6 +19,7 @@ async function main() {
   const args = process.argv.slice(2);
   const shouldSeed = args.includes("seed");
   const force = args.includes("--force");
+  const prune = args.includes("--prune");
   const guildArg = args.find((a) => a.startsWith("--guild="));
   const guildId = guildArg ? guildArg.split("=")[1] : serverId;
 
@@ -123,6 +125,37 @@ async function main() {
     }
 
     console.log(`[SEED] 完成：新增 ${added}、覆蓋 ${updated}、保留 ${skipped}`.cyan);
+
+    // --prune：把不在 pool 的舊 symbol 設為 enabled=false（不刪除文件，UserPortfolio 仍可參照）
+    if (prune) {
+      const poolSymbols = pool.map((s) => s.symbol);
+      const orphans = await stockMarket
+        .find({ guildId, symbol: { $nin: poolSymbols } })
+        .toArray();
+      if (orphans.length === 0) {
+        console.log(`[PRUNE] 沒有需要 disable 的舊 symbol`.gray);
+      } else {
+        const userPortfolio = db.collection("UserPortfolio");
+        for (const o of orphans) {
+          const holders = await userPortfolio.countDocuments({
+            guildId,
+            symbol: o.symbol,
+            shares: { $gt: 0 },
+          });
+          const note = holders > 0 ? `（⚠️ 仍有 ${holders} 人持有，未刪除）` : "";
+          if (!shouldSeed) {
+            console.log(`  ~ 將 disable ${o.symbol} ${o.name || ""} ${note}`.yellow);
+            continue;
+          }
+          await stockMarket.updateOne(
+            { _id: o._id },
+            { $set: { enabled: false, prunedAt: new Date(), updatedAt: new Date() } }
+          );
+          console.log(`  ✓ 已 disable ${o.symbol} ${o.name || ""} ${note}`.yellow);
+        }
+        console.log(`[PRUNE] 完成：${orphans.length} 個舊 symbol 已 disable`.cyan);
+      }
+    }
   } catch (e) {
     console.log(`[SEED] 失敗：${e?.stack || e}`.red);
     process.exit(1);
