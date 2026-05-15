@@ -80,8 +80,9 @@ function calcMultiplier(gateLow, gateHigh, deck, houseEdge = DEFAULT_HOUSE_EDGE)
   const pH = hit / total;
   const edge = Math.max(0, Math.min(0.5, houseEdge));
   const m = (pO + 2 * pH - edge) / pB;
-  if (!Number.isFinite(m) || m < 1.01) return 0;
-  return Math.floor(m * 100) / 100;
+  if (!Number.isFinite(m)) return 0;
+  const floored = Math.floor(m * 100) / 100;
+  return Math.max(1.01, floored);
 }
 
 function startGame({ ante = DEFAULT_ANTE, houseEdge = DEFAULT_HOUSE_EDGE } = {}) {
