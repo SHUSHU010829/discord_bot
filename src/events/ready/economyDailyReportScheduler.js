@@ -7,7 +7,7 @@ const { coinSystem } = require("../../config");
 const { scanAllPairs } = require("../../features/economy/suspiciousTransferDetector");
 
 // 每天 08:00 Asia/Taipei 在指定頻道播報：
-// 1) 過去 N 天每日淨發幣量（流入 / 還款回流 / 流出 / 淨）
+// 1) 過去 N 天每日淨發幣量（流入 / 還款回流 / 流出 / 淨），股票買賣與手續費已併入
 // 2) 過去 N 天賭場 RTP / House Edge
 // 3) 過去 24h 雙向轉帳異常列表
 
@@ -28,9 +28,10 @@ const REAL_INFLOW = [
   "subscription",
   "wheeling",
   "manual",
+  "stock_dividend",
 ];
-const REPAY_INFLOW = ["deposit_release", "payout"];
-const OUTFLOW = ["bet", "deposit_lock", "transfer_out", "shop_buy", "wealth_tax"];
+const REPAY_INFLOW = ["deposit_release", "payout", "stock_sell"];
+const OUTFLOW = ["bet", "deposit_lock", "transfer_out", "shop_buy", "wealth_tax", "stock_buy", "stock_fee"];
 
 const CASINO_GAME_LABEL = {
   blackjack: "BJ",
@@ -198,7 +199,7 @@ async function buildDailyNetSection(client, guildId, opts) {
     r.map((cell, c) => (c === 0 ? padRight(cell, widths[c]) : padLeft(cell, widths[c]))).join("  ")
   );
 
-  const header = `📊 **每日淨發幣量（過去 ${days} 天）**\n流入＝真實發幣（聊天/任務/福利/Twitch/admin…），還款＝存款贖回+賭場派彩，流出＝下注/存款鎖定/轉出/商店/財富稅`;
+  const header = `📊 **每日淨發幣量（過去 ${days} 天）**\n流入＝真實發幣（聊天/任務/福利/Twitch/admin/股息…），還款＝存款贖回+賭場派彩+賣股入帳，流出＝下注/存款鎖定/轉出/商店/財富稅/買股/股票手續費`;
   return `${header}\n\`\`\`\n${lines.join("\n")}\n\`\`\``;
 }
 

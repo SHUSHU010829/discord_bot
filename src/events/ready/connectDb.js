@@ -107,6 +107,13 @@ module.exports = async (client) => {
     // 經濟健康快照（每日聚合，用於通膨追蹤）
     const economySnapshotsCollection = database.collection("EconomySnapshots");
 
+    // 股市系統 collections
+    const stockMarketCollection = database.collection("StockMarket");
+    const stockPricesCollection = database.collection("StockPrices");
+    const userPortfolioCollection = database.collection("UserPortfolio");
+    const stockTransactionsCollection = database.collection("StockTransactions");
+    const stockEventsCollection = database.collection("StockEvents");
+
     client.database = database;
     client.collection = collection;
     client.gaslightCollection = gaslightCollection;
@@ -146,6 +153,11 @@ module.exports = async (client) => {
     client.welfareClaimsCollection = welfareClaimsCollection;
     client.questProgressCollection = questProgressCollection;
     client.economySnapshotsCollection = economySnapshotsCollection;
+    client.stockMarketCollection = stockMarketCollection;
+    client.stockPricesCollection = stockPricesCollection;
+    client.userPortfolioCollection = userPortfolioCollection;
+    client.stockTransactionsCollection = stockTransactionsCollection;
+    client.stockEventsCollection = stockEventsCollection;
     await economySnapshotsCollection
       .createIndex({ guildId: 1, date: 1 }, { unique: true })
       .catch((e) =>
@@ -463,6 +475,48 @@ module.exports = async (client) => {
       await questProgressCollection.createIndex(
         { updatedAt: 1 },
         { expireAfterSeconds: 90 * 24 * 60 * 60, name: "quest_ttl_90d" }
+      );
+
+      // 股市系統索引
+      await stockMarketCollection.createIndex(
+        { symbol: 1, guildId: 1 },
+        { unique: true, name: "uniq_stock_symbol_guild" }
+      );
+      await stockPricesCollection.createIndex(
+        { symbol: 1, guildId: 1, timestamp: -1 },
+        { name: "stock_prices_symbol_guild_time" }
+      );
+      await stockPricesCollection.createIndex(
+        { timestamp: 1 },
+        { expireAfterSeconds: 30 * 24 * 60 * 60, name: "stock_prices_ttl_30d" }
+      );
+      await userPortfolioCollection.createIndex(
+        { userId: 1, guildId: 1, symbol: 1 },
+        { unique: true, name: "uniq_portfolio_user_guild_symbol" }
+      );
+      await userPortfolioCollection.createIndex(
+        { guildId: 1, symbol: 1 },
+        { name: "portfolio_guild_symbol" }
+      );
+      await stockTransactionsCollection.createIndex(
+        { userId: 1, guildId: 1, timestamp: -1 },
+        { name: "stock_tx_user_guild_time" }
+      );
+      await stockTransactionsCollection.createIndex(
+        { guildId: 1, symbol: 1, timestamp: -1 },
+        { name: "stock_tx_guild_symbol_time" }
+      );
+      await stockTransactionsCollection.createIndex(
+        { timestamp: 1 },
+        { expireAfterSeconds: 90 * 24 * 60 * 60, name: "stock_tx_ttl_90d" }
+      );
+      await stockEventsCollection.createIndex(
+        { guildId: 1, timestamp: -1 },
+        { name: "stock_events_guild_time" }
+      );
+      await stockEventsCollection.createIndex(
+        { guildId: 1, eventId: 1, timestamp: -1 },
+        { name: "stock_events_guild_eventId_time" }
       );
     } catch (indexError) {
       console.log(

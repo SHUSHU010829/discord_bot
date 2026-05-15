@@ -11,6 +11,8 @@ const casino = require("./casino.json");
 const shop = require("./shop.json");
 const welfare = require("./welfare.json");
 const quests = require("./quests.json");
+const stocks = require("./stocks.json");
+const stockEvents = require("./stockEvents.json");
 
 module.exports = {
   ...server,
@@ -24,4 +26,6 @@ module.exports = {
   ...shop,
   ...welfare,
   ...quests,
+  ...stocks,
+  ...stockEvents,
 };

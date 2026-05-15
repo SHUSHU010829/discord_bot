@@ -10,9 +10,9 @@ const { getActiveBuffMultiplier } = require("../shop/activeBuff");
 
 const MSG_VOICE_SOURCES = ["message", "voice"];
 const CASINO_SOURCES = ["bet", "payout"];
-const SINK_SOURCES = ["shop_buy", "auction_bid", "wealth_tax", "transfer_out", "deposit_lock"];
+const SINK_SOURCES = ["shop_buy", "auction_bid", "wealth_tax", "transfer_out", "deposit_lock", "stock_buy", "stock_fee"];
 const PEER_SOURCES = ["transfer_in", "transfer_out", "deposit_lock", "deposit_release"];
-const FLAT_REWARD_SOURCES = ["welfare", "quest_daily", "quest_weekly", "quest_event"];
+const FLAT_REWARD_SOURCES = ["welfare", "quest_daily", "quest_weekly", "quest_event", "stock_sell", "stock_dividend"];
 
 module.exports = async (client, opts) => {
   if (!coinSystem?.enabled) return null;
@@ -150,6 +150,16 @@ module.exports = async (client, opts) => {
     try {
       const questService = require("../quests/questService");
       await questService.markCompleted(client, opts.userId, opts.guildId, "daily_gamble").catch(() => {});
+    } catch (e) {
+      // questService 還沒載入或還沒實作就靜默
+    }
+  }
+
+  // 股市初探任務：source=stock_buy 視為完成一筆股票交易（買單在前，賣單只能在曾買過之後）
+  if (opts.source === "stock_buy" || opts.source === "stock_sell") {
+    try {
+      const questService = require("../quests/questService");
+      await questService.markCompleted(client, opts.userId, opts.guildId, "daily_stock").catch(() => {});
     } catch (e) {
       // questService 還沒載入或還沒實作就靜默
     }

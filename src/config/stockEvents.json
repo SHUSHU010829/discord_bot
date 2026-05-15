@@ -1,0 +1,18 @@
+{
+  "stockEventConfig": {
+    "randomEventChance": 0.05,
+    "cooldownHours": 4,
+    "events": [
+      { "id": "shushu_live",      "name": "SHUSHU 開台帶量",      "effect": 0.08,  "stock": "TSPP", "dir": "up" },
+      { "id": "uppi_limited",     "name": "統嗶推出限定聯名",     "effect": 0.12,  "stock": "UPPI", "dir": "up" },
+      { "id": "port_congestion",  "name": "全球港口大塞港",       "effect": 0.18,  "stock": "EGPP", "dir": "up" },
+      { "id": "black_swan",       "name": "市場黑天鵝",           "effect": -0.07, "stock": "ALL",  "dir": "dn" },
+      { "id": "fab_outage",       "name": "晶圓廠跳電停工",       "effect": -0.05, "stock": "TSPP", "dir": "dn" },
+      { "id": "earnings_beat",    "name": "財報超預期",           "effect": 0.10,  "stock": "UPPI", "dir": "up" },
+      { "id": "shipping_glut",    "name": "航運運價崩盤",         "effect": -0.09, "stock": "EGPP", "dir": "dn" },
+      { "id": "institutional",    "name": "外資大舉加碼",         "effect": 0.06,  "stock": "ALL",  "dir": "up" },
+      { "id": "mtk_chip",         "name": "嗶發科新晶片發表",     "effect": 0.14,  "stock": "MTKP", "dir": "up" },
+      { "id": "recession_fear",   "name": "衰退恐慌",             "effect": -0.06, "stock": "ALL",  "dir": "dn" }
+    ]
+  }
+}

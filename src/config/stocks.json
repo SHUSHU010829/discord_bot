@@ -1,0 +1,67 @@
+{
+  "stockSystem": {
+    "enabled": true,
+    "timezone": "Asia/Taipei",
+    "marketOpenHour": 9,
+    "marketCloseHour": 21,
+    "tickCronSchedule": "*/15 * * * *",
+    "openCronSchedule": "0 9 * * *",
+    "closeCronSchedule": "0 21 * * *",
+    "announceChannelId": "1501770364982657084",
+    "reportChannelId": "1501770364982657084",
+    "feeRate": 0.01,
+    "minFee": 5,
+    "maxSharesPerUser": 500,
+    "defaultMarketSentiment": "sideways",
+    "marketDrift": {
+      "bull": 0.001,
+      "bear": -0.001,
+      "sideways": 0
+    },
+    "chart": {
+      "historyPoints": 20
+    },
+    "pool": [
+      {
+        "symbol": "TSPP",
+        "name": "嗶積電",
+        "initialPrice": 500,
+        "sigma": 0.04,
+        "floor": 100,
+        "type": "tech"
+      },
+      {
+        "symbol": "UPPI",
+        "name": "統嗶超商",
+        "initialPrice": 300,
+        "sigma": 0.015,
+        "floor": 60,
+        "type": "blue"
+      },
+      {
+        "symbol": "EGPP",
+        "name": "嗶嗶海運",
+        "initialPrice": 120,
+        "sigma": 0.08,
+        "floor": 20,
+        "type": "meme"
+      },
+      {
+        "symbol": "CTPP",
+        "name": "嗶嗶金控",
+        "initialPrice": 800,
+        "sigma": 0.025,
+        "floor": 160,
+        "type": "blue"
+      },
+      {
+        "symbol": "MTKP",
+        "name": "嗶發科",
+        "initialPrice": 200,
+        "sigma": 0.055,
+        "floor": 40,
+        "type": "tech"
+      }
+    ]
+  }
+}
