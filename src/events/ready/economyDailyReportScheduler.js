@@ -33,14 +33,15 @@ const REPAY_INFLOW = ["deposit_release", "payout"];
 const OUTFLOW = ["bet", "deposit_lock", "transfer_out", "shop_buy", "wealth_tax"];
 
 const CASINO_GAME_LABEL = {
-  blackjack: "🃏 BJ",
-  hilo: "🎲 HiLo",
-  dragonGate: "🐉 DGate",
-  slot: "🎰 Slot",
-  roulette: "🎯 Roul",
-  sicbo: "🎲 Sicbo",
-  poker: "♠️ Poker",
-  lottery: "🎟️ Lott",
+  blackjack: "BJ",
+  hilo: "HiLo",
+  dragonGate: "DGate",
+  slot: "Slot",
+  roulette: "Roul",
+  sicbo: "Sicbo",
+  poker: "Poker",
+  lottery: "Lott",
+  horseRacing: "Horse",
 };
 
 let task = null;
