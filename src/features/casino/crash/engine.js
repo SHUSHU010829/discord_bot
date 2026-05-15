@@ -119,8 +119,6 @@ function multiplierAt(state, now = Date.now()) {
   const m = Math.exp(state.growthRate * climbSec);
   // 飛行中倍率不能超過 bust（時間還沒到的話）
   const capped = Math.min(m, state.bust);
-  // 未達最低收手門檻時也視為 1.00x，避免秒按抓 1.01~1.09 的低倍率薅羊毛
-  if (capped < MIN_AUTOCASHOUT) return 1.0;
   return Math.max(1.0, floor2(capped));
 }
 
