@@ -48,8 +48,56 @@ let consecutiveErrors = 0;
 const MAX_CONSECUTIVE_ERRORS = 5;
 
 const fmt = (n) => Math.round(n).toLocaleString();
-const padLeft = (s, w) => String(s).padStart(w);
-const padRight = (s, w) => String(s).padEnd(w);
+
+// 計算字串在等寬字體下的「顯示寬度」：CJK / 全形符號 / emoji 視為 2，
+// 變體選擇符 / ZWJ 視為 0，其餘 ASCII 視為 1。
+function displayWidth(str) {
+  const s = String(str);
+  let width = 0;
+  for (const ch of s) {
+    const cp = ch.codePointAt(0);
+    // 零寬字元（變體選擇符、ZWJ、tag chars）
+    if (
+      cp === 0x200d ||
+      (cp >= 0xfe00 && cp <= 0xfe0f) ||
+      (cp >= 0xe0020 && cp <= 0xe007f)
+    ) {
+      continue;
+    }
+    // 雙寬字元：CJK、Hangul、全形符號、各種 emoji / 圖案符號
+    if (
+      (cp >= 0x1100 && cp <= 0x115f) ||
+      (cp >= 0x2e80 && cp <= 0x9fff) ||
+      (cp >= 0xa000 && cp <= 0xa4cf) ||
+      (cp >= 0xac00 && cp <= 0xd7a3) ||
+      (cp >= 0xf900 && cp <= 0xfaff) ||
+      (cp >= 0xfe30 && cp <= 0xfe4f) ||
+      (cp >= 0xff00 && cp <= 0xff60) ||
+      (cp >= 0xffe0 && cp <= 0xffe6) ||
+      (cp >= 0x2600 && cp <= 0x27bf) ||
+      (cp >= 0x1f000 && cp <= 0x1ffff) ||
+      (cp >= 0x20000 && cp <= 0x2fffd) ||
+      (cp >= 0x30000 && cp <= 0x3fffd)
+    ) {
+      width += 2;
+      continue;
+    }
+    width += 1;
+  }
+  return width;
+}
+
+const padLeft = (s, w) => {
+  const str = String(s);
+  const pad = Math.max(0, w - displayWidth(str));
+  return " ".repeat(pad) + str;
+};
+const padRight = (s, w) => {
+  const str = String(s);
+  const pad = Math.max(0, w - displayWidth(str));
+  return str + " ".repeat(pad);
+};
+const cellWidth = (s) => displayWidth(String(s));
 
 // 把 luxon DateTime → "YYYY-MM-DD"
 const isoDate = (dt) => dt.toISODate();
@@ -143,7 +191,7 @@ async function buildDailyNetSection(client, guildId, opts) {
 
   // 自動寬度
   const widths = rows[0].map((_, c) =>
-    Math.max(...rows.map((r) => String(r[c]).length))
+    Math.max(...rows.map((r) => cellWidth(r[c])))
   );
   const lines = rows.map((r) =>
     r.map((cell, c) => (c === 0 ? padRight(cell, widths[c]) : padLeft(cell, widths[c]))).join("  ")
@@ -232,7 +280,7 @@ async function buildCasinoSection(client, guildId, opts) {
   ]);
 
   const widths = rows[0].map((_, c) =>
-    Math.max(...rows.map((r) => String(r[c]).length))
+    Math.max(...rows.map((r) => cellWidth(r[c])))
   );
   const lines = rows.map((r) =>
     r.map((cell, c) => (c === 0 ? padRight(cell, widths[c]) : padLeft(cell, widths[c]))).join("  ")
