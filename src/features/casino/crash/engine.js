@@ -25,7 +25,7 @@ const MAX_DURATION_MS = 22_000;
 
 // 暖機期：剛升空時倍率固定 1.00x，這段時間秒按收手只能拿回本，不會白賺。
 // 注意：MIN_DURATION_MS 中前 WARMUP_MS 屬於暖機，剩下的才會開始爬升到 bust。
-const WARMUP_MS = 1_000;
+const WARMUP_MS = 2_000;
 
 // 抽到 bust=1.00 的「直接爆炸」局，會在 0~INSTANT_BUST_MAX_MS 之間隨機爆掉。
 // 不套用 MIN_DURATION_MS，這樣連暖機期內秒按收手也有機率輸錢。
