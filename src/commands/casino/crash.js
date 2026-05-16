@@ -23,6 +23,14 @@ function getCrashConfig() {
   return casino?.crash || {};
 }
 
+function formatRemaining(sec) {
+  const s = Math.max(0, Math.ceil(sec));
+  if (s < 60) return `${s} 秒`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r ? `${m} 分 ${r} 秒` : `${m} 分`;
+}
+
 // 沒設 openingWindow → 全天開放。設了就只在 weekday + [startHour, endHour) 開。
 // endHour 可填 24 表示「到當天結束」。
 function checkOpeningWindow(window, now = DateTime.now()) {
@@ -113,6 +121,26 @@ module.exports = {
         return interaction.editReply(
           "🚀 你還有一支火箭在天上！等它落地（或爆炸）再開新局。",
         );
+      }
+
+      // 結算後冷卻：擋連發
+      const cooldownSec = cfg.cooldownSeconds ?? 0;
+      if (cooldownSec > 0) {
+        const lastSettled = await client.crashGamesCollection.findOne(
+          { userId, guildId, status: "settled" },
+          { sort: { updatedAt: -1 }, projection: { updatedAt: 1 } },
+        );
+        if (lastSettled?.updatedAt) {
+          const lastAt = +lastSettled.updatedAt;
+          const elapsedSec = (Date.now() - lastAt) / 1000;
+          if (elapsedSec < cooldownSec) {
+            const readyEpoch = Math.floor((lastAt + cooldownSec * 1000) / 1000);
+            const remainSec = Math.ceil(cooldownSec - elapsedSec);
+            return interaction.editReply(
+              `⏳ 火箭剛落地，還在補燃料！還要 **${formatRemaining(remainSec)}**，下次可發射：<t:${readyEpoch}:R>（<t:${readyEpoch}:t>）`,
+            );
+          }
+        }
       }
 
       const minBet = cfg.minBet ?? 10;

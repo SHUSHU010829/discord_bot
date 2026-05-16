@@ -50,6 +50,7 @@
       "minBet": 10,
       "maxBet": 5000,
       "houseEdge": 0.02,
+      "cooldownSeconds": 300,
       "openingWindow": {
         "timezone": "Asia/Taipei",
         "weekday": 6,
