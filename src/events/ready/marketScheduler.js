@@ -1,13 +1,20 @@
 require("colors");
 
 const cron = require("node-cron");
-const { EmbedBuilder } = require("discord.js");
+const { EmbedBuilder, AttachmentBuilder } = require("discord.js");
 const { DateTime } = require("luxon");
 
 const { stockSystem } = require("../../config");
 const { nextPrice, calcMarketDrift } = require("../../features/stock/priceEngine");
 const { rollRandomEvent } = require("../../features/stock/eventEngine");
 const { isMarketOpen } = require("../../features/stock/tradeService");
+const { renderMultiLine } = require("../../features/stock/chartRenderer");
+
+const SENTIMENT_LABEL = {
+  bull: "🐂 牛市",
+  bear: "🐻 熊市",
+  sideways: "🦀 震盪",
+};
 
 let tickTask = null;
 let openTask = null;
@@ -49,8 +56,91 @@ async function tickOnce(client) {
     await rollRandomEvent(client, guildId).catch((e) =>
       console.log(`[STOCK] rollRandomEvent failed guild=${guildId}: ${e?.message || e}`.yellow)
     );
+    await postMarketBroadcast(client, guildId).catch((e) =>
+      console.log(`[STOCK] broadcast failed guild=${guildId}: ${e?.message || e}`.yellow)
+    );
   }
   console.log(`[STOCK] tick done for ${guildIds.length} guild(s)`.cyan);
+}
+
+async function postMarketBroadcast(client, guildId) {
+  const channelId = stockSystem?.broadcastChannelId || stockSystem?.reportChannelId;
+  if (!channelId) return;
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+  if (!channel?.isTextBased?.()) return;
+
+  const stocks = await client.stockMarketCollection
+    .find({ guildId, enabled: { $ne: false } })
+    .sort({ symbol: 1 })
+    .toArray();
+  if (stocks.length === 0) return;
+
+  const historyPoints = stockSystem?.chart?.historyPoints ?? 20;
+  const tickMinutes = stockSystem?.tickIntervalMinutes ?? 5;
+  const series = await Promise.all(
+    stocks.map(async (s) => {
+      const points = await client.stockPricesCollection
+        .find({ guildId, symbol: s.symbol })
+        .sort({ timestamp: -1 })
+        .limit(historyPoints)
+        .toArray();
+      return { symbol: s.symbol, name: s.name, points: points.reverse() };
+    })
+  );
+
+  const minutes = historyPoints * tickMinutes;
+  const timeLabel =
+    minutes >= 60
+      ? `${(minutes / 60).toFixed(minutes % 60 === 0 ? 0 : 1)} 小時`
+      : `${minutes} 分鐘`;
+  const buf = renderMultiLine(series, {
+    title: `逼逼股市｜最近 ${timeLabel}各股漲跌`,
+  });
+  const attachment = new AttachmentBuilder(buf, { name: "stock_market.png" });
+
+  const sentiment = stocks[0]?.marketSentiment || stockSystem?.defaultMarketSentiment || "sideways";
+  const sentimentLabel = SENTIMENT_LABEL[sentiment] || sentiment;
+
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const fields = [];
+  for (const s of stocks) {
+    const open = s.openPrice || s.currentPrice;
+    const chg = open > 0 ? ((s.currentPrice - open) / open) * 100 : 0;
+    const weekly = await client.stockPricesCollection
+      .find({ guildId, symbol: s.symbol, timestamp: { $gte: weekAgo } })
+      .toArray();
+    const weekPrices = weekly.map((w) => w.price);
+    const wh = weekPrices.length ? Math.max(...weekPrices, s.currentPrice) : s.currentPrice;
+    const wl = weekPrices.length ? Math.min(...weekPrices, s.currentPrice) : s.currentPrice;
+    fields.push({
+      name: `\`${s.symbol}\` ${s.name}`,
+      value:
+        `現價 **${s.currentPrice.toFixed(1)}**　今日 ${chg >= 0 ? "+" : ""}${chg.toFixed(2)}%\n` +
+        `週高 ${wh.toFixed(1)}　週低 ${wl.toFixed(1)}`,
+      inline: true,
+    });
+  }
+
+  // 下次 tick 時間：對齊 tickIntervalMinutes
+  const now = new Date();
+  const mins = now.getMinutes();
+  const nextTickMin = (Math.floor(mins / tickMinutes) + 1) * tickMinutes;
+  const next = new Date(now);
+  next.setMinutes(nextTickMin % 60, 0, 0);
+  if (nextTickMin >= 60) next.setHours(next.getHours() + 1);
+  const epoch = Math.floor(next.getTime() / 1000);
+
+  const embed = new EmbedBuilder()
+    .setTitle("📈 逼逼股市")
+    .setColor(0x3498db)
+    .setDescription(`市場情緒：${sentimentLabel}　下次更新：<t:${epoch}:R>`)
+    .addFields(fields)
+    .setImage("attachment://stock_market.png")
+    .setTimestamp(new Date());
+
+  await channel.send({ embeds: [embed], files: [attachment] }).catch((e) =>
+    console.log(`[STOCK] broadcast send failed: ${e?.message || e}`.yellow)
+  );
 }
 
 async function runOpen(client) {
@@ -182,7 +272,7 @@ module.exports = async (client) => {
   }
 
   const tz = stockSystem.timezone || "Asia/Taipei";
-  const tickSchedule = stockSystem.tickCronSchedule || "*/15 * * * *";
+  const tickSchedule = stockSystem.tickCronSchedule || "*/5 * * * *";
   const openSchedule = stockSystem.openCronSchedule || "0 9 * * *";
   const closeSchedule = stockSystem.closeCronSchedule || "0 21 * * *";
 
@@ -251,3 +341,4 @@ async function alertSchedulerStopped(client) {
 module.exports.tickOnce = tickOnce;
 module.exports.runOpen = runOpen;
 module.exports.runClose = runClose;
+module.exports.postMarketBroadcast = postMarketBroadcast;

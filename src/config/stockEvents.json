@@ -1,18 +1,47 @@
 {
   "stockEventConfig": {
-    "randomEventChance": 0.05,
-    "cooldownHours": 4,
+    "randomEventChance": 0.12,
+    "cooldownHours": 2,
     "events": [
-      { "id": "shushu_live",      "name": "SHUSHU 開台帶量",      "effect": 0.08,  "stock": "TSPP", "dir": "up" },
-      { "id": "uppi_limited",     "name": "統嗶推出限定聯名",     "effect": 0.12,  "stock": "UPPI", "dir": "up" },
-      { "id": "port_congestion",  "name": "全球港口大塞港",       "effect": 0.18,  "stock": "EGPP", "dir": "up" },
-      { "id": "black_swan",       "name": "市場黑天鵝",           "effect": -0.07, "stock": "ALL",  "dir": "dn" },
-      { "id": "fab_outage",       "name": "晶圓廠跳電停工",       "effect": -0.05, "stock": "TSPP", "dir": "dn" },
-      { "id": "earnings_beat",    "name": "財報超預期",           "effect": 0.10,  "stock": "UPPI", "dir": "up" },
-      { "id": "shipping_glut",    "name": "航運運價崩盤",         "effect": -0.09, "stock": "EGPP", "dir": "dn" },
-      { "id": "institutional",    "name": "外資大舉加碼",         "effect": 0.06,  "stock": "ALL",  "dir": "up" },
-      { "id": "mtk_chip",         "name": "嗶發科新晶片發表",     "effect": 0.14,  "stock": "MTKP", "dir": "up" },
-      { "id": "recession_fear",   "name": "衰退恐慌",             "effect": -0.06, "stock": "ALL",  "dir": "dn" }
+      { "id": "shushu_live",        "name": "SHUSHU 開台帶量",       "effect": 0.08,  "stock": "TSPP", "dir": "up" },
+      { "id": "uppi_limited",       "name": "統嗶推出限定聯名",      "effect": 0.12,  "stock": "UPPI", "dir": "up" },
+      { "id": "port_congestion",    "name": "全球港口大塞港",        "effect": 0.18,  "stock": "EGPP", "dir": "up" },
+      { "id": "black_swan",         "name": "市場黑天鵝",            "effect": -0.07, "stock": "ALL",  "dir": "dn" },
+      { "id": "fab_outage",         "name": "晶圓廠跳電停工",        "effect": -0.05, "stock": "TSPP", "dir": "dn" },
+      { "id": "earnings_beat",      "name": "財報超預期",            "effect": 0.10,  "stock": "UPPI", "dir": "up" },
+      { "id": "shipping_glut",      "name": "航運運價崩盤",          "effect": -0.09, "stock": "EGPP", "dir": "dn" },
+      { "id": "institutional",      "name": "外資大舉加碼",          "effect": 0.06,  "stock": "ALL",  "dir": "up" },
+      { "id": "mtk_chip",           "name": "嗶發科新晶片發表",      "effect": 0.14,  "stock": "MTKP", "dir": "up" },
+      { "id": "recession_fear",     "name": "衰退恐慌",              "effect": -0.06, "stock": "ALL",  "dir": "dn" },
+
+      { "id": "ai_boom",            "name": "AI 熱潮席捲市場",       "effect": 0.07,  "stock": "ALL",  "dir": "up" },
+      { "id": "fed_cut",            "name": "央行大降息救市",        "effect": 0.05,  "stock": "ALL",  "dir": "up" },
+      { "id": "fed_hike",           "name": "央行意外升息",          "effect": -0.05, "stock": "ALL",  "dir": "dn" },
+      { "id": "cpi_shock",          "name": "通膨數據爆表",          "effect": -0.06, "stock": "ALL",  "dir": "dn" },
+      { "id": "typhoon_rally",      "name": "颱風假大盤噴出",        "effect": 0.04,  "stock": "ALL",  "dir": "up" },
+      { "id": "us_crash",           "name": "美股夜盤崩盤",          "effect": -0.07, "stock": "ALL",  "dir": "dn" },
+      { "id": "geopolitical",       "name": "地緣政治衝突升級",      "effect": -0.08, "stock": "ALL",  "dir": "dn" },
+      { "id": "stimulus",           "name": "政府紓困方案出爐",      "effect": 0.06,  "stock": "ALL",  "dir": "up" },
+
+      { "id": "tspp_ai_order",      "name": "嗶積電 AI 訂單塞爆",    "effect": 0.13,  "stock": "TSPP", "dir": "up" },
+      { "id": "tspp_sanction",      "name": "美國禁令衝擊嗶積電",    "effect": -0.09, "stock": "TSPP", "dir": "dn" },
+
+      { "id": "uppi_food_crisis",   "name": "統嗶鮮食大缺貨",        "effect": -0.05, "stock": "UPPI", "dir": "dn" },
+      { "id": "uppi_price_hike",    "name": "統嗶漲價挨轟",          "effect": -0.06, "stock": "UPPI", "dir": "dn" },
+      { "id": "uppi_midnight_shop", "name": "統嗶深夜限定店爆紅",    "effect": 0.07,  "stock": "UPPI", "dir": "up" },
+
+      { "id": "egpp_suez",          "name": "蘇伊士運河擱淺",        "effect": 0.20,  "stock": "EGPP", "dir": "up" },
+      { "id": "egpp_fuel",          "name": "燃油費飆升壓縮獲利",    "effect": -0.07, "stock": "EGPP", "dir": "dn" },
+      { "id": "egpp_redsea_calm",   "name": "紅海航線恢復通航",      "effect": -0.10, "stock": "EGPP", "dir": "dn" },
+
+      { "id": "ctpp_dividend",      "name": "嗶嗶金控配息大方",      "effect": 0.08,  "stock": "CTPP", "dir": "up" },
+      { "id": "ctpp_rate_up",       "name": "升息利多嗶嗶金控",      "effect": 0.06,  "stock": "CTPP", "dir": "up" },
+      { "id": "ctpp_bad_debt",      "name": "嗶嗶金控壞帳爆雷",      "effect": -0.09, "stock": "CTPP", "dir": "dn" },
+      { "id": "ctpp_housing_bust", "name": "房市崩盤拖累嗶嗶金控",  "effect": -0.08, "stock": "CTPP", "dir": "dn" },
+
+      { "id": "mtkp_mass_prod",     "name": "嗶發科 AI 晶片量產捷報", "effect": 0.16,  "stock": "MTKP", "dir": "up" },
+      { "id": "mtkp_patent_loss",   "name": "嗶發科專利訴訟敗訴",    "effect": -0.08, "stock": "MTKP", "dir": "dn" },
+      { "id": "mtkp_5g_design_win", "name": "嗶發科 5G 案大豐收",    "effect": 0.09,  "stock": "MTKP", "dir": "up" }
     ]
   }
 }
