@@ -42,6 +42,7 @@ async function getTodayTransferOut(client, userId, guildId) {
   if (!client.coinTransactionsCollection) return 0;
   const tz = coinSystem?.daily?.resetTimezone || "Asia/Taipei";
   const today = DateTime.now().setZone(tz).toISODate();
+  // 只統計本金（meta.amount），不含手續費；transfer_out 的 amount 為負且含手續費。
   const agg = await client.coinTransactionsCollection
     .aggregate([
       {
@@ -52,10 +53,10 @@ async function getTodayTransferOut(client, userId, guildId) {
           date: today,
         },
       },
-      { $group: { _id: null, total: { $sum: "$amount" } } },
+      { $group: { _id: null, total: { $sum: "$meta.amount" } } },
     ])
     .toArray();
-  return Math.abs(agg[0]?.total || 0);
+  return agg[0]?.total || 0;
 }
 
 module.exports = {
@@ -72,7 +73,7 @@ module.exports = {
     .addIntegerOption((opt) =>
       opt
         .setName("金額")
-        .setDescription("轉帳金額（>1000 收 5% 手續費，否則 2%）")
+        .setDescription("轉帳金額（手續費另計：>1000 額外 5%，否則 2%）")
         .setRequired(true)
         .setMinValue(1)
     )
