@@ -313,31 +313,62 @@ payout  = max(0, principal − penalty)
 
 ---
 
-## 7. 財富稅
+## 7. 財富稅（累進制）
 
 設定：`coinSystem.wealthTax`
 
 | 欄位 | 預設 |
 | --- | --- |
 | `enabled` | true |
-| `threshold` | 50,000 |
-| `rate` | 1% |
+| `brackets` | 見下表 |
 | `cronSchedule` | `0 4 * * 1`（每週一 04:00） |
 | `timezone` | `Asia/Taipei` |
 | `minDeduction` | 1 |
 
+**累進級距（邊際稅率，越富越狠，不留情）**
+
+| 餘額區間 | 邊際稅率 |
+| --- | --- |
+| 0 ~ 50,000 | 0%（免稅額） |
+| 50,000 ~ 100,000 | 2% |
+| 100,000 ~ 300,000 | 5% |
+| 300,000 ~ 1,000,000 | 10% |
+| 1,000,000 ~ 5,000,000 | 20% |
+| 5,000,000 ~ 20,000,000 | 35% |
+| 20,000,000 ~ 100,000,000 | 50% |
+| 100,000,000 以上 | 70% |
+
+`brackets` 為陣列，每筆 `{ from, rate }` 表示「餘額超過 `from` 的部分」適用 `rate`，直到下一級的 `from`。最高一級沒有上限。
+
 **公式**
 
 ```
-taxable = totalCoins − threshold        // 只對超過門檻的部分課
-tax     = max(minDeduction, floor(taxable × rate))
-tax     = min(tax, totalCoins)           // 不能扣到負
+對每個級距 i：
+  lower = brackets[i].from
+  upper = brackets[i+1]?.from ?? ∞
+  if balance > lower:
+    portion  = min(balance, upper) − lower
+    tax     += portion × brackets[i].rate
+
+tax = max(minDeduction, floor(tax))
+tax = min(tax, totalCoins)              // 不能扣到負
 ```
+
+**範例**
+
+| 餘額 | 扣繳 | 有效稅率 |
+| --- | --- | --- |
+| 80,000 | 600 | 0.75% |
+| 500,000 | 31,000 | 6.20% |
+| 2,000,000 | 281,000 | 14.05% |
+| 10,000,000 | 2,631,000 | 26.31% |
+| 50,000,000 | 21,131,000 | 42.26% |
+| 200,000,000 | 116,131,000 | 58.07% |
 
 實作位於 `events/ready/wealthTaxScheduler.js`：
 - 連續錯誤 3 次自動關閉
-- 結算後在 `reportChannelId` 推 embed：總被扣戶數、總稅收、Top 5 被扣大戶
-- 每筆扣稅以 `source: wealth_tax` 寫入 transactions
+- 結算後在 `reportChannelId` 推 embed：級距表、總被扣戶數、總稅收、Top 5（含每人有效稅率）
+- 每筆扣稅以 `source: wealth_tax` 寫入 transactions，meta 含 `brackets`、`before`、`effectiveRate`、`slices`
 
 ---
 
@@ -953,7 +984,7 @@ mul  = floor(fair × (1 − 0.05) × 100) / 100
 | 轉帳每日上限 20,000 | `transfer.dailyCapPerSender` |
 | 雙向轉帳偵測（24h ≥ 5,000） | `suspiciousTransferDetector` |
 | 管理員每日 500,000 上限 | `adminGrant.dailyCapPerAdmin` |
-| 財富稅每週課 1% | `wealthTax`（threshold 50k） |
+| 財富稅每週累進課稅（2%~70%） | `wealthTax.brackets`（免稅額 50k） |
 | 賭場單局鎖定 | 同 `guildId` 同時只能一局按鈕局 |
 | 賭場逾時退款 | 21 點退本金；HI-LO 沒贏退本金、有贏自動 cashout |
 | 樂透訂閱失敗自動停 | 連 2 次扣款失敗 |

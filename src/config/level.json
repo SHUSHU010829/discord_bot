@@ -126,8 +126,15 @@
     },
     "wealthTax": {
       "enabled": true,
-      "threshold": 50000,
-      "rate": 0.01,
+      "brackets": [
+        { "from": 50000, "rate": 0.02 },
+        { "from": 100000, "rate": 0.05 },
+        { "from": 300000, "rate": 0.10 },
+        { "from": 1000000, "rate": 0.20 },
+        { "from": 5000000, "rate": 0.35 },
+        { "from": 20000000, "rate": 0.50 },
+        { "from": 100000000, "rate": 0.70 }
+      ],
       "cronSchedule": "0 4 * * 1",
       "timezone": "Asia/Taipei",
       "reportChannelId": "",

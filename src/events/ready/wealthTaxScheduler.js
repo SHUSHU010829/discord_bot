@@ -46,23 +46,58 @@ async function fetchCasinoWeekly(client, guildId) {
   }
 }
 
-// 每週掃 totalCoins > threshold 的帳戶，扣 rate% 作為財富稅。
-// 預設：每週一 04:00 (Asia/Taipei)，threshold 50,000，rate 1%。
+// 每週掃 totalCoins 高於最低級距的帳戶，依累進稅率分段課徵財富稅。
+// 預設：每週一 04:00 (Asia/Taipei)，最低門檻 50,000，最高邊際稅率 40%。
 // 連續錯誤 3 次自動關閉。
 
 let consecutiveErrors = 0;
 const MAX_CONSECUTIVE_ERRORS = 3;
 let task = null;
 
+function normalizeBrackets(brackets) {
+  if (!Array.isArray(brackets) || brackets.length === 0) return null;
+  const cleaned = brackets
+    .filter((b) => Number.isFinite(b?.from) && Number.isFinite(b?.rate))
+    .map((b) => ({ from: b.from, rate: b.rate }))
+    .sort((a, b) => a.from - b.from);
+  return cleaned.length > 0 ? cleaned : null;
+}
+
+// 計算分級邊際稅。回傳每段切片明細，給回報用。
+function computeProgressiveTax(balance, brackets) {
+  const slices = [];
+  let tax = 0;
+  for (let i = 0; i < brackets.length; i++) {
+    const lower = brackets[i].from;
+    const upper = brackets[i + 1]?.from ?? Infinity;
+    if (balance <= lower) break;
+    const portion = Math.min(balance, upper) - lower;
+    const sliceTax = portion * brackets[i].rate;
+    tax += sliceTax;
+    slices.push({
+      from: lower,
+      to: Number.isFinite(upper) ? upper : null,
+      rate: brackets[i].rate,
+      portion,
+      tax: sliceTax,
+    });
+  }
+  return { tax: Math.floor(tax), slices };
+}
+
 async function sweepOnce(client, cfg) {
   if (!client.userCoinsCollection) return null;
 
-  const threshold = cfg.threshold ?? 50000;
-  const rate = cfg.rate ?? 0.01;
+  const brackets = normalizeBrackets(cfg.brackets);
+  if (!brackets) {
+    console.log(`[WTAX] brackets 未設定或無效，跳過`.yellow);
+    return null;
+  }
   const minDeduction = cfg.minDeduction ?? 1;
+  const exemptFloor = brackets[0].from;
 
   const cursor = client.userCoinsCollection.find({
-    totalCoins: { $gt: threshold },
+    totalCoins: { $gt: exemptFloor },
   });
 
   let affectedUsers = 0;
@@ -71,12 +106,16 @@ async function sweepOnce(client, cfg) {
 
   while (await cursor.hasNext()) {
     const u = await cursor.next();
-    const taxable = u.totalCoins - threshold;
-    if (taxable <= 0) continue;
-    let tax = Math.floor(taxable * rate);
+    const { tax: rawTax, slices } = computeProgressiveTax(
+      u.totalCoins,
+      brackets,
+    );
+    let tax = rawTax;
     if (tax < minDeduction) tax = minDeduction;
     if (tax > u.totalCoins) tax = u.totalCoins;
     if (tax <= 0) continue;
+
+    const effectiveRate = tax / u.totalCoins;
 
     try {
       await grantCoins(client, {
@@ -85,7 +124,12 @@ async function sweepOnce(client, cfg) {
         username: u.username,
         amount: -tax,
         source: "wealth_tax",
-        meta: { threshold, rate, before: u.totalCoins },
+        meta: {
+          brackets,
+          before: u.totalCoins,
+          effectiveRate,
+          slices,
+        },
       });
       affectedUsers += 1;
       totalTaxed += tax;
@@ -94,6 +138,7 @@ async function sweepOnce(client, cfg) {
         username: u.username,
         before: u.totalCoins,
         tax,
+        effectiveRate,
       });
     } catch (e) {
       console.log(`[WTAX] grantCoins failed user=${u.userId}: ${e}`.red);
@@ -103,7 +148,7 @@ async function sweepOnce(client, cfg) {
   topAffected.sort((a, b) => b.tax - a.tax);
   topAffected = topAffected.slice(0, 5);
 
-  return { affectedUsers, totalTaxed, topAffected, threshold, rate };
+  return { affectedUsers, totalTaxed, topAffected, brackets };
 }
 
 async function postReport(client, cfg, summary) {
@@ -112,15 +157,24 @@ async function postReport(client, cfg, summary) {
   const channel = await client.channels.fetch(channelId).catch(() => null);
   if (!channel?.isTextBased?.()) return;
 
+  const bracketLines = summary.brackets.map((b, i) => {
+    const next = summary.brackets[i + 1];
+    const range = next
+      ? `${b.from.toLocaleString()} ~ ${next.from.toLocaleString()}`
+      : `${b.from.toLocaleString()} 以上`;
+    return `・${range}：**${(b.rate * 100).toFixed(0)}%**`;
+  });
+
   const embed = new EmbedBuilder()
-    .setTitle("💸 每週財富稅結算")
+    .setTitle("💸 每週累進財富稅結算")
     .setColor(0xed4245)
     .setDescription(
       [
-        `・扣稅門檻：**${summary.threshold.toLocaleString()}**`,
-        `・稅率：**${(summary.rate * 100).toFixed(2)}%**（超過門檻部分）`,
         `・受影響玩家數：**${summary.affectedUsers}**`,
         `・本次回收金幣：**${summary.totalTaxed.toLocaleString()}**`,
+        "",
+        "**累進級距（邊際稅率，越富越狠）**",
+        ...bracketLines,
       ].join("\n"),
     );
 
@@ -128,7 +182,7 @@ async function postReport(client, cfg, summary) {
     const top = summary.topAffected
       .map(
         (t, i) =>
-          `${i + 1}. <@${t.userId}> 扣 **${t.tax.toLocaleString()}**（餘額 ${t.before.toLocaleString()} → ${(t.before - t.tax).toLocaleString()}）`,
+          `${i + 1}. <@${t.userId}> 扣 **${t.tax.toLocaleString()}**（${t.before.toLocaleString()} → ${(t.before - t.tax).toLocaleString()}，有效稅率 ${(t.effectiveRate * 100).toFixed(2)}%）`,
       )
       .join("\n");
     embed.addFields({ name: "本次扣最多 Top 5", value: top });
@@ -212,7 +266,13 @@ module.exports = async (client) => {
     { timezone: tz },
   );
 
+  const brackets = normalizeBrackets(cfg.brackets);
+  const summary = brackets
+    ? brackets
+        .map((b) => `${b.from.toLocaleString()}+→${(b.rate * 100).toFixed(0)}%`)
+        .join(", ")
+    : "(brackets 未設定)";
   console.log(
-    `[WTAX] 財富稅排程已啟動：${schedule} (${tz})，門檻 ${cfg.threshold ?? 50000}、稅率 ${(cfg.rate ?? 0.01) * 100}%`.cyan,
+    `[WTAX] 累進財富稅排程已啟動：${schedule} (${tz})，級距 ${summary}`.cyan,
   );
 };
