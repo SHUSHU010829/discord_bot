@@ -11,16 +11,20 @@
 //   否則 bust = (1 - houseEdge) / (1 - r)，再 floor 至兩位小數
 //
 // 倍率成長函數：
-//   遊戲一開始 m(t) = exp(growthRate × t_sec)，直到時間到 bust。
-//   不同 bust 對應不同遊戲時長（短局 ~3s、長局 ~22s），用 log 平滑映射。
+//   每一局都用同一個固定成長率 k：m(t) = exp(k × t_sec)，到 bust 時這局爆炸。
+//   遊戲時長 = ln(bust) / k，所以 bust 越大局越久。但「升空速度」對所有局都
+//   一模一樣，玩家沒法從「火箭爬得快不快」反推這局 bust 拿來抓低風險收手。
 
 const DEFAULT_HOUSE_EDGE = 0.1;
 const MIN_AUTOCASHOUT = 1.5;
 const MAX_AUTOCASHOUT = 1_000_000;
 
-// 真的有飛起來的局（bust > 1）：3 秒 hard floor，留玩家反應時間，避免高倍率局秒爆。
-const MIN_DURATION_MS = 3_000;
-const MAX_DURATION_MS = 22_000;
+// 固定升空速度（每秒對數倍率）。對 bust=2 約 4.6s 爆炸、bust=10 約 15.4s、
+// bust=100 約 30.7s。任何 bust 看到的曲線斜率都相同，無法被「等等看升多快」破解。
+const GROWTH_RATE_PER_SEC = 0.15;
+
+// 上限只是避免極端高 bust 拖太久卡 TTL；達上限的局 k 才會被擠快一點。
+const MAX_DURATION_MS = 60_000;
 
 function round2(n) {
   return Math.round(n * 100) / 100;
@@ -39,14 +43,15 @@ function drawBust({ houseEdge = DEFAULT_HOUSE_EDGE, rng = Math.random } = {}) {
   return Math.max(1.0, floor2(raw));
 }
 
-// bust 越大遊戲越久；但要避免低 bust 一閃而過、高 bust 拖太久。
+// 固定升空速度 → 局長就是 ln(bust)/k。低 bust 自然秒爆（給不出反應時間），
+// 高 bust 自然撐久（給玩家慢慢看）。MAX 是安全閥，免得極端高 bust 卡 TTL。
 function bustDurationMs(bust) {
-  const safeBust = Math.max(1.01, bust);
-  const sec = 3 * Math.log2(safeBust + 1); // bust=1.01→~3s, 2→4.75s, 10→10.4s, 100→20s
-  const ms = Math.round(sec * 1000);
-  return Math.max(MIN_DURATION_MS, Math.min(MAX_DURATION_MS, ms));
+  if (bust <= 1) return 0;
+  const ms = Math.ceil((Math.log(bust) / GROWTH_RATE_PER_SEC) * 1000);
+  return Math.min(MAX_DURATION_MS, ms);
 }
 
+// 一般情況回固定 k；只有當 durationMs 被 MAX 截斷時才需要把 k 重新算。
 function growthRateFor(bust, durationMs) {
   if (bust <= 1) return 0;
   const climbMs = Math.max(1, durationMs);
@@ -175,4 +180,6 @@ module.exports = {
   DEFAULT_HOUSE_EDGE,
   MIN_AUTOCASHOUT,
   MAX_AUTOCASHOUT,
+  GROWTH_RATE_PER_SEC,
+  MAX_DURATION_MS,
 };

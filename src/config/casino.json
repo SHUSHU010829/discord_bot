@@ -49,7 +49,13 @@
       "enabled": true,
       "minBet": 10,
       "maxBet": 5000,
-      "houseEdge": 0.02
+      "houseEdge": 0.02,
+      "openingWindow": {
+        "timezone": "Asia/Taipei",
+        "weekday": 6,
+        "startHour": 21,
+        "endHour": 24
+      }
     },
     "dragonGate": {
       "enabled": true,
