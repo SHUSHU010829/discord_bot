@@ -4,6 +4,7 @@ const {
   SlashCommandBuilder,
   InteractionContextType,
 } = require("discord.js");
+const { DateTime } = require("luxon");
 
 const { coinSystem, casino } = require("../../config");
 const grantCoins = require("../../features/economy/grantCoins");
@@ -16,8 +17,39 @@ const {
 const { buildPlayingPayload } = require("../../features/casino/crash/renderer");
 const tickManager = require("../../features/casino/crash/tick");
 
+const WEEKDAY_LABEL = ["", "週一", "週二", "週三", "週四", "週五", "週六", "週日"];
+
 function getCrashConfig() {
   return casino?.crash || {};
+}
+
+// 沒設 openingWindow → 全天開放。設了就只在 weekday + [startHour, endHour) 開。
+// endHour 可填 24 表示「到當天結束」。
+function checkOpeningWindow(window, now = DateTime.now()) {
+  if (!window) return { open: true };
+  const tz = window.timezone || "Asia/Taipei";
+  const localNow = now.setZone(tz);
+  const wd = window.weekday;
+  const sh = window.startHour;
+  const eh = window.endHour;
+  const inDay = wd == null || localNow.weekday === wd;
+  const hour = localNow.hour + localNow.minute / 60;
+  const inHour =
+    (sh == null || hour >= sh) && (eh == null || hour < eh);
+  if (inDay && inHour) return { open: true };
+  const dayLabel = wd != null ? WEEKDAY_LABEL[wd] || `weekday=${wd}` : "每天";
+  const hourLabel =
+    sh != null && eh != null
+      ? `${String(sh).padStart(2, "0")}:00–${String(eh).padStart(2, "0")}:00`
+      : sh != null
+        ? `${String(sh).padStart(2, "0")}:00 之後`
+        : eh != null
+          ? `${String(eh).padStart(2, "0")}:00 之前`
+          : "全天";
+  return {
+    open: false,
+    message: `🕘 火箭只在 **${dayLabel} ${hourLabel}（${tz}）** 開放，現在還沒到時間。`,
+  };
 }
 
 module.exports = {
@@ -58,6 +90,11 @@ module.exports = {
       const cfg = getCrashConfig();
       if (cfg.enabled === false) {
         return interaction.editReply("🔧 火箭暫時關閉中！");
+      }
+
+      const window = checkOpeningWindow(cfg.openingWindow);
+      if (!window.open) {
+        return interaction.editReply(window.message);
       }
 
       const userId = interaction.user.id;
