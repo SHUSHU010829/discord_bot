@@ -46,9 +46,15 @@ function renderBall(num, color) {
 }
 
 function buildPrizeRow(label, count, perWinner, color) {
-  const winnerStr = count > 0
-    ? `${count} 位 × ${perWinner.toLocaleString()}`
-    : "從缺";
+  let winnerStr;
+  if (count <= 0) {
+    winnerStr = "從缺";
+  } else if (perWinner <= 0) {
+    // 有人對中但獎金已隨頭獎從缺滾入下期
+    winnerStr = "從缺(滾入下期)";
+  } else {
+    winnerStr = `${count} 位 × ${perWinner.toLocaleString()}`;
+  }
   return `
     <div style="display:flex;width:100%;justify-content:space-between;align-items:flex-end;padding:6px 0;border-bottom:1px dashed ${PALETTE.muted};">
       <div style="display:flex;align-items:flex-end;">
