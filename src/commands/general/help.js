@@ -25,7 +25,7 @@ const COMMANDS_ROOT = path.join(__dirname, "..");
 
 const CATEGORY_META = {
   food: { label: "食物飲料", emoji: "🍽️", order: 1, blurb: "吃/喝什麼、食物清單、排行榜、飲料菜單管理" },
-  draw: { label: "抽選工具", emoji: "🎲", order: 2, blurb: "抽籤、二選一、鹹魚翻身樂透" },
+  draw: { label: "抽選工具", emoji: "🎲", order: 2, blurb: "抽籤、二選一" },
   weather: { label: "天氣", emoji: "🌤️", order: 3, blurb: "全台與個別縣市天氣查詢" },
   currency: { label: "匯率", emoji: "💱", order: 4, blurb: "即時匯率與加密貨幣報價" },
   economy: { label: "經濟系統", emoji: "💰", order: 9, blurb: "錢包、轉帳、定期存款、骰寶" },

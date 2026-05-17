@@ -366,7 +366,6 @@ embed.js → 發送 Embed
 | 指令 | 說明 |
 | --- | --- |
 | `/choose-one` | 在多個選項中隨機抽一個 |
-| `/lotto` | 模擬樂透開獎（純好玩，不扣 credits；真正的樂透請看 §12） |
 | `/straws` | 抽籤（吉凶） |
 | `/ask` | 占卜 / 星座運勢 |
 | `/stats`、`/leaderboard` | 訊息與語音時長統計（由 `messageStats.js`、`voiceStats.js` 累積） |
