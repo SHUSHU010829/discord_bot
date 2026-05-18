@@ -2,6 +2,9 @@ require("colors");
 const {
   SlashCommandBuilder,
   EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   MessageFlags,
   InteractionContextType,
 } = require("discord.js");
@@ -95,14 +98,35 @@ async function handleBuy(client, interaction) {
   }
   if (item.type === "xp_boost" || item.type === "coin_boost") {
     lines.push(`・效果：已自動套用，請查看 \`/背包\` 查詢剩餘時間`);
-  } else if (item.type === "role_color") {
-    lines.push(`・使用 \`/商店 裝備\` 啟用顏色身份組`);
-  } else if (item.type === "wallet_theme") {
-    lines.push(`・使用 \`/商店 裝備\` 套用到錢包卡與等級卡`);
-  } else if (item.type === "custom_title") {
-    lines.push(`・使用 \`/商店 設定稱號 <文字>\` 套用稱號`);
   }
-  await interaction.editReply(lines.join("\n"));
+
+  const invId = result.inventoryDoc?.insertedId
+    ? String(result.inventoryDoc.insertedId)
+    : null;
+  const components = [];
+  if (invId && (item.type === "role_color" || item.type === "wallet_theme")) {
+    const label =
+      item.type === "role_color" ? "🎨 立即裝備顏色" : "🎴 立即套用卡面";
+    components.push(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`shop_equip_btn_${invId}`)
+          .setLabel(label)
+          .setStyle(ButtonStyle.Primary),
+      ),
+    );
+  } else if (invId && item.type === "custom_title") {
+    components.push(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`shop_title_open_${invId}`)
+          .setLabel("🪪 設定稱號文字")
+          .setStyle(ButtonStyle.Primary),
+      ),
+    );
+  }
+
+  await interaction.editReply({ content: lines.join("\n"), components });
 }
 
 async function handleEquip(client, interaction) {
