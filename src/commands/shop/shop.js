@@ -2,6 +2,9 @@ require("colors");
 const {
   SlashCommandBuilder,
   EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   MessageFlags,
   InteractionContextType,
 } = require("discord.js");
@@ -9,7 +12,6 @@ const {
 const { shop } = require("../../config");
 const { getCatalog, getCategories, getItem } = require("../../features/shop/catalog");
 const buyItem = require("../../features/shop/buyItem");
-const equipItem = require("../../features/shop/equipItem");
 
 function categoryChoices() {
   return getCategories()
@@ -95,60 +97,35 @@ async function handleBuy(client, interaction) {
   }
   if (item.type === "xp_boost" || item.type === "coin_boost") {
     lines.push(`・效果：已自動套用，請查看 \`/背包\` 查詢剩餘時間`);
-  } else if (item.type === "role_color") {
-    lines.push(`・使用 \`/商店 裝備\` 啟用顏色身份組`);
-  } else if (item.type === "wallet_theme") {
-    lines.push(`・使用 \`/商店 裝備\` 套用到錢包卡與等級卡`);
-  } else if (item.type === "custom_title") {
-    lines.push(`・使用 \`/商店 設定稱號 <文字>\` 套用稱號`);
   }
-  await interaction.editReply(lines.join("\n"));
-}
 
-async function handleEquip(client, interaction) {
-  const inventoryId = interaction.options.getString("inventory_id");
-  if (!client.userInventoryCollection) {
-    return interaction.editReply("商店系統尚未就緒");
-  }
-  const result = await equipItem(client, {
-    userId: interaction.user.id,
-    guildId: interaction.guildId,
-    member: interaction.member,
-    guild: interaction.guild,
-    inventoryId,
-  });
-  if (!result.ok) return interaction.editReply(`❌ ${result.error}`);
-  await interaction.editReply(`✅ 已裝備 **${result.item.name}**`);
-}
-
-async function handleSetTitle(client, interaction) {
-  const text = interaction.options.getString("text");
-  if (!client.userInventoryCollection) {
-    return interaction.editReply("商店系統尚未就緒");
-  }
-  // 找一個未過期且 type=custom_title 的 inventory
-  const inv = await client.userInventoryCollection.findOne({
-    userId: interaction.user.id,
-    guildId: interaction.guildId,
-    type: "custom_title",
-    expired: { $ne: true },
-    $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
-  });
-  if (!inv) {
-    return interaction.editReply(
-      "❌ 你沒有可用的自訂稱號道具。先到 `/商店` 購買「自訂稱號」",
+  const invId = result.inventoryDoc?.insertedId
+    ? String(result.inventoryDoc.insertedId)
+    : null;
+  const components = [];
+  if (invId && (item.type === "role_color" || item.type === "wallet_theme")) {
+    const label =
+      item.type === "role_color" ? "🎨 立即裝備顏色" : "🎴 立即套用卡面";
+    components.push(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`shop_equip_btn_${invId}`)
+          .setLabel(label)
+          .setStyle(ButtonStyle.Primary),
+      ),
+    );
+  } else if (invId && item.type === "custom_title") {
+    components.push(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`shop_title_open_${invId}`)
+          .setLabel("🪪 設定稱號文字")
+          .setStyle(ButtonStyle.Primary),
+      ),
     );
   }
-  const result = await equipItem(client, {
-    userId: interaction.user.id,
-    guildId: interaction.guildId,
-    member: interaction.member,
-    guild: interaction.guild,
-    inventoryId: String(inv._id),
-    titleText: text,
-  });
-  if (!result.ok) return interaction.editReply(`❌ ${result.error}`);
-  await interaction.editReply(`✅ 已將稱號設為「${text.trim().slice(0, 24)}」`);
+
+  await interaction.editReply({ content: lines.join("\n"), components });
 }
 
 const data = new SlashCommandBuilder()
@@ -173,29 +150,6 @@ const data = new SlashCommandBuilder()
         if (choices) o.addChoices(...choices);
         return o;
       }),
-  )
-  .addSubcommand((sc) =>
-    sc
-      .setName("裝備")
-      .setDescription("裝備背包中的道具（顏色／主題）")
-      .addStringOption((o) =>
-        o
-          .setName("inventory_id")
-          .setDescription("從 /背包 取得的道具 ID")
-          .setRequired(true),
-      ),
-  )
-  .addSubcommand((sc) =>
-    sc
-      .setName("設定稱號")
-      .setDescription("設定自訂稱號（需先持有「自訂稱號」道具）")
-      .addStringOption((o) =>
-        o
-          .setName("text")
-          .setDescription("稱號文字（最多 24 字）")
-          .setMaxLength(24)
-          .setRequired(true),
-      ),
   );
 
 module.exports = {
@@ -214,8 +168,6 @@ module.exports = {
       const sub = interaction.options.getSubcommand();
       if (sub === "瀏覽") return handleBrowse(client, interaction);
       if (sub === "購買") return handleBuy(client, interaction);
-      if (sub === "裝備") return handleEquip(client, interaction);
-      if (sub === "設定稱號") return handleSetTitle(client, interaction);
       return interaction.editReply("未知子指令");
     } catch (error) {
       console.log(`[ERROR] /商店:\n${error}\n${error.stack}`.red);
