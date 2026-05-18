@@ -41,96 +41,96 @@ async function ensureSymbolExists(client, guildId, symbol) {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("股市事件")
-    .setDescription("[ADMIN] 管理股市突發事件（一次性觸發或加入事件簿）")
+    .setName("stock-event")
+    .setDescription("[ADMIN] Manage stock market events (one-time fire or add to event book)")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .setContexts(InteractionContextType.Guild)
     .addSubcommand((sc) =>
       sc
-        .setName("觸發")
-        .setDescription("[ADMIN] 立即觸發一次性事件（不加入事件簿）")
+        .setName("fire")
+        .setDescription("[ADMIN] Fire a one-time custom event immediately (not saved to event book)")
         .addStringOption((o) =>
-          o.setName("名稱").setDescription("事件顯示名稱，例如：央行救市").setRequired(true)
+          o.setName("name").setDescription("Event display name, e.g. 央行救市").setRequired(true)
         )
         .addNumberOption((o) =>
           o
-            .setName("漲跌幅")
-            .setDescription("百分比，例如 5 表示 +5%，-7 表示 -7%（範圍 -50 ~ 50）")
+            .setName("change")
+            .setDescription("Percent change, e.g. 5 = +5%, -7 = -7% (range -50 ~ 50)")
             .setMinValue(-50)
             .setMaxValue(50)
             .setRequired(true)
         )
         .addStringOption((o) =>
           o
-            .setName("目標")
-            .setDescription("股票代號（例如 TSPP），留空或填 ALL 代表全市場")
+            .setName("target")
+            .setDescription("Stock symbol (e.g. TSPP); leave empty or ALL for whole market")
             .setRequired(false)
         )
         .addBooleanOption((o) =>
           o
-            .setName("略過冷卻")
-            .setDescription("是否略過事件冷卻時間（預設 true）")
+            .setName("skip-cooldown")
+            .setDescription("Whether to bypass event cooldown (default true)")
             .setRequired(false)
         )
     )
     .addSubcommand((sc) =>
       sc
-        .setName("依id觸發")
-        .setDescription("[ADMIN] 依現有事件 id 立即觸發（不會新增到事件簿）")
+        .setName("fire-by-id")
+        .setDescription("[ADMIN] Fire an existing event by id (does not add to event book)")
         .addStringOption((o) =>
-          o.setName("id").setDescription("事件 id，可用「列表」查看").setRequired(true)
+          o.setName("id").setDescription("Event id; use `list` to view available ids").setRequired(true)
         )
         .addBooleanOption((o) =>
           o
-            .setName("略過冷卻")
-            .setDescription("是否略過事件冷卻時間（預設 true）")
+            .setName("skip-cooldown")
+            .setDescription("Whether to bypass event cooldown (default true)")
             .setRequired(false)
         )
     )
     .addSubcommand((sc) =>
       sc
-        .setName("加入事件簿")
-        .setDescription("[ADMIN] 新增事件至事件簿，未來會隨機觸發")
+        .setName("add")
+        .setDescription("[ADMIN] Add a new event to the event book (will randomly trigger later)")
         .addStringOption((o) =>
-          o.setName("名稱").setDescription("事件顯示名稱").setRequired(true)
+          o.setName("name").setDescription("Event display name").setRequired(true)
         )
         .addNumberOption((o) =>
           o
-            .setName("漲跌幅")
-            .setDescription("百分比，例如 8 表示 +8%（範圍 -50 ~ 50）")
+            .setName("change")
+            .setDescription("Percent change, e.g. 8 = +8% (range -50 ~ 50)")
             .setMinValue(-50)
             .setMaxValue(50)
             .setRequired(true)
         )
         .addStringOption((o) =>
           o
-            .setName("目標")
-            .setDescription("股票代號（例如 TSPP），留空或填 ALL 代表全市場")
+            .setName("target")
+            .setDescription("Stock symbol (e.g. TSPP); leave empty or ALL for whole market")
             .setRequired(false)
         )
         .addStringOption((o) =>
           o
             .setName("id")
-            .setDescription("自訂事件 id（英數/底線），留空自動由名稱產生")
+            .setDescription("Custom event id (alphanumeric/underscore); auto-generated from name if omitted")
             .setRequired(false)
         )
         .addBooleanOption((o) =>
           o
-            .setName("立即觸發")
-            .setDescription("新增後是否立即觸發一次（預設 false）")
+            .setName("fire-now")
+            .setDescription("Also fire it once immediately after adding (default false)")
             .setRequired(false)
         )
     )
     .addSubcommand((sc) =>
       sc
-        .setName("移除")
-        .setDescription("[ADMIN] 從事件簿移除自訂事件")
+        .setName("remove")
+        .setDescription("[ADMIN] Remove a custom event from the event book")
         .addStringOption((o) =>
-          o.setName("id").setDescription("要移除的事件 id").setRequired(true)
+          o.setName("id").setDescription("Event id to remove").setRequired(true)
         )
     )
     .addSubcommand((sc) =>
-      sc.setName("列表").setDescription("[ADMIN] 列出所有可用事件（static + 自訂）")
+      sc.setName("list").setDescription("[ADMIN] List all available events (static + custom)")
     )
     .toJSON(),
 
@@ -147,11 +147,11 @@ module.exports = {
       const sub = interaction.options.getSubcommand();
       const guildId = interaction.guildId;
 
-      if (sub === "觸發") {
-        const name = interaction.options.getString("名稱").trim();
-        const pct = interaction.options.getNumber("漲跌幅");
-        const target = normalizeSymbol(interaction.options.getString("目標"));
-        const force = interaction.options.getBoolean("略過冷卻") ?? true;
+      if (sub === "fire") {
+        const name = interaction.options.getString("name").trim();
+        const pct = interaction.options.getNumber("change");
+        const target = normalizeSymbol(interaction.options.getString("target"));
+        const force = interaction.options.getBoolean("skip-cooldown") ?? true;
 
         if (pct === 0) return interaction.editReply("❌ 漲跌幅不能為 0。");
         const exists = await ensureSymbolExists(client, guildId, target);
@@ -181,9 +181,9 @@ module.exports = {
         );
       }
 
-      if (sub === "依id觸發") {
+      if (sub === "fire-by-id") {
         const eventId = interaction.options.getString("id").trim();
-        const force = interaction.options.getBoolean("略過冷卻") ?? true;
+        const force = interaction.options.getBoolean("skip-cooldown") ?? true;
         const result = await fireEvent(client, guildId, eventId, {
           force,
           triggeredBy: interaction.user.id,
@@ -199,15 +199,15 @@ module.exports = {
         );
       }
 
-      if (sub === "加入事件簿") {
+      if (sub === "add") {
         if (!client.stockEventDefsCollection) {
           return interaction.editReply("🔧 事件簿尚未就緒（StockEventDefs collection 不存在）。");
         }
-        const name = interaction.options.getString("名稱").trim();
-        const pct = interaction.options.getNumber("漲跌幅");
-        const target = normalizeSymbol(interaction.options.getString("目標"));
+        const name = interaction.options.getString("name").trim();
+        const pct = interaction.options.getNumber("change");
+        const target = normalizeSymbol(interaction.options.getString("target"));
         const rawId = interaction.options.getString("id");
-        const fireNow = interaction.options.getBoolean("立即觸發") ?? false;
+        const fireNow = interaction.options.getBoolean("fire-now") ?? false;
 
         if (pct === 0) return interaction.editReply("❌ 漲跌幅不能為 0。");
         const exists = await ensureSymbolExists(client, guildId, target);
@@ -264,7 +264,7 @@ module.exports = {
         );
       }
 
-      if (sub === "移除") {
+      if (sub === "remove") {
         if (!client.stockEventDefsCollection) {
           return interaction.editReply("🔧 事件簿尚未就緒。");
         }
@@ -276,7 +276,7 @@ module.exports = {
         return interaction.editReply(`✅ 已移除自訂事件 \`${id}\``);
       }
 
-      if (sub === "列表") {
+      if (sub === "list") {
         const defs = await getMergedEventDefs(client, guildId);
         if (defs.length === 0) return interaction.editReply("（無）");
         const staticDefs = defs.filter((d) => d.source !== "dynamic");
@@ -307,7 +307,7 @@ module.exports = {
 
       return interaction.editReply("❌ 未知子指令。");
     } catch (error) {
-      console.log(`[ERROR] /股市事件:\n${error}\n${error.stack}`.red);
+      console.log(`[ERROR] /stock-event:\n${error}\n${error.stack}`.red);
       await interaction
         .editReply(`🔧 指令失敗：${error?.message || error}`)
         .catch(() => {});
