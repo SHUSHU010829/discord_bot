@@ -113,6 +113,9 @@ module.exports = async (client) => {
     // 經濟健康快照（每日聚合，用於通膨追蹤）
     const economySnapshotsCollection = database.collection("EconomySnapshots");
 
+    // 成員自辦活動 collections
+    const hostedEventsCollection = database.collection("HostedEvents");
+
     // 股市系統 collections
     const stockMarketCollection = database.collection("StockMarket");
     const stockPricesCollection = database.collection("StockPrices");
@@ -161,6 +164,7 @@ module.exports = async (client) => {
     client.welfareClaimsCollection = welfareClaimsCollection;
     client.questProgressCollection = questProgressCollection;
     client.economySnapshotsCollection = economySnapshotsCollection;
+    client.hostedEventsCollection = hostedEventsCollection;
     client.stockMarketCollection = stockMarketCollection;
     client.stockPricesCollection = stockPricesCollection;
     client.userPortfolioCollection = userPortfolioCollection;
@@ -561,6 +565,24 @@ module.exports = async (client) => {
       await stockEventsCollection.createIndex(
         { guildId: 1, eventId: 1, timestamp: -1 },
         { name: "stock_events_guild_eventId_time" }
+      );
+
+      // 成員自辦活動索引
+      await hostedEventsCollection.createIndex(
+        { eventId: 1 },
+        { unique: true, name: "uniq_hosted_event_id" }
+      );
+      await hostedEventsCollection.createIndex(
+        { guildId: 1, status: 1, createdAt: -1 },
+        { name: "hosted_event_guild_status_time" }
+      );
+      await hostedEventsCollection.createIndex(
+        { messageId: 1 },
+        { sparse: true, name: "hosted_event_messageId" }
+      );
+      await hostedEventsCollection.createIndex(
+        { hostId: 1, guildId: 1, status: 1 },
+        { name: "hosted_event_host_status" }
       );
     } catch (indexError) {
       console.log(
