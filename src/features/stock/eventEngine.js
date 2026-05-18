@@ -3,12 +3,39 @@ const { EmbedBuilder } = require("discord.js");
 const { stockSystem, stockEventConfig } = require("../../config");
 const { applyEvent } = require("./priceEngine");
 
-function getEventDefs() {
+function getStaticEventDefs() {
   return stockEventConfig?.events || [];
 }
 
-function findEventById(eventId) {
-  return getEventDefs().find((e) => e.id === eventId) || null;
+async function getDynamicEventDefs(client, guildId) {
+  if (!client?.stockEventDefsCollection || !guildId) return [];
+  return client.stockEventDefsCollection
+    .find({ guildId, enabled: { $ne: false } })
+    .toArray();
+}
+
+// 合併 static (config) + dynamic (DB) 事件定義；同 id 以 dynamic 覆蓋
+async function getMergedEventDefs(client, guildId) {
+  const statics = getStaticEventDefs();
+  const dynamics = await getDynamicEventDefs(client, guildId);
+  const map = new Map();
+  for (const e of statics) map.set(e.id, { ...e, source: "static" });
+  for (const e of dynamics) {
+    map.set(e.id, {
+      id: e.id,
+      name: e.name,
+      effect: e.effect,
+      stock: e.stock,
+      dir: e.dir,
+      source: "dynamic",
+    });
+  }
+  return Array.from(map.values());
+}
+
+async function findEventById(client, guildId, eventId) {
+  const defs = await getMergedEventDefs(client, guildId);
+  return defs.find((e) => e.id === eventId) || null;
 }
 
 async function isOnCooldown(client, guildId, eventId) {
@@ -27,7 +54,7 @@ async function isOnCooldown(client, guildId, eventId) {
 async function rollRandomEvent(client, guildId) {
   const chance = stockEventConfig?.randomEventChance ?? 0.05;
   if (Math.random() >= chance) return null;
-  const events = getEventDefs();
+  const events = await getMergedEventDefs(client, guildId);
   if (events.length === 0) return null;
 
   // 隨機抽一個還沒在 cooldown 中的
@@ -69,9 +96,12 @@ async function applyEffectToStocks(client, guildId, targetSymbol, effect) {
 }
 
 async function fireEvent(client, guildId, eventId, opts = {}) {
-  const def = findEventById(eventId);
+  // 支援 ad-hoc：opts.customDef 直接帶入定義（不需要事先註冊）
+  const def = opts.customDef
+    ? { ...opts.customDef, source: "adhoc" }
+    : await findEventById(client, guildId, eventId);
   if (!def) return null;
-  if (!opts.force && (await isOnCooldown(client, guildId, eventId))) return null;
+  if (!opts.force && (await isOnCooldown(client, guildId, def.id))) return null;
 
   const changes = await applyEffectToStocks(client, guildId, def.stock, def.effect);
   if (changes.length === 0) return null;
@@ -126,4 +156,7 @@ module.exports = {
   fireEvent,
   findEventById,
   isOnCooldown,
+  getStaticEventDefs,
+  getDynamicEventDefs,
+  getMergedEventDefs,
 };

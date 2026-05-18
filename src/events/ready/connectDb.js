@@ -119,6 +119,7 @@ module.exports = async (client) => {
     const userPortfolioCollection = database.collection("UserPortfolio");
     const stockTransactionsCollection = database.collection("StockTransactions");
     const stockEventsCollection = database.collection("StockEvents");
+    const stockEventDefsCollection = database.collection("StockEventDefs");
 
     client.database = database;
     client.collection = collection;
@@ -166,6 +167,7 @@ module.exports = async (client) => {
     client.userPortfolioCollection = userPortfolioCollection;
     client.stockTransactionsCollection = stockTransactionsCollection;
     client.stockEventsCollection = stockEventsCollection;
+    client.stockEventDefsCollection = stockEventDefsCollection;
     await economySnapshotsCollection
       .createIndex({ guildId: 1, date: 1 }, { unique: true })
       .catch((e) =>
@@ -561,6 +563,10 @@ module.exports = async (client) => {
       await stockEventsCollection.createIndex(
         { guildId: 1, eventId: 1, timestamp: -1 },
         { name: "stock_events_guild_eventId_time" }
+      );
+      await stockEventDefsCollection.createIndex(
+        { guildId: 1, id: 1 },
+        { unique: true, name: "stock_event_defs_guild_id" }
       );
     } catch (indexError) {
       console.log(
