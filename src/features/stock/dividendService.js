@@ -37,6 +37,7 @@ async function payoutForStock(client, guildId, stockDoc) {
   const perSharePerWeek = (stockDoc.currentPrice * annualYield) / weeksPerYear;
   let totalPaid = 0;
   let recipients = 0;
+  const recipientDetails = [];
 
   for (const h of holders) {
     const payout = computePayout(h.shares, stockDoc.currentPrice, annualYield, weeksPerYear, minPerHolder);
@@ -57,6 +58,11 @@ async function payoutForStock(client, guildId, stockDoc) {
       if (result) {
         totalPaid += result.granted;
         recipients += 1;
+        recipientDetails.push({
+          userId: h.userId,
+          shares: h.shares,
+          payout: result.granted,
+        });
         await client.stockTransactionsCollection.insertOne({
           userId: h.userId,
           guildId,
@@ -82,6 +88,7 @@ async function payoutForStock(client, guildId, stockDoc) {
     perSharePerWeek: Number(perSharePerWeek.toFixed(4)),
     recipients,
     totalPaid,
+    recipientDetails,
   };
 }
 
@@ -131,9 +138,68 @@ async function announce(client, guildId, summaries) {
   await channel.send({ embeds: [embed] }).catch(() => {});
 }
 
+// 彙總每位用戶在各股的本週配息，逐一 DM
+async function sendDmNotifications(client, summaries) {
+  if (!summaries || summaries.length === 0) return;
+
+  const perUser = new Map();
+  for (const s of summaries) {
+    for (const r of s.recipientDetails || []) {
+      let entry = perUser.get(r.userId);
+      if (!entry) {
+        entry = { userId: r.userId, total: 0, items: [] };
+        perUser.set(r.userId, entry);
+      }
+      entry.total += r.payout;
+      entry.items.push({
+        symbol: s.symbol,
+        name: s.name,
+        shares: r.shares,
+        payout: r.payout,
+        annualYield: s.annualYield,
+        currentPrice: s.currentPrice,
+        perSharePerWeek: s.perSharePerWeek,
+      });
+    }
+  }
+
+  for (const entry of perUser.values()) {
+    try {
+      const user = await client.users.fetch(entry.userId).catch(() => null);
+      if (!user) continue;
+
+      const lines = entry.items
+        .sort((a, b) => b.payout - a.payout)
+        .map((it) => {
+          const yieldPct = (it.annualYield * 100).toFixed(1);
+          return (
+            `\`${it.symbol}\` ${it.name}\n` +
+            `　持股 **${it.shares}** ｜ 每股 ${it.perSharePerWeek.toFixed(2)}（年化 ${yieldPct}%）\n` +
+            `　本次入帳 **${it.payout.toLocaleString()}** credits`
+          );
+        });
+
+      const embed = new EmbedBuilder()
+        .setTitle("💰 你本週的股息入帳")
+        .setColor(0x2ecc71)
+        .setDescription(lines.join("\n\n"))
+        .addFields({
+          name: "本週合計",
+          value: `**${entry.total.toLocaleString()}** credits（共 ${entry.items.length} 支股票）`,
+        })
+        .setTimestamp(new Date());
+
+      await user.send({ embeds: [embed] }).catch(() => {});
+    } catch (e) {
+      console.log(`[DIV] DM 失敗 user=${entry.userId}: ${e?.message || e}`.yellow);
+    }
+  }
+}
+
 module.exports = {
   payoutAll,
   payoutForStock,
   announce,
+  sendDmNotifications,
   computePayout,
 };

@@ -2,7 +2,7 @@ require("colors");
 
 const cron = require("node-cron");
 const { stockSystem } = require("../../config");
-const { payoutAll, announce } = require("../../features/stock/dividendService");
+const { payoutAll, announce, sendDmNotifications } = require("../../features/stock/dividendService");
 
 let task = null;
 let consecutiveErrors = 0;
@@ -26,6 +26,7 @@ async function runPayout(client) {
       const hits = summaries.reduce((a, b) => a + b.recipients, 0);
       console.log(`[DIV] guild=${guildId} 本週配息完成：${total.toLocaleString()} credits, ${hits} 筆派息, ${summaries.length} 支股票`.cyan);
       await announce(client, guildId, summaries);
+      await sendDmNotifications(client, summaries);
     } catch (e) {
       console.log(`[DIV] guild=${guildId} 配息失敗：${e?.stack || e?.message || e}`.red);
       throw e;
