@@ -33,6 +33,7 @@ function buildActiveEmbed(eventDoc) {
     minParticipants,
     maxParticipants,
     participants,
+    recruitmentClosed,
   } = eventDoc;
 
   const participantLine = participants.length
@@ -44,9 +45,13 @@ function buildActiveEmbed(eventDoc) {
     : `${participants.length}（最少 ${minParticipants}）`;
 
   const isFull = maxParticipants && participants.length >= maxParticipants;
+  let statusLabel;
+  if (recruitmentClosed) statusLabel = "報名已截止";
+  else if (isFull) statusLabel = "報名中（已滿）";
+  else statusLabel = "報名中";
 
   return new EmbedBuilder()
-    .setColor(EMBED_COLOR_ACTIVE)
+    .setColor(recruitmentClosed ? 0x95a5a6 : EMBED_COLOR_ACTIVE)
     .setTitle(`🎉 ${name}`)
     .setDescription(description || "（沒有描述）")
     .addFields(
@@ -55,7 +60,7 @@ function buildActiveEmbed(eventDoc) {
       { name: "名次", value: `${rankCount} 名`, inline: true },
       { name: "報名人數", value: capacityLabel, inline: false },
       {
-        name: isFull ? "報名中（已滿）" : "報名中",
+        name: statusLabel,
         value: participantLine.slice(0, 1024),
         inline: false,
       }
@@ -103,13 +108,15 @@ function buildCancelledEmbed(eventDoc) {
     .setTimestamp(eventDoc.cancelledAt || new Date());
 }
 
-function buildActionRow(eventId) {
+function buildActionRow(eventId, opts = {}) {
+  const { recruitmentClosed = false } = opts;
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`event_join_${eventId}`)
-      .setLabel("參與")
+      .setLabel(recruitmentClosed ? "報名已截止" : "參與")
       .setEmoji("🎟️")
-      .setStyle(ButtonStyle.Success),
+      .setStyle(recruitmentClosed ? ButtonStyle.Secondary : ButtonStyle.Success)
+      .setDisabled(recruitmentClosed),
     new ButtonBuilder()
       .setCustomId(`event_manage_${eventId}`)
       .setLabel("管理（限主辦人）")
@@ -121,6 +128,7 @@ function buildActionRow(eventId) {
 function buildManagePanel(eventDoc) {
   const participantCount = eventDoc.participants.length;
   const canSettle = participantCount >= eventDoc.minParticipants;
+  const isClosed = !!eventDoc.recruitmentClosed;
 
   const settleBtn = new ButtonBuilder()
     .setCustomId(`event_settle_${eventDoc.eventId}`)
@@ -129,13 +137,19 @@ function buildManagePanel(eventDoc) {
     .setStyle(ButtonStyle.Primary)
     .setDisabled(!canSettle);
 
+  const toggleBtn = new ButtonBuilder()
+    .setCustomId(`event_toggleopen_${eventDoc.eventId}`)
+    .setLabel(isClosed ? "重新開放報名" : "結束報名")
+    .setEmoji(isClosed ? "🔓" : "🔒")
+    .setStyle(isClosed ? ButtonStyle.Success : ButtonStyle.Secondary);
+
   const cancelBtn = new ButtonBuilder()
     .setCustomId(`event_cancel_${eventDoc.eventId}`)
     .setLabel("取消活動")
     .setEmoji("🚫")
     .setStyle(ButtonStyle.Danger);
 
-  return new ActionRowBuilder().addComponents(settleBtn, cancelBtn);
+  return new ActionRowBuilder().addComponents(settleBtn, toggleBtn, cancelBtn);
 }
 
 function buildPickSelect(eventDoc, rank, alreadyPicked, participantMembers) {
@@ -289,7 +303,11 @@ async function refreshEventMessage(client, eventDoc) {
   let components;
   if (eventDoc.status === "RECRUITING") {
     embed = buildActiveEmbed(eventDoc);
-    components = [buildActionRow(eventDoc.eventId)];
+    components = [
+      buildActionRow(eventDoc.eventId, {
+        recruitmentClosed: !!eventDoc.recruitmentClosed,
+      }),
+    ];
   } else if (eventDoc.status === "SETTLED") {
     embed = buildSettledEmbed(eventDoc);
     components = [];
@@ -308,6 +326,9 @@ function unwrap(res) {
 }
 
 async function toggleJoin(client, eventDoc, userId) {
+  if (eventDoc.recruitmentClosed) {
+    return { action: "closed", doc: eventDoc };
+  }
   const isJoined = eventDoc.participants.includes(userId);
   if (isJoined) {
     const updated = await client.hostedEventsCollection.findOneAndUpdate(
@@ -337,6 +358,20 @@ async function toggleJoin(client, eventDoc, userId) {
   const doc = unwrap(updated);
   if (!doc) return { action: "full", doc: eventDoc };
   return { action: "join", doc };
+}
+
+async function setRecruitmentClosed(client, eventDoc, closed) {
+  const updated = await client.hostedEventsCollection.findOneAndUpdate(
+    { _id: eventDoc._id, status: "RECRUITING" },
+    { $set: { recruitmentClosed: !!closed, updatedAt: new Date() } },
+    { returnDocument: "after" }
+  );
+  const doc = unwrap(updated);
+  if (!doc) {
+    throw new Error("活動已不在報名階段。");
+  }
+  await refreshEventMessage(client, doc).catch(() => {});
+  return doc;
 }
 
 async function cancelEvent(client, eventDoc, actor, channel) {
@@ -479,6 +514,7 @@ module.exports = {
   toggleJoin,
   cancelEvent,
   settleEvent,
+  setRecruitmentClosed,
   refreshEventMessage,
   buildActiveEmbed,
   buildSettledEmbed,
