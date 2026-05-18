@@ -20,6 +20,12 @@
       "bear": -0.001,
       "sideways": 0
     },
+    "sentimentRotation": {
+      "enabled": true,
+      "cronSchedule": "0 9 * * *",
+      "weights": { "bull": 1, "bear": 1, "sideways": 2 },
+      "announce": true
+    },
     "chart": {
       "historyPoints": 20
     },
