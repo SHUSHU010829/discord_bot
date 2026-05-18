@@ -19,8 +19,62 @@ const SENTIMENT_LABEL = {
 let tickTask = null;
 let openTask = null;
 let closeTask = null;
+let sentimentTask = null;
 let consecutiveErrors = 0;
 const MAX_CONSECUTIVE_ERRORS = 3;
+
+function pickWeightedSentiment(weights) {
+  const entries = Object.entries(weights || {}).filter(([, w]) => Number(w) > 0);
+  if (entries.length === 0) return "sideways";
+  const total = entries.reduce((s, [, w]) => s + Number(w), 0);
+  let r = Math.random() * total;
+  for (const [k, w] of entries) {
+    r -= Number(w);
+    if (r <= 0) return k;
+  }
+  return entries[entries.length - 1][0];
+}
+
+async function rotateSentimentOnce(client) {
+  const cfg = stockSystem?.sentimentRotation;
+  if (!cfg?.enabled) return;
+  const guildIds = await listGuildIdsWithMarket(client);
+  for (const guildId of guildIds) {
+    const stocks = await client.stockMarketCollection
+      .find({ guildId, enabled: { $ne: false } })
+      .toArray();
+    if (stocks.length === 0) continue;
+    const prev = stocks[0]?.marketSentiment || stockSystem?.defaultMarketSentiment || "sideways";
+    const next = pickWeightedSentiment(cfg.weights);
+    await client.stockMarketCollection.updateMany(
+      { guildId, enabled: { $ne: false } },
+      { $set: { marketSentiment: next, sentimentUpdatedAt: new Date() } }
+    );
+    console.log(`[STOCK] sentiment rotated guild=${guildId} ${prev} → ${next}`.cyan);
+    if (cfg.announce !== false) {
+      await announceSentimentChange(client, prev, next).catch((e) =>
+        console.log(`[STOCK] sentiment announce failed guild=${guildId}: ${e?.message || e}`.yellow)
+      );
+    }
+  }
+}
+
+async function announceSentimentChange(client, prev, next) {
+  const channelId = stockSystem?.announceChannelId || stockSystem?.broadcastChannelId || stockSystem?.reportChannelId;
+  if (!channelId) return;
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+  if (!channel?.isTextBased?.()) return;
+  if (prev === next) return;
+  const color = next === "bull" ? 0x2ecc71 : next === "bear" ? 0xe74c3c : 0x95a5a6;
+  const embed = new EmbedBuilder()
+    .setTitle("🧭 市場情緒切換")
+    .setColor(color)
+    .setDescription(
+      `今日市場情緒：**${SENTIMENT_LABEL[next] || next}**（前日：${SENTIMENT_LABEL[prev] || prev}）`
+    )
+    .setTimestamp(new Date());
+  await channel.send({ embeds: [embed] }).catch(() => {});
+}
 
 async function listGuildIdsWithMarket(client) {
   if (!client.stockMarketCollection) return [];
@@ -321,9 +375,28 @@ module.exports = async (client) => {
     { timezone: tz }
   );
 
-  console.log(
-    `[STOCK] 股市排程已啟動：tick=${tickSchedule}, open=${openSchedule}, close=${closeSchedule} (${tz})`.cyan
-  );
+  const sentimentCfg = stockSystem.sentimentRotation;
+  if (sentimentCfg?.enabled) {
+    const sentimentSchedule = sentimentCfg.cronSchedule || "0 9 * * *";
+    sentimentTask = cron.schedule(
+      sentimentSchedule,
+      async () => {
+        try {
+          await rotateSentimentOnce(client);
+        } catch (err) {
+          console.log(`[ERROR] marketScheduler sentiment failed:\n${err?.stack || err}`.red);
+        }
+      },
+      { timezone: tz }
+    );
+    console.log(
+      `[STOCK] 股市排程已啟動：tick=${tickSchedule}, open=${openSchedule}, close=${closeSchedule}, sentiment=${sentimentSchedule} (${tz})`.cyan
+    );
+  } else {
+    console.log(
+      `[STOCK] 股市排程已啟動：tick=${tickSchedule}, open=${openSchedule}, close=${closeSchedule} (${tz})`.cyan
+    );
+  }
 };
 
 async function alertSchedulerStopped(client) {
@@ -342,3 +415,4 @@ module.exports.tickOnce = tickOnce;
 module.exports.runOpen = runOpen;
 module.exports.runClose = runClose;
 module.exports.postMarketBroadcast = postMarketBroadcast;
+module.exports.rotateSentimentOnce = rotateSentimentOnce;
