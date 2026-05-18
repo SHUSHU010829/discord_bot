@@ -29,6 +29,11 @@
     "deleteReason": "動態語音頻道已空，自動刪除"
   },
 
+  "hostedEvents": {
+    "publishChannelId": "1174352640210124877",
+    "maxRankCount": 5
+  },
+
   "ticket": {
     "categoryId": "1445041268114587779",
     "supportRoleId": "1174352637295067164",
