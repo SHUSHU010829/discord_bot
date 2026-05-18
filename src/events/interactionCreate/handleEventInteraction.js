@@ -5,6 +5,7 @@ const {
   toggleJoin,
   cancelEvent,
   settleEvent,
+  setRecruitmentClosed,
   refreshEventMessage,
   buildManagePanel,
   buildPickSelect,
@@ -42,6 +43,7 @@ function isEventInteraction(customId) {
       customId.startsWith("event_manage_") ||
       customId.startsWith("event_settle_") ||
       customId.startsWith("event_cancel_") ||
+      customId.startsWith("event_toggleopen_") ||
       customId.startsWith("event_pick_") ||
       customId.startsWith("event_amounts_"))
   );
@@ -83,6 +85,9 @@ async function handleJoinButton(client, interaction) {
   if (result.action === "full") {
     return interaction.editReply("🚫 活動人數已滿，無法報名。");
   }
+  if (result.action === "closed") {
+    return interaction.editReply("🔒 報名已截止，無法加入。");
+  }
 
   await refreshEventMessage(client, result.doc).catch(() => {});
 
@@ -117,6 +122,40 @@ async function handleManageButton(client, interaction) {
     components: [buildManagePanel(doc)],
     flags: MessageFlags.Ephemeral,
   });
+}
+
+async function handleToggleOpenButton(client, interaction) {
+  await interaction.deferUpdate();
+
+  const { doc } = await loadEventByCustomId(
+    client,
+    interaction.customId,
+    "event_toggleopen_"
+  );
+  if (!doc) return interaction.editReply({ content: "❌ 找不到活動。", components: [] });
+  if (interaction.user.id !== doc.hostId) {
+    return interaction.editReply({ content: "❌ 只有主辦人能操作。", components: [] });
+  }
+  if (doc.status !== "RECRUITING") {
+    return interaction.editReply({
+      content: "❌ 活動已不在報名階段。",
+      components: [],
+    });
+  }
+
+  try {
+    const next = !doc.recruitmentClosed;
+    const updated = await setRecruitmentClosed(client, doc, next);
+    await interaction.editReply({
+      content: next
+        ? `🔒 已結束「${doc.name}」的報名，原訊息「參與」鈕已禁用。`
+        : `🔓 已重新開放「${doc.name}」的報名。`,
+      components: [buildManagePanel(updated)],
+    });
+  } catch (err) {
+    console.log(`[ERROR] event toggle recruitment: ${err}`.red);
+    await interaction.editReply({ content: `❌ ${err.message || err}`, components: [] });
+  }
 }
 
 async function handleCancelButton(client, interaction) {
@@ -364,6 +403,7 @@ module.exports = async (client, interaction) => {
       if (customId.startsWith("event_manage_")) return handleManageButton(client, interaction);
       if (customId.startsWith("event_settle_")) return startSettleFlow(client, interaction);
       if (customId.startsWith("event_cancel_")) return handleCancelButton(client, interaction);
+      if (customId.startsWith("event_toggleopen_")) return handleToggleOpenButton(client, interaction);
       if (customId.startsWith("event_amounts_")) return handleAmountsButton(client, interaction);
     } else if (interaction.isStringSelectMenu()) {
       if (customId.startsWith("event_pick_")) return handlePickSelect(client, interaction);
