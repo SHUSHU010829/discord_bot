@@ -9,6 +9,10 @@ require("colors");
 
 const axios = require("axios");
 const cheerio = require("cheerio");
+const {
+  isGenericPlaceName,
+  looksLikeAddress,
+} = require("../utils/recommendationParser");
 
 const FETCH_TIMEOUT_MS = 8_000;
 const MAX_REDIRECTS = 5;
@@ -124,7 +128,24 @@ async function fetchMapMeta(url) {
       typeof ogTitle === "string" && !isGenericTitle(ogTitle)
         ? ogTitle.trim()
         : null;
-    const placeName = titleFromOg || fromUrl.placeName || null;
+    const rawTitle = titleFromOg || fromUrl.placeName || null;
+
+    // 判斷這個「title」實際是什麼：
+    // - 通用值 → 全部捨棄
+    // - 地址 → 放到 address 欄位，placeName 為 null
+    // - 店名 → 放到 placeName
+    let placeName = null;
+    let address = null;
+    if (rawTitle) {
+      const trimmed = String(rawTitle).slice(0, 200);
+      if (isGenericPlaceName(trimmed)) {
+        // 連 "Google Maps" / Discord 表情碼之類都過濾
+      } else if (looksLikeAddress(trimmed)) {
+        address = trimmed.slice(0, 200);
+      } else {
+        placeName = trimmed.slice(0, 120);
+      }
+    }
 
     // og:description 在通用頁也常常是 "Find local businesses..."，過濾掉
     const descFromOg =
@@ -137,7 +158,8 @@ async function fetchMapMeta(url) {
     const meta = {
       sourceUrl: url,
       finalUrl,
-      placeName: placeName ? String(placeName).slice(0, 120) : null,
+      placeName,
+      address,
       description: descFromOg ? descFromOg.slice(0, 500) : null,
       image: ogImage || null,
       lat: Number.isFinite(fromUrl.lat) ? fromUrl.lat : null,
@@ -145,7 +167,7 @@ async function fetchMapMeta(url) {
       fetchedAt: new Date(),
     };
 
-    if (!meta.placeName && !meta.description && meta.lat == null) {
+    if (!meta.placeName && !meta.address && !meta.description && meta.lat == null) {
       return null;
     }
     return meta;
@@ -177,7 +199,8 @@ function formatMapContextForPrompt(metas) {
   const blocks = metas
     .map((m) => {
       const lines = [];
-      if (m.placeName) lines.push(`店名：${m.placeName}`);
+      if (m.placeName) lines.push(`可能店名：${m.placeName}`);
+      if (m.address) lines.push(`地址：${m.address}`);
       if (m.description) lines.push(`描述：${m.description}`);
       if (m.lat != null && m.lng != null) {
         lines.push(`座標：${m.lat},${m.lng}`);

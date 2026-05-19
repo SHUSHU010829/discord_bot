@@ -9,8 +9,9 @@ const axios = require("axios");
 const {
   normalizeAnalysis,
   heuristicAnalyze,
-  stripUrls,
+  cleanMessageText,
   isGenericPlaceName,
+  looksLikeAddress,
 } = require("../utils/recommendationParser");
 const { formatMapContextForPrompt } = require("./mapMetaFetcher");
 
@@ -53,7 +54,7 @@ function recordSuccess() {
 }
 
 const SCHEMA_DOC = `欄位定義：
-- "name": 店名或場所名稱（簡短，不含描述）。不可以使用 "Google Maps"、"Google 地圖"、"地圖"、"連結" 等通用詞；沒明確店名就填 null。
+- "name": 店名或場所名稱（簡短，不含描述）。沒明確店名就填 null。
 - "type": "restaurant" | "bar" | "beverage" | "entertainment" | "other"
 - "cuisine": 若 type=restaurant，標出料理類型（日式、韓式、火鍋、燒肉、義式、咖啡廳、早午餐、甜點、小吃...）；否則 null
 - "mealTimes": 陣列，元素為 "breakfast" | "lunch" | "dinner" | "snack"；不確定填空陣列
@@ -66,7 +67,16 @@ type 規則：
 - 酒吧/居酒屋/餐酒館/精釀店 → bar
 - 手搖飲料、咖啡廳（不主打餐點）、茶飲店 → beverage
 - KTV、桌遊、電影院、密室、樂園、SPA、夜店 → entertainment
-- 無法判斷 → other`;
+- 無法判斷 → other
+
+name 規則（重要）：
+- 必須是真實的店名／品牌名稱。例：「鼎泰豐」「星巴克」「Re:Creation」
+- 不可以是地址（含郵遞區號、縣市、區、路號）。地址塞到 area 即可，name 仍填 null
+- 不可以是 "Google Maps"、"Google 地圖"、"地圖"、"連結" 等通用詞
+- 不可以是純數字、Discord 表情碼（例 "a:nessie:1279579267931439176"）、隨機字串
+- Maps 資訊裡有時 placeName 抓到的是地址或片段，請判斷後再用：是地址→放 area 不放 name；是店名→才放 name
+
+判斷優先順序：使用者訊息 > Maps 資訊。當兩者衝突以使用者訊息為主。`;
 
 const SYSTEM_PROMPT_SINGLE = `你是一個專門處理推薦資訊的分類助手。
 使用者會給你一段來自 Discord 推薦頻道的訊息（通常是餐廳、酒吧、飲料、娛樂場所的介紹），
@@ -266,7 +276,7 @@ function applyFallbackName(analysis, mapMetas) {
 
 // 對外介面：單筆分析
 async function analyzeRecommendation(rawText, options = {}) {
-  const text = stripUrls(rawText || "").trim();
+  const text = cleanMessageText(rawText || "").trim();
   const mapContext = formatMapContextForPrompt(options.mapMetas);
 
   if (!text && !mapContext) return heuristicAnalyze("");
@@ -287,7 +297,7 @@ async function analyzeRecommendationBatch(items, options = {}) {
 
   const prepared = items.map((it) => ({
     id: String(it.id),
-    text: stripUrls(it.rawText || "").trim(),
+    text: cleanMessageText(it.rawText || "").trim(),
     mapContext: formatMapContextForPrompt(it.mapMetas),
     mapMetas: it.mapMetas,
   }));
