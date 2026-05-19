@@ -9,7 +9,8 @@
     "update-calendar": "node ./src/scripts/updateCalendar.js",
     "verify-calendar": "node ./src/scripts/verifyCalendar.js",
     "convert-calendar": "node ./src/scripts/convertCalendarFormat.js",
-    "clear-crash-stats": "node ./src/scripts/clearCrashStats.js"
+    "clear-crash-stats": "node ./src/scripts/clearCrashStats.js",
+    "backfill-recommendations": "node ./src/scripts/backfillRecommendations.js"
   },
   "keywords": [],
   "author": "ShuShu",
