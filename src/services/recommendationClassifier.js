@@ -6,12 +6,16 @@ const {
   normalizeAnalysis,
   heuristicAnalyze,
   stripUrls,
+  isGenericPlaceName,
 } = require("../utils/recommendationParser");
 const { formatMapContextForPrompt } = require("./mapMetaFetcher");
 
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5";
 const API_TIMEOUT_MS = 15_000;
+// 遇到 Overloaded / 5xx 時的重試設定
+const RETRY_STATUSES = new Set([429, 500, 502, 503, 504, 529]);
+const RETRY_DELAYS_MS = [1500, 4000, 9000];
 
 // 簡單失敗保險絲：連續失敗 → 暫停一段時間避免無謂呼叫
 const CB_FAIL_WINDOW_MS = 5 * 60 * 1000;
@@ -64,7 +68,32 @@ type 規則：
 - 酒吧/居酒屋/餐酒館/精釀店 → bar
 - 手搖飲料、咖啡廳（不主打餐點）、茶飲店 → beverage
 - KTV、桌遊、電影院、密室、樂園、SPA、夜店 → entertainment
-- 無法判斷 → other`;
+- 無法判斷 → other
+
+name 規則：
+- 必須是實際店名或場所名稱
+- 不可以使用 "Google Maps"、"Google 地圖"、"地圖"、"連結" 等通用詞當作 name
+- 如果使用者訊息與 Google Maps 連結資訊都沒有明確店名，name 填 null`;
+
+async function callClaudeOnce(apiKey, userContent) {
+  return axios.post(
+    ANTHROPIC_API,
+    {
+      model: MODEL,
+      max_tokens: 600,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userContent }],
+    },
+    {
+      timeout: API_TIMEOUT_MS,
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+    },
+  );
+}
 
 async function classifyWithClaude(text, mapContext = "") {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -75,52 +104,52 @@ async function classifyWithClaude(text, mapContext = "") {
     ? `請分析以下推薦訊息並輸出 JSON：\n\n[使用者訊息]\n${text}\n\n[Google Maps 連結資訊（如與訊息衝突，以訊息為主）]\n${mapContext}`
     : `請分析以下推薦訊息並輸出 JSON：\n\n${text}`;
 
-  try {
-    const response = await axios.post(
-      ANTHROPIC_API,
-      {
-        model: MODEL,
-        max_tokens: 600,
-        system: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: "user",
-            content: userContent,
-          },
-        ],
-      },
-      {
-        timeout: API_TIMEOUT_MS,
-        headers: {
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-      },
-    );
+  let lastError = null;
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      const response = await callClaudeOnce(apiKey, userContent);
+      const blocks = response.data?.content || [];
+      const textBlock = blocks.find((b) => b.type === "text");
+      if (!textBlock?.text) {
+        recordFailure();
+        return null;
+      }
+      const parsed = parseJsonLoose(textBlock.text);
+      if (!parsed) {
+        recordFailure();
+        return null;
+      }
+      recordSuccess();
+      return parsed;
+    } catch (error) {
+      lastError = error;
+      const status = error.response?.status;
+      const isRetryable =
+        RETRY_STATUSES.has(status) ||
+        error.code === "ECONNRESET" ||
+        error.code === "ETIMEDOUT" ||
+        error.code === "ECONNABORTED";
 
-    const blocks = response.data?.content || [];
-    const textBlock = blocks.find((b) => b.type === "text");
-    if (!textBlock?.text) {
-      recordFailure();
-      return null;
+      if (!isRetryable || attempt >= RETRY_DELAYS_MS.length) break;
+
+      const delay = RETRY_DELAYS_MS[attempt];
+      const reason =
+        error.response?.data?.error?.message || error.code || error.message;
+      console.log(
+        `[Recommendation] Claude API ${status || error.code} 重試中（${attempt + 1}/${RETRY_DELAYS_MS.length}，${delay}ms）：${reason}`
+          .yellow,
+      );
+      await new Promise((r) => setTimeout(r, delay));
     }
-
-    const parsed = parseJsonLoose(textBlock.text);
-    if (!parsed) {
-      recordFailure();
-      return null;
-    }
-
-    recordSuccess();
-    return parsed;
-  } catch (error) {
-    recordFailure();
-    const detail =
-      error.response?.data?.error?.message || error.message || error;
-    console.log(`[Recommendation] Claude API 失敗：${detail}`.yellow);
-    return null;
   }
+
+  recordFailure();
+  const detail =
+    lastError?.response?.data?.error?.message ||
+    lastError?.message ||
+    lastError;
+  console.log(`[Recommendation] Claude API 失敗：${detail}`.yellow);
+  return null;
 }
 
 // 抽出第一個 JSON 物件（防 Claude 不小心多輸出文字或 code fence）
@@ -156,7 +185,11 @@ async function analyzeRecommendation(rawText, options = {}) {
   // Fallback：啟發式無法命中時，把 mapMeta 的 placeName 拿來補 name
   const fallback = heuristicAnalyze(text);
   const firstMeta = Array.isArray(options.mapMetas) ? options.mapMetas[0] : null;
-  if (firstMeta?.placeName && !fallback.name) {
+  if (
+    firstMeta?.placeName &&
+    !isGenericPlaceName(firstMeta.placeName) &&
+    !fallback.name
+  ) {
     fallback.name = firstMeta.placeName.slice(0, 50);
   }
   return fallback;

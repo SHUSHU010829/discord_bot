@@ -32,6 +32,16 @@ function extractMapUrls(text) {
   return Array.from(found);
 }
 
+// 過濾 AI 偶爾會把 og:title 直接抄成店名的通用值
+function isGenericPlaceName(name) {
+  if (!name) return false;
+  const t = String(name).trim().toLowerCase();
+  if (!t) return false;
+  if (/^google\s*(maps?|地圖|地图|マップ|지도)(\s|$|[-—–|·:：])/.test(t)) return true;
+  if (/^(地圖|地图|連結|连结|maps?|map|link)$/.test(t)) return true;
+  return false;
+}
+
 function stripUrls(text) {
   if (!text) return "";
   return text
@@ -165,10 +175,11 @@ function normalizeAnalysis(analysis, fallbackText) {
       ? safe.area.trim().slice(0, 30)
       : fallback.area;
 
-  const name =
+  const rawName =
     typeof safe.name === "string" && safe.name.trim()
       ? safe.name.trim().slice(0, 50)
-      : fallback.name;
+      : null;
+  const name = isGenericPlaceName(rawName) ? fallback.name : rawName;
 
   const summary =
     typeof safe.summary === "string" && safe.summary.trim()
@@ -204,6 +215,7 @@ module.exports = {
   normalizeAnalysis,
   looksLikeRecommendation,
   extractKeywords,
+  isGenericPlaceName,
 };
 
 module.exports.CUISINES = CUISINES;
