@@ -1,11 +1,12 @@
 // 推薦頻道分類常數
-// type：頂層分類（餐廳 / 酒吧 / 飲料 / 娛樂 / 其他）
+// type：頂層分類（餐廳 / 酒吧 / 咖啡廳 / 飲料 / 娛樂 / 其他）
 // cuisine：餐廳的子類別（日式 / 韓式 / 火鍋 / ...）
 // mealTime：早午晚餐宵夜（與 foodCategories.js 對齊）
 
 const TYPES = {
   restaurant: { label: "餐廳", emoji: "🍽️" },
   bar: { label: "酒吧", emoji: "🍸" },
+  cafe: { label: "咖啡廳", emoji: "☕" },
   beverage: { label: "飲料", emoji: "🥤" },
   entertainment: { label: "娛樂", emoji: "🎉" },
   other: { label: "其他", emoji: "📌" },
@@ -123,17 +124,32 @@ const BEVERAGE_KEYWORDS = [
   "果汁",
   "冷飲",
   "茶店",
+  "tea shop",
+  "bubble tea",
+];
+
+// 咖啡廳關鍵字
+const CAFE_KEYWORDS = [
   "咖啡廳",
   "咖啡店",
   "咖啡館",
+  "咖啡屋",
+  "自家烘焙",
+  "精品咖啡",
+  "手沖咖啡",
+  "義式咖啡",
   "cafe",
   "café",
   "coffee",
+  "coffee shop",
+  "coffee house",
+  "roastery",
   "拿鐵",
   "美式咖啡",
+  "卡布奇諾",
   "espresso",
-  "tea shop",
-  "bubble tea",
+  "latte",
+  "cappuccino",
 ];
 
 // 娛樂關鍵字
@@ -212,6 +228,7 @@ module.exports = {
   CUISINES,
   CUISINE_KEYWORDS,
   BAR_KEYWORDS,
+  CAFE_KEYWORDS,
   BEVERAGE_KEYWORDS,
   ENTERTAINMENT_KEYWORDS,
   MEAL_TIME_KEYWORDS,

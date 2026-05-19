@@ -55,8 +55,8 @@ function recordSuccess() {
 
 const SCHEMA_DOC = `欄位定義：
 - "name": 店名或場所名稱（簡短，不含描述）。沒明確店名就填 null。
-- "type": "restaurant" | "bar" | "beverage" | "entertainment" | "other"
-- "cuisine": 若 type=restaurant，標出料理類型（日式、韓式、火鍋、燒肉、義式、咖啡廳、早午餐、甜點、小吃...）；否則 null
+- "type": "restaurant" | "bar" | "cafe" | "beverage" | "entertainment" | "other"
+- "cuisine": 若 type=restaurant，標出料理類型（日式、韓式、火鍋、燒肉、義式、早午餐、甜點、小吃...）；否則 null
 - "mealTimes": 陣列，元素為 "breakfast" | "lunch" | "dinner" | "snack"；不確定填空陣列
 - "area": 地區（縣市或行政區或商圈，例：台北市信義區、東區、西門町）
 - "summary": 用一句話總結這個推薦的特色（30 字內）
@@ -65,7 +65,8 @@ const SCHEMA_DOC = `欄位定義：
 type 規則：
 - 餐廳（吃正餐、料理為主）→ restaurant
 - 酒吧/居酒屋/餐酒館/精釀店 → bar
-- 手搖飲料、咖啡廳（不主打餐點）、茶飲店 → beverage
+- 咖啡廳/咖啡店/自家烘焙/精品咖啡（以咖啡為主，可能搭配甜點輕食）→ cafe
+- 手搖飲料、茶飲店、果汁店（非咖啡為主）→ beverage
 - KTV、桌遊、電影院、密室、樂園、SPA、夜店 → entertainment
 - 無法判斷 → other
 

@@ -7,6 +7,7 @@ const {
   CUISINES,
   CUISINE_KEYWORDS,
   BAR_KEYWORDS,
+  CAFE_KEYWORDS,
   BEVERAGE_KEYWORDS,
   ENTERTAINMENT_KEYWORDS,
   MEAL_TIME_KEYWORDS,
@@ -100,6 +101,7 @@ function detectTypeHeuristic(text) {
   const hit = (list) => list.some((kw) => lower.includes(kw.toLowerCase()));
   if (hit(BAR_KEYWORDS)) return "bar";
   if (hit(ENTERTAINMENT_KEYWORDS)) return "entertainment";
+  if (hit(CAFE_KEYWORDS)) return "cafe";
   if (hit(BEVERAGE_KEYWORDS)) return "beverage";
   // 餐廳：靠 cuisine 關鍵字或泛用「餐廳/食/吃」字眼判斷
   for (const [, kws] of CUISINE_KEYWORDS) {
@@ -183,7 +185,7 @@ function heuristicAnalyze(text) {
     type,
     cuisine: type === "restaurant" ? detectCuisineHeuristic(cleanText) : null,
     mealTimes:
-      type === "restaurant" || type === "beverage"
+      type === "restaurant" || type === "beverage" || type === "cafe"
         ? detectMealTimesHeuristic(cleanText)
         : [],
     area: detectAreaHeuristic(cleanText),
