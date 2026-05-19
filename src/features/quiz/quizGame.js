@@ -18,6 +18,7 @@ const OPTION_KEYS = ["A", "B", "C", "D"];
 const OPTION_EMOJIS = { A: "🇦", B: "🇧", C: "🇨", D: "🇩" };
 
 const COLOR_ACTIVE = 0x5865f2;
+const COLOR_LOCKED = 0xeb8f34;
 const COLOR_SETTLED = 0xfee75c;
 const COLOR_CANCELLED = 0xed4245;
 
@@ -46,10 +47,36 @@ function buildActiveEmbed(quizDoc) {
       { name: "主辦人", value: `<@${hostId}>`, inline: true },
       { name: "獎金池", value: `${prizePool.toLocaleString()} credits`, inline: true },
       { name: "已作答人數", value: `${answerCount} 人`, inline: true },
-      { name: "結束時間", value: formatEndsAt(endsAt), inline: false }
+      { name: "截止時間", value: formatEndsAt(endsAt), inline: false }
     )
     .setFooter({ text: `問答 ID：${quizDoc.quizId}　提示：答對者平分獎金池` })
     .setTimestamp(quizDoc.createdAt);
+}
+
+function buildLockedEmbed(quizDoc) {
+  const { question, options, prizePool, hostId, answers = {}, lockedAt } = quizDoc;
+  const answerCount = Object.keys(answers).length;
+
+  const optionLines = options
+    .map((o) => `${OPTION_EMOJIS[o.key]} **${o.key}.** ${o.text}`)
+    .join("\n");
+
+  const ts = lockedAt ? Math.floor(new Date(lockedAt).getTime() / 1000) : null;
+
+  return new EmbedBuilder()
+    .setColor(COLOR_LOCKED)
+    .setTitle(`🔒 ${question}`)
+    .setDescription(`${optionLines}\n\n**作答已截止**，等待主辦人公布答案 ⏳`)
+    .addFields(
+      { name: "主辦人", value: `<@${hostId}>`, inline: true },
+      { name: "獎金池", value: `${prizePool.toLocaleString()} credits`, inline: true },
+      { name: "已作答人數", value: `${answerCount} 人`, inline: true },
+      ts
+        ? { name: "截止時間", value: `<t:${ts}:R>（<t:${ts}:T>）`, inline: false }
+        : { name: "狀態", value: "作答已截止", inline: false }
+    )
+    .setFooter({ text: `問答 ID：${quizDoc.quizId}` })
+    .setTimestamp(new Date(lockedAt || Date.now()));
 }
 
 function buildSettledEmbed(quizDoc) {
@@ -134,8 +161,8 @@ function buildCancelledEmbed(quizDoc) {
     .setTimestamp(quizDoc.cancelledAt || new Date());
 }
 
-function buildActionRow(quizDoc, opts = {}) {
-  const { disabled = false } = opts;
+function buildActionRow(quizDoc) {
+  const locked = quizDoc.status === "LOCKED";
   const answerRow = new ActionRowBuilder();
   for (const opt of quizDoc.options) {
     answerRow.addComponents(
@@ -143,23 +170,34 @@ function buildActionRow(quizDoc, opts = {}) {
         .setCustomId(`quiz_ans_${quizDoc.quizId}_${opt.key}`)
         .setLabel(opt.key)
         .setEmoji(OPTION_EMOJIS[opt.key])
-        .setStyle(ButtonStyle.Primary)
-        .setDisabled(disabled)
+        .setStyle(locked ? ButtonStyle.Secondary : ButtonStyle.Primary)
+        .setDisabled(locked)
     );
   }
-  const ctrlRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`quiz_end_${quizDoc.quizId}`)
-      .setLabel("結束並公布答案（限主辦人）")
-      .setEmoji("🏁")
-      .setStyle(ButtonStyle.Success)
-      .setDisabled(disabled),
+  const ctrlRow = new ActionRowBuilder();
+  if (locked) {
+    ctrlRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`quiz_reveal_${quizDoc.quizId}`)
+        .setLabel("公布答案並發獎金（限主辦人）")
+        .setEmoji("🏁")
+        .setStyle(ButtonStyle.Success)
+    );
+  } else {
+    ctrlRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`quiz_lock_${quizDoc.quizId}`)
+        .setLabel("提早截止作答（限主辦人）")
+        .setEmoji("🔒")
+        .setStyle(ButtonStyle.Primary)
+    );
+  }
+  ctrlRow.addComponents(
     new ButtonBuilder()
       .setCustomId(`quiz_cancel_${quizDoc.quizId}`)
       .setLabel("取消問答")
       .setEmoji("🚫")
       .setStyle(ButtonStyle.Danger)
-      .setDisabled(disabled)
   );
   return [answerRow, ctrlRow];
 }
@@ -288,7 +326,7 @@ function unwrap(res) {
   return res.value !== undefined ? res.value : res;
 }
 
-async function refreshQuizMessage(client, quizDoc, opts = {}) {
+async function refreshQuizMessage(client, quizDoc) {
   const channel = await client.channels.fetch(quizDoc.channelId).catch(() => null);
   if (!channel) return null;
   const msg = await channel.messages.fetch(quizDoc.messageId).catch(() => null);
@@ -298,7 +336,10 @@ async function refreshQuizMessage(client, quizDoc, opts = {}) {
   let components;
   if (quizDoc.status === "ACTIVE") {
     embed = buildActiveEmbed(quizDoc);
-    components = buildActionRow(quizDoc, { disabled: !!opts.disabled });
+    components = buildActionRow(quizDoc);
+  } else if (quizDoc.status === "LOCKED") {
+    embed = buildLockedEmbed(quizDoc);
+    components = buildActionRow(quizDoc);
   } else if (quizDoc.status === "SETTLED") {
     embed = buildSettledEmbed(quizDoc);
     components = [];
@@ -329,9 +370,50 @@ async function setAnswer(client, quizDoc, userId, key, displayName) {
   return { action: "ok", doc };
 }
 
-async function settleQuiz(client, quizDoc, reason = "manual") {
+async function lockQuiz(client, quizDoc, reason = "manual") {
   if (quizDoc.status !== "ACTIVE") {
-    throw new Error("問答已不在進行中。");
+    throw new Error("問答已不在作答中。");
+  }
+  const updated = await client.quizGamesCollection.findOneAndUpdate(
+    { _id: quizDoc._id, status: "ACTIVE" },
+    {
+      $set: {
+        status: "LOCKED",
+        lockedAt: new Date(),
+        lockReason: reason,
+        updatedAt: new Date(),
+      },
+    },
+    { returnDocument: "after" }
+  );
+  const doc = unwrap(updated);
+  if (!doc) {
+    throw new Error("問答狀態已改變，無法截止作答。");
+  }
+
+  const msg = await refreshQuizMessage(client, doc);
+  if (msg) {
+    const head = reason === "expired" ? "⏰" : "🔒";
+    const tip =
+      reason === "expired"
+        ? "答題時間到，作答已截止。"
+        : "主辦人提早截止作答。";
+    await msg
+      .reply({
+        content: `${head} 問答「${doc.question}」${tip}\n等待主辦人 <@${doc.hostId}> 公布答案。`,
+      })
+      .catch(() => {});
+  }
+  return doc;
+}
+
+async function settleQuiz(client, quizDoc, reason = "manual") {
+  if (quizDoc.status === "ACTIVE") {
+    // 還在作答中 → 先鎖、再結算（保險路徑，主流程應該不會走到）
+    quizDoc = await lockQuiz(client, quizDoc, reason);
+  }
+  if (quizDoc.status !== "LOCKED") {
+    throw new Error("問答已不在等待公布答案的狀態。");
   }
 
   const answers = quizDoc.answers || {};
@@ -346,7 +428,7 @@ async function settleQuiz(client, quizDoc, reason = "manual") {
   const winners = winnerIds.map((uid) => ({ userId: uid, prize: perWinnerPrize }));
 
   const updated = await client.quizGamesCollection.findOneAndUpdate(
-    { _id: quizDoc._id, status: "ACTIVE" },
+    { _id: quizDoc._id, status: "LOCKED" },
     {
       $set: {
         status: "SETTLED",
@@ -421,7 +503,7 @@ async function settleQuiz(client, quizDoc, reason = "manual") {
 
 async function cancelQuiz(client, quizDoc, actor) {
   const updated = await client.quizGamesCollection.findOneAndUpdate(
-    { _id: quizDoc._id, status: "ACTIVE" },
+    { _id: quizDoc._id, status: { $in: ["ACTIVE", "LOCKED"] } },
     {
       $set: {
         status: "CANCELLED",
@@ -434,7 +516,7 @@ async function cancelQuiz(client, quizDoc, actor) {
   );
   const doc = unwrap(updated);
   if (!doc) {
-    throw new Error("問答已不在進行中，無法取消。");
+    throw new Error("問答已結束，無法取消。");
   }
 
   await grantCoins(client, {
@@ -468,10 +550,12 @@ module.exports = {
   OPTION_EMOJIS,
   createQuiz,
   setAnswer,
+  lockQuiz,
   settleQuiz,
   cancelQuiz,
   refreshQuizMessage,
   buildActiveEmbed,
+  buildLockedEmbed,
   buildSettledEmbed,
   buildCancelledEmbed,
   buildActionRow,

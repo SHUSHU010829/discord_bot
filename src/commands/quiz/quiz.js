@@ -133,7 +133,8 @@ module.exports = {
       await interaction.editReply(
         `✅ 問答已發布！已鎖定 **${prizePool.toLocaleString()}** credits 作為獎金池。\n` +
           `📢 問答訊息：${message.url}\n` +
-          `⏰ ${minutes} 分鐘後自動結算。也可隨時按「結束並公布答案」提前結束。\n` +
+          `⏰ ${minutes} 分鐘後自動截止作答，**但答案不會自動公布**——準備好的時候按「公布答案並發獎金」由你決定何時揭曉。\n` +
+          `（也可以隨時按「提早截止作答」提前鎖住票數）\n` +
           `問答 ID：\`${quizDoc.quizId}\``
       );
     } catch (error) {
