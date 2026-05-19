@@ -54,6 +54,27 @@ function parseUrlPlace(url) {
   return out;
 }
 
+// Google Maps 的 server-side HTML 經常只給通用 title（"Google Maps" / "Google 地圖"），
+// 真正的店名是 JS render 進去的。碰到這類通用標題就視為無效。
+const GENERIC_TITLES = new Set([
+  "google maps",
+  "google 地圖",
+  "google 地图",
+  "google maps - 路線、即時路況、大眾運輸資訊",
+  "google マップ",
+  "구글 지도",
+]);
+
+function isGenericTitle(title) {
+  if (!title) return true;
+  const t = title.trim().toLowerCase();
+  if (!t) return true;
+  if (GENERIC_TITLES.has(t)) return true;
+  // 開頭就是 "google maps" / "google 地圖" 視同通用
+  if (/^google\s*(maps?|地圖|地图|マップ|지도)(\s|$|[-—–|·:：])/.test(t)) return true;
+  return false;
+}
+
 async function fetchMapMeta(url) {
   if (!url || typeof url !== "string") return null;
   try {
@@ -98,18 +119,26 @@ async function fetchMapMeta(url) {
         null;
     }
 
-    const placeName =
-      (typeof ogTitle === "string" && ogTitle.trim()) ||
-      fromUrl.placeName ||
-      null;
+    // 通用標題（"Google Maps"）直接忽略，改用 URL 上的 /place/<name>
+    const titleFromOg =
+      typeof ogTitle === "string" && !isGenericTitle(ogTitle)
+        ? ogTitle.trim()
+        : null;
+    const placeName = titleFromOg || fromUrl.placeName || null;
+
+    // og:description 在通用頁也常常是 "Find local businesses..."，過濾掉
+    const descFromOg =
+      typeof ogDescription === "string" &&
+      !/^find local businesses/i.test(ogDescription.trim()) &&
+      !/探索當地商家|尋找當地商家/.test(ogDescription)
+        ? ogDescription.trim()
+        : null;
 
     const meta = {
       sourceUrl: url,
       finalUrl,
-      placeName: placeName ? String(placeName).trim().slice(0, 120) : null,
-      description: ogDescription
-        ? String(ogDescription).trim().slice(0, 500)
-        : null,
+      placeName: placeName ? String(placeName).slice(0, 120) : null,
+      description: descFromOg ? descFromOg.slice(0, 500) : null,
       image: ogImage || null,
       lat: Number.isFinite(fromUrl.lat) ? fromUrl.lat : null,
       lng: Number.isFinite(fromUrl.lng) ? fromUrl.lng : null,
