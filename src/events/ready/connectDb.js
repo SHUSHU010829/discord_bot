@@ -116,6 +116,9 @@ module.exports = async (client) => {
     // 成員自辦活動 collections
     const hostedEventsCollection = database.collection("HostedEvents");
 
+    // 有獎問答
+    const quizGamesCollection = database.collection("QuizGames");
+
     // 推薦頻道紀錄（餐廳/酒吧/飲料/娛樂）
     const recommendationsCollection = database.collection("Recommendations");
 
@@ -169,6 +172,7 @@ module.exports = async (client) => {
     client.questProgressCollection = questProgressCollection;
     client.economySnapshotsCollection = economySnapshotsCollection;
     client.hostedEventsCollection = hostedEventsCollection;
+    client.quizGamesCollection = quizGamesCollection;
     client.stockMarketCollection = stockMarketCollection;
     client.stockPricesCollection = stockPricesCollection;
     client.userPortfolioCollection = userPortfolioCollection;
@@ -611,6 +615,20 @@ module.exports = async (client) => {
       await hostedEventsCollection.createIndex(
         { hostId: 1, guildId: 1, status: 1 },
         { name: "hosted_event_host_status" }
+      );
+
+      // 有獎問答索引
+      await quizGamesCollection.createIndex(
+        { quizId: 1 },
+        { unique: true, name: "uniq_quiz_id" }
+      );
+      await quizGamesCollection.createIndex(
+        { status: 1, endsAt: 1 },
+        { name: "quiz_status_endsAt" }
+      );
+      await quizGamesCollection.createIndex(
+        { messageId: 1 },
+        { sparse: true, name: "quiz_messageId" }
       );
     } catch (indexError) {
       console.log(
