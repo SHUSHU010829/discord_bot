@@ -266,9 +266,41 @@ const getStatus = async (client, userId, guildId) => {
   };
 };
 
+// 補領：自動入帳失敗時的退路。掃出 ready 的任務，逐一原子標 claimed + 發幣
+const claimAll = async (client, userId, guildId, member, username) => {
+  if (!isEnabled()) return { claimed: [], total: 0 };
+  if (!client.questProgressCollection) return { claimed: [], total: 0 };
+
+  const status = await getStatus(client, userId, guildId);
+  const ready = [
+    ...status.daily.map((q) => ({ ...q, period: "daily" })),
+    ...status.weekly.map((q) => ({ ...q, period: "weekly" })),
+  ].filter((q) => q.state === "ready");
+
+  const claimedList = [];
+  let total = 0;
+  for (const quest of ready) {
+    const questDef = getQuestById(quest.id);
+    const result = await tryAutoClaim(
+      client,
+      userId,
+      guildId,
+      questDef,
+      member,
+      username
+    );
+    if (!result) continue;
+    claimedList.push(result);
+    total += result.reward;
+  }
+
+  return { claimed: claimedList, total };
+};
+
 module.exports = {
   periodKey,
   incrementProgress,
   markCompleted,
   getStatus,
+  claimAll,
 };

@@ -100,7 +100,7 @@ module.exports = {
 
       container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          `-# 任務完成會自動入帳並私訊通知，不用再手動領取。`
+          `-# 任務完成會自動入帳並私訊通知；若有「待入帳」未到帳，可用 \`/領錢\` 補領。`
         )
       );
 
