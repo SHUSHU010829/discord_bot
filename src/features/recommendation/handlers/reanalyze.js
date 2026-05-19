@@ -31,7 +31,10 @@ async function run(client, interaction) {
       return;
     }
 
-    const analysis = await analyzeRecommendation(doc.content || doc.cleanText || "");
+    const analysis = await analyzeRecommendation(
+      doc.content || doc.cleanText || "",
+      { mapMetas: Array.isArray(doc.mapMetas) ? doc.mapMetas : [] },
+    );
     await collection.updateOne(
       { messageId },
       {

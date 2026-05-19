@@ -10,7 +10,8 @@
     "verify-calendar": "node ./src/scripts/verifyCalendar.js",
     "convert-calendar": "node ./src/scripts/convertCalendarFormat.js",
     "clear-crash-stats": "node ./src/scripts/clearCrashStats.js",
-    "backfill-recommendations": "node ./src/scripts/backfillRecommendations.js"
+    "backfill-recommendations": "node ./src/scripts/backfillRecommendations.js",
+    "backfill-map-meta": "node ./src/scripts/backfillMapMeta.js"
   },
   "keywords": [],
   "author": "ShuShu",
