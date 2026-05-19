@@ -127,12 +127,19 @@ function buildActionRow(eventId, opts = {}) {
 
 function buildManagePanel(eventDoc) {
   const participantCount = eventDoc.participants.length;
-  const canSettle = participantCount >= eventDoc.minParticipants;
+  const canSettle = participantCount >= eventDoc.minParticipants && participantCount >= 1;
   const isClosed = !!eventDoc.recruitmentClosed;
+  const effectiveRanks = Math.min(eventDoc.rankCount, participantCount);
 
   const settleBtn = new ButtonBuilder()
     .setCustomId(`event_settle_${eventDoc.eventId}`)
-    .setLabel(canSettle ? "結算名次" : `結算（需 ≥ ${eventDoc.minParticipants} 人）`)
+    .setLabel(
+      canSettle
+        ? effectiveRanks < eventDoc.rankCount
+          ? `結算（${effectiveRanks} 名）`
+          : "結算名次"
+        : `結算（需 ≥ ${Math.max(eventDoc.minParticipants, 1)} 人）`
+    )
     .setEmoji("🏆")
     .setStyle(ButtonStyle.Primary)
     .setDisabled(!canSettle);
@@ -418,10 +425,11 @@ async function cancelEvent(client, eventDoc, actor, channel) {
 }
 
 async function settleEvent(client, eventDoc, picks, prizes) {
-  if (picks.length !== eventDoc.rankCount) {
+  const effectiveRanks = Math.min(eventDoc.rankCount, eventDoc.participants.length);
+  if (picks.length === 0 || picks.length !== effectiveRanks) {
     throw new Error("名次選擇不完整。");
   }
-  if (prizes.length !== eventDoc.rankCount) {
+  if (prizes.length !== effectiveRanks) {
     throw new Error("獎金數量與名次不符。");
   }
   for (const p of prizes) {
