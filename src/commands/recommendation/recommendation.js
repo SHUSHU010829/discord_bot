@@ -6,45 +6,32 @@ const {
   TYPE_CHOICES,
 } = require("../../constants/recommendationCategories");
 
-const listHandler = require("../../features/recommendation/handlers/list");
-const searchHandler = require("../../features/recommendation/handlers/search");
+const queryHandler = require("../../features/recommendation/handlers/query");
 const editHandler = require("../../features/recommendation/handlers/edit");
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("推薦")
-    .setDescription("瀏覽、搜尋或編輯伺服器的推薦（餐廳/酒吧/飲料/娛樂）📒")
+    .setDescription("瀏覽、查詢或編輯伺服器的推薦（餐廳/酒吧/飲料/娛樂）📒")
     .addSubcommand((sub) =>
       sub
-        .setName("清單")
-        .setDescription("瀏覽推薦清單")
+        .setName("查詢")
+        .setDescription("瀏覽或搜尋推薦（可用關鍵字、類別、地區過濾）")
+        .addStringOption((option) =>
+          option
+            .setName("關鍵字")
+            .setDescription("店名、料理、地區、特色...都可以（不填則顯示全部）"),
+        )
         .addStringOption((option) =>
           option
             .setName("類別")
-            .setDescription("依類別過濾（不選則顯示全部）")
+            .setDescription("依類別過濾")
             .addChoices(...TYPE_CHOICES),
         )
         .addStringOption((option) =>
           option
             .setName("地區")
             .setDescription("依地區過濾（支援模糊比對，例：信義、台中）"),
-        ),
-    )
-    .addSubcommand((sub) =>
-      sub
-        .setName("搜尋")
-        .setDescription("以關鍵字搜尋推薦")
-        .addStringOption((option) =>
-          option
-            .setName("關鍵字")
-            .setDescription("店名、料理、地區、特色...都可以")
-            .setRequired(true),
-        )
-        .addStringOption((option) =>
-          option
-            .setName("類別")
-            .setDescription("限制在某個類別內搜尋")
-            .addChoices(...TYPE_CHOICES),
         ),
     )
     .addSubcommand((sub) =>
@@ -82,10 +69,8 @@ module.exports = {
   run: async (client, interaction) => {
     const sub = interaction.options.getSubcommand();
     switch (sub) {
-      case "清單":
-        return listHandler.run(client, interaction);
-      case "搜尋":
-        return searchHandler.run(client, interaction);
+      case "查詢":
+        return queryHandler.run(client, interaction);
       case "編輯":
         return editHandler.run(client, interaction);
     }
