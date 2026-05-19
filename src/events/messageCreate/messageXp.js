@@ -6,6 +6,7 @@ const { randomInt } = require("../../utils/levelMath");
 const grantXp = require("../../features/leveling/grantXp");
 const grantCoins = require("../../features/economy/grantCoins");
 const questService = require("../../features/quests/questService");
+const notifyQuestClaim = require("../../features/quests/notifyQuestClaim");
 const { getQuestById } = require("../../features/quests/questDefinitions");
 
 module.exports = async (client, message) => {
@@ -100,13 +101,31 @@ async function tryUpdateMessageQuests(client, message) {
   try {
     const userId = message.author.id;
     const guildId = message.guildId;
+    const claimCtx = {
+      member: message.member,
+      username: message.author.username,
+    };
+    const notifyCtx = { user: message.author, userId };
 
-    await questService
-      .incrementProgress(client, userId, guildId, "daily_messages", 1)
-      .catch((e) => console.log(`[ERROR] quest daily_messages: ${e}`.red));
-    await questService
-      .incrementProgress(client, userId, guildId, "weekly_messages", 1)
-      .catch((e) => console.log(`[ERROR] quest weekly_messages: ${e}`.red));
+    const dailyMsgRes = await questService
+      .incrementProgress(client, userId, guildId, "daily_messages", 1, claimCtx)
+      .catch((e) => {
+        console.log(`[ERROR] quest daily_messages: ${e}`.red);
+        return null;
+      });
+    if (dailyMsgRes?.autoClaimed) {
+      await notifyQuestClaim(client, notifyCtx, dailyMsgRes.autoClaimed);
+    }
+
+    const weeklyMsgRes = await questService
+      .incrementProgress(client, userId, guildId, "weekly_messages", 1, claimCtx)
+      .catch((e) => {
+        console.log(`[ERROR] quest weekly_messages: ${e}`.red);
+        return null;
+      });
+    if (weeklyMsgRes?.autoClaimed) {
+      await notifyQuestClaim(client, notifyCtx, weeklyMsgRes.autoClaimed);
+    }
 
     const morningDef = getQuestById("daily_morning");
     if (morningDef && morningDef.morningChannelId) {
@@ -116,9 +135,15 @@ async function tryUpdateMessageQuests(client, message) {
         const startH = morningDef.morningStartHour ?? 7;
         const endH = morningDef.morningEndHour ?? 10;
         if (hour >= startH && hour < endH) {
-          await questService
-            .markCompleted(client, userId, guildId, "daily_morning")
-            .catch((e) => console.log(`[ERROR] quest daily_morning: ${e}`.red));
+          const morningRes = await questService
+            .markCompleted(client, userId, guildId, "daily_morning", claimCtx)
+            .catch((e) => {
+              console.log(`[ERROR] quest daily_morning: ${e}`.red);
+              return null;
+            });
+          if (morningRes?.autoClaimed) {
+            await notifyQuestClaim(client, notifyCtx, morningRes.autoClaimed);
+          }
         }
       }
     }

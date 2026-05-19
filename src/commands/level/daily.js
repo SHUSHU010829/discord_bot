@@ -17,6 +17,7 @@ const grantXp = require("../../features/leveling/grantXp");
 const grantCoins = require("../../features/economy/grantCoins");
 const generateCheckinCard = require("../../utils/generateCheckinCard");
 const questService = require("../../features/quests/questService");
+const notifyQuestClaim = require("../../features/quests/notifyQuestClaim");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -167,10 +168,18 @@ module.exports = {
       );
 
       // 週週出席任務：簽到成功 +1
+      let weeklyAttendanceClaimed = null;
       if (questSystem?.enabled && client.questProgressCollection) {
-        questService
-          .incrementProgress(client, userId, guildId, "weekly_attendance", 1)
-          .catch((e) => console.log(`[ERROR] quest weekly_attendance: ${e}`.red));
+        const res = await questService
+          .incrementProgress(client, userId, guildId, "weekly_attendance", 1, {
+            member: interaction.member,
+            username: interaction.user.username,
+          })
+          .catch((e) => {
+            console.log(`[ERROR] quest weekly_attendance: ${e}`.red);
+            return null;
+          });
+        weeklyAttendanceClaimed = res?.autoClaimed || null;
       }
 
       const grantResult = await grantXp(client, {
@@ -330,6 +339,14 @@ module.exports = {
         files: [attachment],
         flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
       });
+
+      if (weeklyAttendanceClaimed) {
+        await notifyQuestClaim(
+          client,
+          { interaction, user: interaction.user, userId },
+          weeklyAttendanceClaimed
+        );
+      }
     } catch (error) {
       console.log(`[ERROR] /每日簽到:\n${error}\n${error.stack}`.red);
       await interaction

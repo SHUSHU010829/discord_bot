@@ -23,12 +23,75 @@ const periodKey = (period, tz = getTz()) => {
 const grantSourceFor = (period) =>
   period === "weekly" ? "quest_weekly" : "quest_daily";
 
+// 內部：原子標 claimed + 發幣。成功 → 回傳 { id, name, reward, period }；否則 null
+const tryAutoClaim = async (
+  client,
+  userId,
+  guildId,
+  questDef,
+  member,
+  username
+) => {
+  if (!questDef) return null;
+  const period = periodKey(questDef.period);
+
+  const update = await client.questProgressCollection.findOneAndUpdate(
+    {
+      userId,
+      guildId,
+      questId: questDef.id,
+      period,
+      completed: true,
+      claimed: { $ne: true },
+    },
+    {
+      $set: {
+        claimed: true,
+        claimedAt: new Date(),
+        updatedAt: new Date(),
+      },
+    },
+    { returnDocument: "after" }
+  );
+  const after = update?.value || update;
+  if (!after) return null; // 已被別的 process 領了，或還沒 completed
+
+  const grantResult = await grantCoins(client, {
+    userId,
+    guildId,
+    username,
+    amount: questDef.reward,
+    source: grantSourceFor(questDef.period),
+    member,
+    meta: { questId: questDef.id, period },
+  });
+
+  if (!grantResult) {
+    // 發放失敗 → rollback claimed
+    await client.questProgressCollection
+      .updateOne(
+        { userId, guildId, questId: questDef.id, period },
+        { $set: { claimed: false }, $unset: { claimedAt: "" } }
+      )
+      .catch(() => {});
+    return null;
+  }
+
+  return {
+    id: questDef.id,
+    name: questDef.name,
+    reward: grantResult.granted,
+    period: questDef.period,
+  };
+};
+
 const incrementProgress = async (
   client,
   userId,
   guildId,
   questId,
-  delta = 1
+  delta = 1,
+  claimCtx = null
 ) => {
   if (!isEnabled()) return null;
   if (!client.questProgressCollection) return null;
@@ -45,7 +108,7 @@ const incrementProgress = async (
     period,
   });
   if (existing?.claimed) {
-    return existing;
+    return { doc: existing, autoClaimed: null };
   }
 
   // 把進度直接 cap 在 target 上（不需要追蹤超過部分）
@@ -71,10 +134,30 @@ const incrementProgress = async (
     },
     { upsert: true, returnDocument: "after" }
   );
-  return update?.value || update;
+  const doc = update?.value || update;
+
+  let autoClaimed = null;
+  if (completed && !doc?.claimed) {
+    autoClaimed = await tryAutoClaim(
+      client,
+      userId,
+      guildId,
+      quest,
+      claimCtx?.member,
+      claimCtx?.username
+    );
+  }
+
+  return { doc, autoClaimed };
 };
 
-const markCompleted = async (client, userId, guildId, questId) => {
+const markCompleted = async (
+  client,
+  userId,
+  guildId,
+  questId,
+  claimCtx = null
+) => {
   if (!isEnabled()) return null;
   if (!client.questProgressCollection) return null;
   const quest = getQuestById(questId);
@@ -90,10 +173,7 @@ const markCompleted = async (client, userId, guildId, questId) => {
     period,
   });
   if (existing?.claimed) {
-    return existing;
-  }
-  if (existing?.completed) {
-    return existing;
+    return { doc: existing, autoClaimed: null };
   }
 
   const update = await client.questProgressCollection.findOneAndUpdate(
@@ -115,7 +195,21 @@ const markCompleted = async (client, userId, guildId, questId) => {
     },
     { upsert: true, returnDocument: "after" }
   );
-  return update?.value || update;
+  const doc = update?.value || update;
+
+  let autoClaimed = null;
+  if (!doc?.claimed) {
+    autoClaimed = await tryAutoClaim(
+      client,
+      userId,
+      guildId,
+      quest,
+      claimCtx?.member,
+      claimCtx?.username
+    );
+  }
+
+  return { doc, autoClaimed };
 };
 
 const getStatus = async (client, userId, guildId) => {
@@ -172,75 +266,9 @@ const getStatus = async (client, userId, guildId) => {
   };
 };
 
-const claimAll = async (client, userId, guildId, member, username) => {
-  if (!isEnabled()) return { claimed: [], total: 0 };
-  if (!client.questProgressCollection) return { claimed: [], total: 0 };
-
-  const status = await getStatus(client, userId, guildId);
-  const ready = [
-    ...status.daily.map((q) => ({ ...q, period: "daily" })),
-    ...status.weekly.map((q) => ({ ...q, period: "weekly" })),
-  ].filter((q) => q.state === "ready");
-
-  const claimedList = [];
-  let total = 0;
-  for (const quest of ready) {
-    const period = periodKey(quest.period);
-    // 原子標 claimed：只允許 completed=true && claimed != true 的 doc 被標
-    const update = await client.questProgressCollection.findOneAndUpdate(
-      {
-        userId,
-        guildId,
-        questId: quest.id,
-        period,
-        completed: true,
-        claimed: { $ne: true },
-      },
-      {
-        $set: {
-          claimed: true,
-          claimedAt: new Date(),
-          updatedAt: new Date(),
-        },
-      },
-      { returnDocument: "after" }
-    );
-    const after = update?.value || update;
-    if (!after) continue; // 已被別的 process 領了
-
-    const grantResult = await grantCoins(client, {
-      userId,
-      guildId,
-      username,
-      amount: quest.reward,
-      source: grantSourceFor(quest.period),
-      member,
-      meta: { questId: quest.id, period },
-    });
-    if (!grantResult) {
-      // 發放失敗 → rollback claimed
-      await client.questProgressCollection.updateOne(
-        { userId, guildId, questId: quest.id, period },
-        { $set: { claimed: false }, $unset: { claimedAt: "" } }
-      ).catch(() => {});
-      continue;
-    }
-    claimedList.push({
-      id: quest.id,
-      name: quest.name,
-      reward: grantResult.granted,
-      period: quest.period,
-    });
-    total += grantResult.granted;
-  }
-
-  return { claimed: claimedList, total };
-};
-
 module.exports = {
   periodKey,
   incrementProgress,
   markCompleted,
   getStatus,
-  claimAll,
 };

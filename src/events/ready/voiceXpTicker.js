@@ -6,6 +6,7 @@ const grantXp = require("../../features/leveling/grantXp");
 const grantCoins = require("../../features/economy/grantCoins");
 const voiceSessionStore = require("../../utils/voiceSessionStore");
 const questService = require("../../features/quests/questService");
+const notifyQuestClaim = require("../../features/quests/notifyQuestClaim");
 
 module.exports = async (client) => {
   if (!levelSystem?.enabled) return;
@@ -133,11 +134,26 @@ module.exports = async (client) => {
 
           // 語音任務：每分鐘 +1 進度（incrementProgress 內部已 cap 在 target）
           if (questSystem?.enabled && client.questProgressCollection) {
+            const claimCtx = {
+              member,
+              username: member.user.username || session.username,
+            };
+            const notifyCtx = { user: member.user, userId: session.userId };
             questService
-              .incrementProgress(client, session.userId, session.guildId, "daily_voice_30", 1)
+              .incrementProgress(client, session.userId, session.guildId, "daily_voice_30", 1, claimCtx)
+              .then((res) => {
+                if (res?.autoClaimed) {
+                  notifyQuestClaim(client, notifyCtx, res.autoClaimed).catch(() => {});
+                }
+              })
               .catch((e) => console.log(`[ERROR] quest voice_30: ${e}`.red));
             questService
-              .incrementProgress(client, session.userId, session.guildId, "daily_voice_60", 1)
+              .incrementProgress(client, session.userId, session.guildId, "daily_voice_60", 1, claimCtx)
+              .then((res) => {
+                if (res?.autoClaimed) {
+                  notifyQuestClaim(client, notifyCtx, res.autoClaimed).catch(() => {});
+                }
+              })
               .catch((e) => console.log(`[ERROR] quest voice_60: ${e}`.red));
           }
 

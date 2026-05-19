@@ -21,7 +21,7 @@ const STATE_EMOJI = {
 const STATE_LABEL = {
   pending: "未開始",
   in_progress: "進行中",
-  ready: "可領取",
+  ready: "待入帳",
   claimed: "已領取",
 };
 
@@ -66,21 +66,14 @@ module.exports = {
       const readyCount =
         status.daily.filter((q) => q.state === "ready").length +
         status.weekly.filter((q) => q.state === "ready").length;
-      const readyTotal =
-        status.daily
-          .filter((q) => q.state === "ready")
-          .reduce((s, q) => s + q.reward, 0) +
-        status.weekly
-          .filter((q) => q.state === "ready")
-          .reduce((s, q) => s + q.reward, 0);
 
       const container = new ContainerBuilder()
-        .setAccentColor(readyCount > 0 ? 0x4caf50 : 0x607d8b)
+        .setAccentColor(readyCount > 0 ? 0xffa726 : 0x607d8b)
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(
             `## 📜 逼幣任務${
               readyCount > 0
-                ? ` ・ 有 **${readyCount}** 個待領（共 **${readyTotal.toLocaleString()}** 🪙）`
+                ? ` ・ 有 **${readyCount}** 個任務剛完成等入帳`
                 : ""
             }`
           )
@@ -107,9 +100,7 @@ module.exports = {
 
       container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          readyCount > 0
-            ? `-# 用 \`/領錢\` 領取所有可領取的獎勵。`
-            : `-# 完成任務後再來看看！`
+          `-# 任務完成會自動入帳並私訊通知，不用再手動領取。`
         )
       );
 

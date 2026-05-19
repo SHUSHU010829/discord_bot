@@ -4,6 +4,7 @@ const { levelSystem, coinSystem, questSystem } = require("../../config");
 const grantXp = require("../../features/leveling/grantXp");
 const grantCoins = require("../../features/economy/grantCoins");
 const questService = require("../../features/quests/questService");
+const notifyQuestClaim = require("../../features/quests/notifyQuestClaim");
 
 const COOLDOWN_MS = 30 * 1000;
 
@@ -104,14 +105,25 @@ module.exports = async (client, reaction, user) => {
 
     // 人氣王任務：作者本週收到反應 +1（已排除自反應 + 同 reactor 30s cooldown）
     if (questSystem?.enabled && client.questProgressCollection) {
+      const claimCtx = {
+        member: authorMember,
+        username: message.author.username,
+      };
+      const notifyCtx = { user: message.author, userId: message.author.id };
       questService
         .incrementProgress(
           client,
           message.author.id,
           message.guild.id,
           "weekly_popular",
-          1
+          1,
+          claimCtx
         )
+        .then((res) => {
+          if (res?.autoClaimed) {
+            notifyQuestClaim(client, notifyCtx, res.autoClaimed).catch(() => {});
+          }
+        })
         .catch((e) => console.log(`[ERROR] quest weekly_popular: ${e}`.red));
     }
   } catch (error) {
