@@ -206,20 +206,21 @@ async function startSettleFlow(client, interaction) {
       flags: MessageFlags.Ephemeral,
     });
   }
-  if (doc.participants.length < doc.rankCount) {
-    return interaction.reply({
-      content: `❌ 報名人數 ${doc.participants.length} 人少於名次數 ${doc.rankCount}。`,
-      flags: MessageFlags.Ephemeral,
-    });
-  }
+
+  const effectiveRanks = Math.min(doc.rankCount, doc.participants.length);
 
   clearPicks(doc.eventId, doc.hostId);
   setPicks(doc.eventId, doc.hostId, []);
 
   const members = await fetchParticipantMembers(interaction.guild, doc.participants);
 
+  const noteShort =
+    effectiveRanks < doc.rankCount
+      ? `（人數 ${doc.participants.length} < 名次 ${doc.rankCount}，將只發出 ${effectiveRanks} 名，剩餘退回主辦人）\n`
+      : "";
+
   await interaction.reply({
-    content: `🏆 開始結算「${doc.name}」（共 ${doc.rankCount} 名）\n請依序選出第 1 名。`,
+    content: `🏆 開始結算「${doc.name}」（共 ${effectiveRanks} 名）\n${noteShort}請依序選出第 1 名。`,
     components: [buildPickSelect(doc, 1, [], members)],
     flags: MessageFlags.Ephemeral,
   });
@@ -267,6 +268,7 @@ async function handlePickSelect(client, interaction) {
   const nextPicks = [...currentPicks, picked];
   setPicks(eventId, doc.hostId, nextPicks);
 
+  const effectiveRanks = Math.min(doc.rankCount, doc.participants.length);
   const members = await fetchParticipantMembers(interaction.guild, doc.participants);
   const pickedLines = nextPicks
     .map((id, idx) => {
@@ -276,7 +278,7 @@ async function handlePickSelect(client, interaction) {
     })
     .join("\n");
 
-  if (rank < doc.rankCount) {
+  if (rank < effectiveRanks) {
     await interaction.editReply({
       content: `✅ 已選\n${pickedLines}\n\n請選第 ${rank + 1} 名。`,
       components: [buildPickSelect(doc, rank + 1, nextPicks, members)],
@@ -317,8 +319,9 @@ async function handleAmountsButton(client, interaction) {
     return interaction.reply({ content: "❌ 活動已結束。", flags: MessageFlags.Ephemeral });
   }
 
+  const effectiveRanks = Math.min(doc.rankCount, doc.participants.length);
   const picks = getPicks(eventId, doc.hostId);
-  if (picks.length !== doc.rankCount) {
+  if (picks.length !== effectiveRanks) {
     return interaction.reply({
       content: "❌ 名次選擇已失效，請從「管理 → 結算」重新開始。",
       flags: MessageFlags.Ephemeral,
@@ -344,13 +347,14 @@ async function handleAmountsModal(client, interaction) {
     return interaction.editReply("❌ 活動已結束。");
   }
 
+  const effectiveRanks = Math.min(doc.rankCount, doc.participants.length);
   const picks = getPicks(eventId, doc.hostId);
-  if (picks.length !== doc.rankCount) {
+  if (picks.length !== effectiveRanks) {
     return interaction.editReply("❌ 名次選擇已失效，請重新結算。");
   }
 
   const prizes = [];
-  for (let i = 1; i <= doc.rankCount; i += 1) {
+  for (let i = 1; i <= effectiveRanks; i += 1) {
     const raw = interaction.fields.getTextInputValue(`prize_${i}`).trim().replace(/[,，\s]/g, "");
     const num = Number(raw);
     if (!Number.isInteger(num) || num < 1) {
