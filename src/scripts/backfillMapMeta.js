@@ -37,8 +37,8 @@ function parseArgs(argv) {
     force: false,
     limit: Infinity,
     delayMs: 300,
-    batch: 5,
-    batchDelayMs: 1500,
+    batch: 3,
+    batchDelayMs: 2000,
     help: false,
   };
   for (const a of argv.slice(2)) {
@@ -69,8 +69,9 @@ function printHelp() {
   --force             即使紀錄已有 mapMetas 也重抓
   --limit=N           最多處理 N 筆
   --delay=MS          每筆抓 Google Maps 後延遲毫秒數（預設 300）
-  --batch=N           AI 分析的批次大小（預設 5；只在 --reanalyze 時有意義）
-  --batch-delay=MS    兩個 AI 批次之間延遲毫秒數（預設 1500）
+  --batch=N           AI 分析的批次大小（預設 3；只在 --reanalyze 時有意義）
+                      Batch 失敗時會自動 fallback 到單筆模式
+  --batch-delay=MS    兩個 AI 批次之間延遲毫秒數（預設 2000）
   -h, --help          顯示此說明
 `);
 }
@@ -123,10 +124,13 @@ async function processBatch(collection, batch, stats, args) {
       mapMetas: b.metas,
     }));
 
-  let results = new Map();
+  let analyses = new Map();
+  let sources = new Map();
   if (items.length > 0) {
     try {
-      results = await analyzeRecommendationBatch(items);
+      const result = await analyzeRecommendationBatch(items);
+      analyses = result.analyses;
+      sources = result.sources;
     } catch (error) {
       console.log(`\n[ERROR] 批次分析失敗：${error.message}`.red);
     }
@@ -136,10 +140,13 @@ async function processBatch(collection, batch, stats, args) {
     try {
       const updateSet = buildMetaUpdateSet(b.doc, b.metas, true);
       const id = b.doc._id.toString();
-      const analysis = results.get(id);
+      const analysis = analyses.get(id);
+      const source = sources.get(id);
       if (analysis) {
         mergeAnalysis(updateSet, analysis);
-        stats.reanalyzed++;
+        if (source === "ai_batch") stats.aiBatch++;
+        else if (source === "ai_single") stats.aiSingle++;
+        else stats.heuristic++;
       }
       await collection.updateOne({ _id: b.doc._id }, { $set: updateSet });
       stats.updated++;
@@ -197,7 +204,9 @@ async function main() {
     updated: 0,
     fetched: 0,
     empty: 0,
-    reanalyzed: 0,
+    aiBatch: 0,
+    aiSingle: 0,
+    heuristic: 0,
   };
   const t0 = Date.now();
 
@@ -207,7 +216,7 @@ async function main() {
   const flushProgress = () => {
     const sec = ((Date.now() - t0) / 1000).toFixed(1);
     process.stdout.write(
-      `\r進度 ${stats.processed}/${total}　fetch 成功 ${stats.fetched}　無 meta ${stats.empty}　reanalyze ${stats.reanalyzed}　耗時 ${sec}s`,
+      `\r進度 ${stats.processed}/${total}　fetch ${stats.fetched}　無 meta ${stats.empty}　AI(batch/single) ${stats.aiBatch}/${stats.aiSingle}　啟發式 ${stats.heuristic}　${sec}s`,
     );
   };
 
@@ -253,9 +262,14 @@ async function main() {
   console.log("");
   console.log("=== 完成 ===".green);
   console.log(
-    `處理：${stats.processed}　寫入：${stats.updated}　成功抓 meta：${stats.fetched}　無 meta：${stats.empty}` +
-      (args.reanalyze ? `　重新分析：${stats.reanalyzed}` : ""),
+    `處理：${stats.processed}　寫入：${stats.updated}　成功抓 meta：${stats.fetched}　無 meta：${stats.empty}`,
   );
+  if (args.reanalyze) {
+    const aiTotal = stats.aiBatch + stats.aiSingle;
+    console.log(
+      `AI batch：${stats.aiBatch}　AI single fallback：${stats.aiSingle}　啟發式 fallback：${stats.heuristic}　(AI 命中率 ${aiTotal}/${aiTotal + stats.heuristic})`,
+    );
+  }
 
   await mongoClient.close();
   process.exit(0);
