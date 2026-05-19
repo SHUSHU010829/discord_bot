@@ -39,13 +39,57 @@ function isGenericPlaceName(name) {
   if (!t) return false;
   if (/^google\s*(maps?|地圖|地图|マップ|지도)(\s|$|[-—–|·:：])/.test(t)) return true;
   if (/^(地圖|地图|連結|连结|maps?|map|link)$/.test(t)) return true;
+  // Discord 自訂表情碼：<a:name:id> 或 <:name:id>，去掉角括號後是 a:xxx:digits
+  if (/^a?:[\w]+:\d{6,}$/.test(t)) return true;
+  // Discord mention 殘留：@everyone / @here / @user / role id
+  if (/^@(everyone|here)$/.test(t)) return true;
+  // 純數字 ID（Discord ID 通常 17~20 位）
+  if (/^\d{6,}$/.test(t)) return true;
   return false;
+}
+
+// 看起來像地址而不是店名（台灣常見格式）：郵遞區號開頭、或縣市+區+路號
+function looksLikeAddress(text) {
+  if (!text) return false;
+  const t = String(text).trim();
+  if (!t) return false;
+  // 郵遞區號開頭：3~5 位數字 + 台/臺/縣/市/區
+  if (/^\d{3,5}\s*[台臺][一-鿿]/.test(t)) return true;
+  if (/^\d{3,5}\s*[一-鿿]+[市縣]/.test(t)) return true;
+  // 縣市 + 區 + 路/街/巷/弄/號
+  if (/[一-鿿]+[市縣].*[一-鿿]+[區鄉鎮].*[一-鿿]+(路|街|巷|弄|大道)/.test(t)) {
+    return true;
+  }
+  // 結尾有 "號" 之類的地址元素
+  if (/\d+\s*號(\s*\d+\s*樓)?/.test(t) && /[市縣區鄉鎮路街]/.test(t)) {
+    return true;
+  }
+  return false;
+}
+
+// Discord 訊息常見的非語意 token（mention / channel / role / emoji 等）
+function stripDiscordTokens(text) {
+  if (!text) return "";
+  return text
+    .replace(/<@[!&]?\d+>/g, " ") // <@123>, <@!123>, <@&123>
+    .replace(/<#\d+>/g, " ") // <#channel-id>
+    .replace(/<a?:\w+:\d+>/g, " ") // <:name:id>, <a:name:id>
+    .replace(/<t:\d+(:[a-zA-Z])?>/g, " ") // <t:timestamp:R>
+    .replace(/@(everyone|here)\b/g, " ");
 }
 
 function stripUrls(text) {
   if (!text) return "";
   return text
     .replace(/https?:\/\/\S+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// 給 AI / heuristic 用的文字：URL、Discord token 都剝掉
+function cleanMessageText(text) {
+  if (!text) return "";
+  return stripDiscordTokens(stripUrls(text))
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -106,19 +150,21 @@ function detectAreaHeuristic(text) {
 // 從訊息文字中粗抽店名候選：第一行或第一個非 emoji 字串
 function detectNameHeuristic(text) {
   if (!text) return null;
-  const cleaned = stripUrls(text);
+  const cleaned = cleanMessageText(text);
   if (!cleaned) return null;
   const firstLine = cleaned.split(/[\r\n。！!？?…]/)[0].trim();
   // 去頭尾雜訊（emoji、標點）
   const compact = firstLine.replace(/^[\s\W_]+|[\s\W_]+$/g, "").trim();
   if (!compact) return null;
+  // 看起來像地址或通用值就不要回
+  if (looksLikeAddress(compact) || isGenericPlaceName(compact)) return null;
   // 長度上限 30，太長就截
   return compact.length > 30 ? compact.slice(0, 30) : compact;
 }
 
 function extractKeywords(text) {
   if (!text) return [];
-  const cleaned = stripUrls(text).toLowerCase();
+  const cleaned = cleanMessageText(text).toLowerCase();
   const tokens = new Set();
   // 中文連續 2~6 字 token（粗切，作為 search 用）
   const chineseMatches = cleaned.match(/[一-龥]{2,6}/g) || [];
@@ -131,7 +177,7 @@ function extractKeywords(text) {
 
 // 啟發式整包分析（AI 失敗時用）
 function heuristicAnalyze(text) {
-  const cleanText = stripUrls(text);
+  const cleanText = cleanMessageText(text);
   const type = detectTypeHeuristic(cleanText);
   return {
     type,
@@ -179,7 +225,9 @@ function normalizeAnalysis(analysis, fallbackText) {
     typeof safe.name === "string" && safe.name.trim()
       ? safe.name.trim().slice(0, 50)
       : null;
-  const name = isGenericPlaceName(rawName) ? fallback.name : rawName;
+  const nameIsBad =
+    !rawName || isGenericPlaceName(rawName) || looksLikeAddress(rawName);
+  const name = nameIsBad ? fallback.name : rawName;
 
   const summary =
     typeof safe.summary === "string" && safe.summary.trim()
@@ -200,22 +248,28 @@ function normalizeAnalysis(analysis, fallbackText) {
   return { type, cuisine, mealTimes, area, name, summary, keywords };
 }
 
-// 推薦訊息門檻判斷：必須有 Google Maps 連結 + 一段文字
-function looksLikeRecommendation(text, minTextLength = 2) {
+// 推薦訊息門檻判斷：必須有 Google Maps 連結。文字長度（去掉 URL 與
+// Discord 表情/mention 之後）會列入考量，但即使無文字，只要有 maps
+// 連結還是視為推薦（之後可以靠 mapMetas 補資訊）。
+function looksLikeRecommendation(text, minTextLength = 0) {
   const urls = extractMapUrls(text);
   if (urls.length === 0) return false;
-  const clean = stripUrls(text);
+  if (minTextLength <= 0) return true;
+  const clean = cleanMessageText(text);
   return clean.length >= minTextLength;
 }
 
 module.exports = {
   extractMapUrls,
   stripUrls,
+  stripDiscordTokens,
+  cleanMessageText,
   heuristicAnalyze,
   normalizeAnalysis,
   looksLikeRecommendation,
   extractKeywords,
   isGenericPlaceName,
+  looksLikeAddress,
 };
 
 module.exports.CUISINES = CUISINES;
