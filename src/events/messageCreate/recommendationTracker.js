@@ -9,6 +9,7 @@ const {
 const {
   analyzeRecommendation,
 } = require("../../services/recommendationClassifier");
+const { fetchMapMetaForUrls } = require("../../services/mapMetaFetcher");
 
 module.exports = async (client, message) => {
   if (message.author?.bot) return;
@@ -28,7 +29,8 @@ module.exports = async (client, message) => {
     const mapUrls = extractMapUrls(content);
     const cleanText = stripUrls(content);
 
-    const analysis = await analyzeRecommendation(content);
+    const mapMetas = await fetchMapMetaForUrls(mapUrls);
+    const analysis = await analyzeRecommendation(content, { mapMetas });
 
     const attachments = Array.from(message.attachments?.values?.() || [])
       .map((a) => a.url)
@@ -44,6 +46,7 @@ module.exports = async (client, message) => {
       content,
       cleanText,
       mapUrls,
+      mapMetas,
       attachments,
       messageUrl: `https://discord.com/channels/${message.guild.id}/${message.channel.id}/${message.id}`,
       type: analysis.type,

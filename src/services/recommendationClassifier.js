@@ -7,6 +7,7 @@ const {
   heuristicAnalyze,
   stripUrls,
 } = require("../utils/recommendationParser");
+const { formatMapContextForPrompt } = require("./mapMetaFetcher");
 
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5";
@@ -65,10 +66,14 @@ type 規則：
 - KTV、桌遊、電影院、密室、樂園、SPA、夜店 → entertainment
 - 無法判斷 → other`;
 
-async function classifyWithClaude(text) {
+async function classifyWithClaude(text, mapContext = "") {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
   if (circuitOpen()) return null;
+
+  const userContent = mapContext
+    ? `請分析以下推薦訊息並輸出 JSON：\n\n[使用者訊息]\n${text}\n\n[Google Maps 連結資訊（如與訊息衝突，以訊息為主）]\n${mapContext}`
+    : `請分析以下推薦訊息並輸出 JSON：\n\n${text}`;
 
   try {
     const response = await axios.post(
@@ -80,7 +85,7 @@ async function classifyWithClaude(text) {
         messages: [
           {
             role: "user",
-            content: `請分析以下推薦訊息並輸出 JSON：\n\n${text}`,
+            content: userContent,
           },
         ],
       },
@@ -136,15 +141,25 @@ function parseJsonLoose(raw) {
 }
 
 // 對外介面：給訊息純文字 → 回傳 normalized 分析結果
-async function analyzeRecommendation(rawText) {
+// options.mapMetas: 由 mapMetaFetcher 抓回來的陣列，會以額外 context 餵給 AI
+async function analyzeRecommendation(rawText, options = {}) {
   const text = stripUrls(rawText || "").trim();
-  if (!text) return heuristicAnalyze("");
+  const mapContext = formatMapContextForPrompt(options.mapMetas);
 
-  const aiResult = await classifyWithClaude(text);
+  if (!text && !mapContext) return heuristicAnalyze("");
+
+  const aiResult = await classifyWithClaude(text, mapContext);
   if (aiResult) {
     return normalizeAnalysis(aiResult, text);
   }
-  return heuristicAnalyze(text);
+
+  // Fallback：啟發式無法命中時，把 mapMeta 的 placeName 拿來補 name
+  const fallback = heuristicAnalyze(text);
+  const firstMeta = Array.isArray(options.mapMetas) ? options.mapMetas[0] : null;
+  if (firstMeta?.placeName && !fallback.name) {
+    fallback.name = firstMeta.placeName.slice(0, 50);
+  }
+  return fallback;
 }
 
 module.exports = {
