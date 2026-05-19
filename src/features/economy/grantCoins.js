@@ -149,7 +149,20 @@ module.exports = async (client, opts) => {
   if (opts.source === "bet") {
     try {
       const questService = require("../quests/questService");
-      await questService.markCompleted(client, opts.userId, opts.guildId, "daily_gamble").catch(() => {});
+      const notifyQuestClaim = require("../quests/notifyQuestClaim");
+      const res = await questService
+        .markCompleted(client, opts.userId, opts.guildId, "daily_gamble", {
+          member: opts.member,
+          username: opts.username,
+        })
+        .catch(() => null);
+      if (res?.autoClaimed) {
+        await notifyQuestClaim(
+          client,
+          { user: opts.member?.user, userId: opts.userId },
+          res.autoClaimed
+        );
+      }
     } catch (e) {
       // questService 還沒載入或還沒實作就靜默
     }
@@ -159,7 +172,20 @@ module.exports = async (client, opts) => {
   if (opts.source === "stock_buy" || opts.source === "stock_sell") {
     try {
       const questService = require("../quests/questService");
-      await questService.markCompleted(client, opts.userId, opts.guildId, "daily_stock").catch(() => {});
+      const notifyQuestClaim = require("../quests/notifyQuestClaim");
+      const res = await questService
+        .markCompleted(client, opts.userId, opts.guildId, "daily_stock", {
+          member: opts.member,
+          username: opts.username,
+        })
+        .catch(() => null);
+      if (res?.autoClaimed) {
+        await notifyQuestClaim(
+          client,
+          { user: opts.member?.user, userId: opts.userId },
+          res.autoClaimed
+        );
+      }
     } catch (e) {
       // questService 還沒載入或還沒實作就靜默
     }
