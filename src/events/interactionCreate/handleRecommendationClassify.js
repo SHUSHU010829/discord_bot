@@ -2,17 +2,18 @@ require("colors");
 
 const {
   ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  StringSelectMenuBuilder,
-  EmbedBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
   MessageFlags,
 } = require("discord.js");
 
+const { TYPES } = require("../../constants/recommendationCategories");
 const {
-  TYPES,
-  TYPE_DISPLAY,
-} = require("../../constants/recommendationCategories");
+  buildClassifyComponents,
+  buildClassifyEmbed,
+  buildConfirmedEmbed,
+} = require("../../features/recommendation/classifyUI");
 
 const PREFIX = "rec_class_";
 
@@ -27,60 +28,46 @@ function parseCustomId(customId) {
   };
 }
 
-function buildComponents(messageId, currentType, disabled = false) {
-  const select = new StringSelectMenuBuilder()
-    .setCustomId(`rec_class_select:${messageId}`)
-    .setPlaceholder("重新選擇分類…")
-    .setDisabled(disabled)
-    .addOptions(
-      Object.entries(TYPES).map(([value, { label, emoji }]) => ({
-        label,
-        value,
-        emoji,
-        default: value === currentType,
-      })),
-    );
+function buildEditModal(messageId, doc) {
+  const modal = new ModalBuilder()
+    .setCustomId(`rec_class_modal:${messageId}`)
+    .setTitle("編輯推薦資訊");
 
-  const confirm = new ButtonBuilder()
-    .setCustomId(`rec_class_confirm:${messageId}`)
-    .setLabel(disabled ? "已確認" : "確認分類")
-    .setEmoji("✅")
-    .setStyle(ButtonStyle.Success)
-    .setDisabled(disabled);
-
-  return [
-    new ActionRowBuilder().addComponents(select),
-    new ActionRowBuilder().addComponents(confirm),
+  const fields = [
+    { id: "name", label: "店名", value: doc.name, max: 100 },
+    { id: "cuisine", label: "料理／子類別", value: doc.cuisine, max: 50 },
+    { id: "area", label: "地區", value: doc.area, max: 50 },
+    { id: "summary", label: "特色（一句話）", value: doc.summary, max: 200 },
   ];
+
+  for (const f of fields) {
+    const input = new TextInputBuilder()
+      .setCustomId(f.id)
+      .setLabel(f.label)
+      .setStyle(f.id === "summary" ? TextInputStyle.Paragraph : TextInputStyle.Short)
+      .setRequired(false)
+      .setMaxLength(f.max);
+    if (f.value) input.setValue(String(f.value).slice(0, f.max));
+    modal.addComponents(new ActionRowBuilder().addComponents(input));
+  }
+
+  return modal;
 }
 
-function buildEmbed(doc) {
-  const lines = [];
-  lines.push(`類別：${TYPE_DISPLAY[doc.type] || doc.type}`);
-  if (doc.cuisine) lines.push(`料理：${doc.cuisine}`);
-  if (doc.area) lines.push(`地區：${doc.area}`);
-  if (doc.name) lines.push(`店名：${doc.name}`);
-  return new EmbedBuilder()
-    .setTitle("🤖 我幫你分到這個分類，對嗎？")
-    .setDescription(lines.join("\n"))
-    .setFooter({ text: "點下方選單可以改分類，按「確認分類」即可保留" })
-    .setColor(0x5865f2);
-}
-
-function buildConfirmedEmbed(doc) {
-  const lines = [];
-  lines.push(`類別：${TYPE_DISPLAY[doc.type] || doc.type}`);
-  if (doc.cuisine) lines.push(`料理：${doc.cuisine}`);
-  if (doc.area) lines.push(`地區：${doc.area}`);
-  if (doc.name) lines.push(`店名：${doc.name}`);
-  return new EmbedBuilder()
-    .setTitle("✅ 分類已確認")
-    .setDescription(lines.join("\n"))
-    .setColor(0x57f287);
+function normalizeField(raw) {
+  if (raw === undefined || raw === null) return null;
+  const trimmed = String(raw).trim();
+  return trimmed.length === 0 ? null : trimmed;
 }
 
 module.exports = async (client, interaction) => {
-  if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
+  if (
+    !interaction.isButton() &&
+    !interaction.isStringSelectMenu() &&
+    !interaction.isModalSubmit?.()
+  ) {
+    return;
+  }
   const parsed = parseCustomId(interaction.customId);
   if (!parsed) return;
 
@@ -103,16 +90,6 @@ module.exports = async (client, interaction) => {
       await interaction
         .reply({
           content: "找不到對應的推薦紀錄，可能已被刪除。",
-          flags: MessageFlags.Ephemeral,
-        })
-        .catch(() => {});
-      return;
-    }
-
-    if (interaction.user.id !== doc.authorId) {
-      await interaction
-        .reply({
-          content: "只有原 PO 可以調整這則推薦的分類喔。",
           flags: MessageFlags.Ephemeral,
         })
         .catch(() => {});
@@ -142,11 +119,43 @@ module.exports = async (client, interaction) => {
       const updatedDoc = { ...doc, ...update };
 
       await interaction.update({
-        embeds: [buildEmbed(updatedDoc)],
-        components: buildComponents(messageId, newType, false),
+        embeds: [buildClassifyEmbed(updatedDoc)],
+        components: buildClassifyComponents(messageId, newType, false),
       });
       console.log(
         `[Recommendation] ${interaction.user.username} 改分類 ${doc.type} → ${newType} (${messageId})`
+          .cyan,
+      );
+      return;
+    }
+
+    if (action === "edit" && interaction.isButton()) {
+      await interaction.showModal(buildEditModal(messageId, doc));
+      return;
+    }
+
+    if (action === "modal" && interaction.isModalSubmit()) {
+      const update = {
+        name: normalizeField(interaction.fields.getTextInputValue("name")),
+        cuisine: normalizeField(
+          interaction.fields.getTextInputValue("cuisine"),
+        ),
+        area: normalizeField(interaction.fields.getTextInputValue("area")),
+        summary: normalizeField(
+          interaction.fields.getTextInputValue("summary"),
+        ),
+        updatedAt: new Date(),
+      };
+
+      await collection.updateOne({ messageId }, { $set: update });
+      const updatedDoc = { ...doc, ...update };
+
+      await interaction.update({
+        embeds: [buildClassifyEmbed(updatedDoc)],
+        components: buildClassifyComponents(messageId, updatedDoc.type, false),
+      });
+      console.log(
+        `[Recommendation] ${interaction.user.username} 編輯推薦資訊 (${messageId})`
           .cyan,
       );
       return;
@@ -173,7 +182,7 @@ module.exports = async (client, interaction) => {
         await interaction
           .update({
             embeds: [buildConfirmedEmbed(doc)],
-            components: buildComponents(messageId, doc.type, true),
+            components: buildClassifyComponents(messageId, doc.type, true),
           })
           .catch(() => {});
       }

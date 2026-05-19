@@ -21,6 +21,10 @@ const ITEMS_PER_PAGE = 5;
 const PAGINATION_TIMEOUT = 5 * 60 * 1000;
 const ACCENT_COLOR = 0xff8c69;
 
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function formatEntry(doc, index) {
   const head = `**${index}. ${doc.name || "(未命名)"}**`;
   const meta = [];
@@ -113,6 +117,7 @@ async function run(client, interaction) {
     return;
   }
 
+  const keyword = (interaction.options.getString("關鍵字") || "").trim();
   const type = interaction.options.getString("類別");
   const area = interaction.options.getString("地區");
 
@@ -121,6 +126,17 @@ async function run(client, interaction) {
   const query = { guildId: interaction.guild.id };
   if (type) query.type = type;
   if (area) query.area = { $regex: area, $options: "i" };
+  if (keyword) {
+    const re = new RegExp(escapeRegex(keyword), "i");
+    query.$or = [
+      { name: re },
+      { cleanText: re },
+      { summary: re },
+      { area: re },
+      { cuisine: re },
+      { keywords: keyword.toLowerCase() },
+    ];
+  }
 
   try {
     const docs = await collection
@@ -129,17 +145,24 @@ async function run(client, interaction) {
       .limit(200)
       .toArray();
 
+    const filterBits = [];
+    if (keyword) filterBits.push(`關鍵字：「${keyword}」`);
+    if (type) filterBits.push(`類別：${TYPE_DISPLAY[type] || TYPE_LABEL[type] || type}`);
+    if (area) filterBits.push(`地區：${area}`);
+
     if (docs.length === 0) {
-      const note = type
-        ? `目前沒有「${TYPE_LABEL[type] || type}」類別的推薦${area ? `（地區：${area}）` : ""}。`
-        : `目前還沒有任何推薦${area ? `（地區：${area}）` : ""}。`;
+      const note =
+        filterBits.length > 0
+          ? `找不到符合條件的推薦（${filterBits.join("，")}）。`
+          : "目前還沒有任何推薦。";
       await interaction.editReply(note);
       return;
     }
 
     const totalPages = Math.max(1, Math.ceil(docs.length / ITEMS_PER_PAGE));
     let page = 0;
-    const headerBits = ["## 📒 推薦清單"];
+    const headerBits = [keyword ? "## 🔍 推薦查詢" : "## 📒 推薦清單"];
+    if (keyword) headerBits.push(`關鍵字：「${keyword}」`);
     if (type) headerBits.push(`類別：${TYPE_DISPLAY[type] || type}`);
     if (area) headerBits.push(`地區：${area}`);
     const headerTitle = headerBits.join("　|　");
@@ -163,7 +186,7 @@ async function run(client, interaction) {
     collector.on("collect", async (btn) => {
       if (btn.user.id !== interaction.user.id) {
         return btn.reply({
-          content: "這不是你的清單！請自行使用 /推薦清單 查看。",
+          content: "這不是你的查詢結果！請自行使用 /推薦 查詢 查看。",
           flags: MessageFlags.Ephemeral,
         });
       }
@@ -199,8 +222,10 @@ async function run(client, interaction) {
         .catch(() => {});
     });
   } catch (error) {
-    console.log(`[ERROR] 推薦清單失敗：\n${error}`.red);
-    await interaction.editReply("🔧 查詢推薦清單失敗，請稍後再試。").catch(() => {});
+    console.log(`[ERROR] 推薦查詢失敗：\n${error}`.red);
+    await interaction
+      .editReply("🔧 查詢推薦失敗，請稍後再試。")
+      .catch(() => {});
   }
 }
 
