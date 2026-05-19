@@ -122,29 +122,21 @@ module.exports = async (client, message) => {
         .cyan,
     );
 
-    // 送出分類確認提示（DM 給作者，僅自己可見）
+    // 在頻道公開回覆分類確認提示；PO 按下「確認」後會自動刪除
     try {
-      const dm = await message.author.createDM();
-      const prompt = await dm.send({
-        content: `📒 你在 <#${message.channel.id}> 的推薦：${doc.messageUrl}`,
+      const prompt = await message.reply({
         embeds: [buildClassifyEmbed(doc)],
         components: buildClassifyComponents(message.id, doc.type),
+        allowedMentions: { repliedUser: false },
       });
 
       await collection.updateOne(
         { messageId: message.id },
-        {
-          $set: {
-            classifyPromptId: prompt.id,
-            classifyPromptChannelId: dm.id,
-          },
-        },
+        { $set: { classifyPromptId: prompt.id } },
       );
     } catch (promptError) {
-      // 多半是使用者關閉了 DM。記 warning 不打斷主流程。
       console.log(
-        `[Recommendation] 無法私訊分類確認（可能未開啟 DM）：${promptError.message}`
-          .yellow,
+        `[Recommendation] 發送分類確認提示失敗：${promptError.message}`.yellow,
       );
     }
   } catch (error) {

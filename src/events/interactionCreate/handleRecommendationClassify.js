@@ -161,13 +161,22 @@ module.exports = async (client, interaction) => {
             classifyConfirmedAt: new Date(),
             updatedAt: new Date(),
           },
+          $unset: { classifyPromptId: "" },
         },
       );
 
-      await interaction.update({
-        embeds: [buildConfirmedEmbed(doc)],
-        components: buildComponents(messageId, doc.type, true),
-      });
+      // 確認後刪除提示訊息，保持頻道整潔
+      try {
+        await interaction.message.delete();
+      } catch (deleteError) {
+        // 刪不掉就退回 update 顯示已確認
+        await interaction
+          .update({
+            embeds: [buildConfirmedEmbed(doc)],
+            components: buildComponents(messageId, doc.type, true),
+          })
+          .catch(() => {});
+      }
       console.log(
         `[Recommendation] ${interaction.user.username} 確認分類 [${doc.type}] (${messageId})`
           .cyan,
