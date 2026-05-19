@@ -4,6 +4,9 @@
 // 加 --reanalyze 會在抓到 meta 後重新跑一次 AI 分類，把店名 / 地區
 // 等欄位順便更新（會消耗 Anthropic API 額度）。
 //
+// AI 分類會把多筆塞進同一個 Claude 請求，預設一批 5 筆，
+// 大幅減少 API 呼叫次數，遇到 Overloaded 時也比較容易撐過去。
+//
 // 用法範例：
 //   # 先看會處理幾筆，不寫 DB
 //   node src/scripts/backfillMapMeta.js --dry-run
@@ -11,11 +14,11 @@
 //   # 抓 metadata，只更新 mapMetas 與缺少的 name
 //   node src/scripts/backfillMapMeta.js
 //
-//   # 抓 metadata + 重跑 AI 分類
+//   # 抓 metadata + 重跑 AI 分類（一批 5 筆）
 //   node src/scripts/backfillMapMeta.js --reanalyze
 //
-//   # 即使已有 mapMetas 也重抓
-//   node src/scripts/backfillMapMeta.js --force --reanalyze
+//   # 把已有 mapMetas 的紀錄也一起重抓 + 一批 10 筆
+//   node src/scripts/backfillMapMeta.js --force --reanalyze --batch=10
 
 require("dotenv/config");
 require("colors");
@@ -24,7 +27,7 @@ const { MongoClient } = require("mongodb");
 
 const { fetchMapMetaForUrls } = require("../services/mapMetaFetcher");
 const {
-  analyzeRecommendation,
+  analyzeRecommendationBatch,
 } = require("../services/recommendationClassifier");
 
 function parseArgs(argv) {
@@ -34,6 +37,8 @@ function parseArgs(argv) {
     force: false,
     limit: Infinity,
     delayMs: 300,
+    batch: 5,
+    batchDelayMs: 1500,
     help: false,
   };
   for (const a of argv.slice(2)) {
@@ -42,8 +47,12 @@ function parseArgs(argv) {
     else if (a === "--force") args.force = true;
     else if (a.startsWith("--limit=")) args.limit = parseInt(a.slice(8), 10);
     else if (a.startsWith("--delay=")) args.delayMs = parseInt(a.slice(8), 10);
-    else if (a === "-h" || a === "--help") args.help = true;
+    else if (a.startsWith("--batch=")) args.batch = parseInt(a.slice(8), 10);
+    else if (a.startsWith("--batch-delay=")) {
+      args.batchDelayMs = parseInt(a.slice(14), 10);
+    } else if (a === "-h" || a === "--help") args.help = true;
   }
+  if (!Number.isFinite(args.batch) || args.batch < 1) args.batch = 1;
   return args;
 }
 
@@ -55,12 +64,14 @@ function printHelp() {
   node src/scripts/backfillMapMeta.js [options]
 
 選項：
-  --dry-run        只統計，不寫入資料庫，也不抓 Google Maps
-  --reanalyze      抓到 meta 後同時重新跑 AI 分類（會用 Anthropic API）
-  --force          即使紀錄已有 mapMetas 也重抓
-  --limit=N        最多處理 N 筆
-  --delay=MS       每筆之間延遲毫秒數（預設 300，避免被 Google 擋）
-  -h, --help       顯示此說明
+  --dry-run           只統計，不寫入資料庫，也不抓 Google Maps
+  --reanalyze         抓到 meta 後同時重新跑 AI 分類（會用 Anthropic API）
+  --force             即使紀錄已有 mapMetas 也重抓
+  --limit=N           最多處理 N 筆
+  --delay=MS          每筆抓 Google Maps 後延遲毫秒數（預設 300）
+  --batch=N           AI 分析的批次大小（預設 5；只在 --reanalyze 時有意義）
+  --batch-delay=MS    兩個 AI 批次之間延遲毫秒數（預設 1500）
+  -h, --help          顯示此說明
 `);
 }
 
@@ -75,6 +86,73 @@ async function connectMongo() {
   return { mongoClient, collection };
 }
 
+function buildMetaUpdateSet(doc, metas, useAi) {
+  const updateSet = {
+    mapMetas: metas,
+    mapMetaFetchedAt: new Date(),
+    updatedAt: new Date(),
+  };
+  // 沒開 --reanalyze 時，name 為空就拿 placeName 補
+  if (!useAi && metas.length > 0 && !doc.name && metas[0].placeName) {
+    updateSet.name = metas[0].placeName.slice(0, 50);
+  }
+  return updateSet;
+}
+
+function mergeAnalysis(updateSet, analysis) {
+  Object.assign(updateSet, {
+    type: analysis.type,
+    cuisine: analysis.cuisine,
+    mealTimes: analysis.mealTimes,
+    area: analysis.area,
+    name: analysis.name,
+    summary: analysis.summary,
+    keywords: analysis.keywords,
+  });
+}
+
+async function processBatch(collection, batch, stats, args) {
+  if (batch.length === 0) return;
+
+  // 整理成批次 AI 的輸入
+  const items = batch
+    .filter((b) => b.metas.length > 0)
+    .map((b) => ({
+      id: b.doc._id.toString(),
+      rawText: b.doc.content || b.doc.cleanText || "",
+      mapMetas: b.metas,
+    }));
+
+  let results = new Map();
+  if (items.length > 0) {
+    try {
+      results = await analyzeRecommendationBatch(items);
+    } catch (error) {
+      console.log(`\n[ERROR] 批次分析失敗：${error.message}`.red);
+    }
+  }
+
+  for (const b of batch) {
+    try {
+      const updateSet = buildMetaUpdateSet(b.doc, b.metas, true);
+      const id = b.doc._id.toString();
+      const analysis = results.get(id);
+      if (analysis) {
+        mergeAnalysis(updateSet, analysis);
+        stats.reanalyzed++;
+      }
+      await collection.updateOne({ _id: b.doc._id }, { $set: updateSet });
+      stats.updated++;
+    } catch (error) {
+      console.log(`\n[ERROR] ${b.doc.messageId}：${error.message}`.red);
+    }
+  }
+
+  if (args.batchDelayMs > 0) {
+    await new Promise((r) => setTimeout(r, args.batchDelayMs));
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv);
   if (args.help) {
@@ -84,9 +162,11 @@ async function main() {
 
   console.log("=== 推薦 Maps metadata 回填工具 ===".cyan);
   console.log(
-    `模式：${args.dryRun ? "dry-run" : args.reanalyze ? "fetch + reanalyze" : "fetch only"}`,
+    `模式：${args.dryRun ? "dry-run" : args.reanalyze ? `fetch + reanalyze (batch=${args.batch})` : "fetch only"}`,
   );
-  console.log(`force=${args.force}　limit=${args.limit}　delay=${args.delayMs}ms`);
+  console.log(
+    `force=${args.force}　limit=${args.limit}　delay=${args.delayMs}ms　batch-delay=${args.batchDelayMs}ms`,
+  );
   console.log("");
 
   const { mongoClient, collection } = await connectMongo();
@@ -112,61 +192,43 @@ async function main() {
   const cursorLimit = Number.isFinite(args.limit) ? args.limit : 0;
   const cursor = collection.find(baseQuery).limit(cursorLimit);
 
-  let processed = 0;
-  let updated = 0;
-  let fetched = 0;
-  let empty = 0;
-  let reanalyzed = 0;
+  const stats = {
+    processed: 0,
+    updated: 0,
+    fetched: 0,
+    empty: 0,
+    reanalyzed: 0,
+  };
   const t0 = Date.now();
 
+  // 累積一個 batch，攢滿後丟給 AI 與 DB
+  let batch = [];
+
+  const flushProgress = () => {
+    const sec = ((Date.now() - t0) / 1000).toFixed(1);
+    process.stdout.write(
+      `\r進度 ${stats.processed}/${total}　fetch 成功 ${stats.fetched}　無 meta ${stats.empty}　reanalyze ${stats.reanalyzed}　耗時 ${sec}s`,
+    );
+  };
+
   for await (const doc of cursor) {
-    processed++;
+    stats.processed++;
     try {
-      const metas = await fetchMapMetaForUrls(doc.mapUrls, {
-        delayMs: 0, // 內部 delay 由外圈控制
-      });
+      const metas = await fetchMapMetaForUrls(doc.mapUrls, { delayMs: 0 });
+      if (metas.length === 0) stats.empty++;
+      else stats.fetched++;
 
-      const updateSet = {
-        mapMetas: metas,
-        mapMetaFetchedAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      if (metas.length === 0) {
-        empty++;
-      } else {
-        fetched++;
-        // name 為空時用 placeName 補；reanalyze 模式下交給 AI 決定
-        if (!args.reanalyze && !doc.name && metas[0].placeName) {
-          updateSet.name = metas[0].placeName.slice(0, 50);
+      if (args.reanalyze) {
+        batch.push({ doc, metas });
+        if (batch.length >= args.batch) {
+          await processBatch(collection, batch, stats, args);
+          batch = [];
+          flushProgress();
         }
-      }
-
-      if (args.reanalyze && metas.length > 0) {
-        const analysis = await analyzeRecommendation(
-          doc.content || doc.cleanText || "",
-          { mapMetas: metas },
-        );
-        Object.assign(updateSet, {
-          type: analysis.type,
-          cuisine: analysis.cuisine,
-          mealTimes: analysis.mealTimes,
-          area: analysis.area,
-          name: analysis.name,
-          summary: analysis.summary,
-          keywords: analysis.keywords,
-        });
-        reanalyzed++;
-      }
-
-      await collection.updateOne({ _id: doc._id }, { $set: updateSet });
-      updated++;
-
-      if (processed % 5 === 0 || processed === total) {
-        const sec = ((Date.now() - t0) / 1000).toFixed(1);
-        process.stdout.write(
-          `\r進度 ${processed}/${total}　成功 ${fetched}　無 meta ${empty}　reanalyze ${reanalyzed}　耗時 ${sec}s`,
-        );
+      } else {
+        const updateSet = buildMetaUpdateSet(doc, metas, false);
+        await collection.updateOne({ _id: doc._id }, { $set: updateSet });
+        stats.updated++;
       }
     } catch (error) {
       console.log(`\n[ERROR] ${doc.messageId}：${error.message}`.red);
@@ -175,14 +237,24 @@ async function main() {
     if (args.delayMs > 0) {
       await new Promise((r) => setTimeout(r, args.delayMs));
     }
+    if (stats.processed % 5 === 0 || stats.processed === total) {
+      flushProgress();
+    }
+  }
+
+  // 收尾：把剩下的 batch 處理掉
+  if (batch.length > 0) {
+    await processBatch(collection, batch, stats, args);
+    batch = [];
+    flushProgress();
   }
   process.stdout.write("\n");
 
   console.log("");
   console.log("=== 完成 ===".green);
   console.log(
-    `處理：${processed}　寫入：${updated}　成功抓 meta：${fetched}　無 meta：${empty}` +
-      (args.reanalyze ? `　重新分析：${reanalyzed}` : ""),
+    `處理：${stats.processed}　寫入：${stats.updated}　成功抓 meta：${stats.fetched}　無 meta：${stats.empty}` +
+      (args.reanalyze ? `　重新分析：${stats.reanalyzed}` : ""),
   );
 
   await mongoClient.close();
