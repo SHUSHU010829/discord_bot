@@ -122,21 +122,29 @@ module.exports = async (client, message) => {
         .cyan,
     );
 
-    // 送出分類確認提示（公開回覆，但只有作者能操作）
+    // 送出分類確認提示（DM 給作者，僅自己可見）
     try {
-      const prompt = await message.reply({
+      const dm = await message.author.createDM();
+      const prompt = await dm.send({
+        content: `📒 你在 <#${message.channel.id}> 的推薦：${doc.messageUrl}`,
         embeds: [buildClassifyEmbed(doc)],
         components: buildClassifyComponents(message.id, doc.type),
-        allowedMentions: { repliedUser: false },
       });
 
       await collection.updateOne(
         { messageId: message.id },
-        { $set: { classifyPromptId: prompt.id } },
+        {
+          $set: {
+            classifyPromptId: prompt.id,
+            classifyPromptChannelId: dm.id,
+          },
+        },
       );
     } catch (promptError) {
+      // 多半是使用者關閉了 DM。記 warning 不打斷主流程。
       console.log(
-        `[Recommendation] 發送分類確認提示失敗：${promptError.message}`.yellow,
+        `[Recommendation] 無法私訊分類確認（可能未開啟 DM）：${promptError.message}`
+          .yellow,
       );
     }
   } catch (error) {
