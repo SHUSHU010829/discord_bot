@@ -16,12 +16,12 @@ async function run(client, interaction) {
     return;
   }
 
-  const messageId = interaction.options.getString("message_id");
-  const type = interaction.options.getString("type");
-  const name = interaction.options.getString("name");
-  const cuisine = interaction.options.getString("cuisine");
-  const area = interaction.options.getString("area");
-  const summary = interaction.options.getString("summary");
+  const messageId = interaction.options.getString("訊息id");
+  const type = interaction.options.getString("類別");
+  const name = interaction.options.getString("店名");
+  const cuisine = interaction.options.getString("料理");
+  const area = interaction.options.getString("地區");
+  const summary = interaction.options.getString("特色");
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
