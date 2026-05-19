@@ -53,8 +53,10 @@ module.exports = {
         .setDescription("修改推薦的分類欄位（未填的欄位不會動）")
         .addStringOption((o) =>
           o
-            .setName("訊息id")
-            .setDescription("推薦訊息的 Discord message ID")
+            .setName("訊息連結")
+            .setDescription(
+              "推薦訊息的連結（在訊息點「分享」→「複製訊息連結」）",
+            )
             .setRequired(true),
         )
         .addStringOption((o) =>
