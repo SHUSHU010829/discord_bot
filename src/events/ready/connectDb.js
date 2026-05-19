@@ -116,6 +116,9 @@ module.exports = async (client) => {
     // 成員自辦活動 collections
     const hostedEventsCollection = database.collection("HostedEvents");
 
+    // 推薦頻道紀錄（餐廳/酒吧/飲料/娛樂）
+    const recommendationsCollection = database.collection("Recommendations");
+
     // 股市系統 collections
     const stockMarketCollection = database.collection("StockMarket");
     const stockPricesCollection = database.collection("StockPrices");
@@ -172,6 +175,7 @@ module.exports = async (client) => {
     client.stockTransactionsCollection = stockTransactionsCollection;
     client.stockEventsCollection = stockEventsCollection;
     client.stockEventDefsCollection = stockEventDefsCollection;
+    client.recommendationsCollection = recommendationsCollection;
     await economySnapshotsCollection
       .createIndex({ guildId: 1, date: 1 }, { unique: true })
       .catch((e) =>
@@ -571,6 +575,24 @@ module.exports = async (client) => {
       await stockEventDefsCollection.createIndex(
         { guildId: 1, id: 1 },
         { unique: true, name: "stock_event_defs_guild_id" }
+      );
+
+      // 推薦頻道索引（type 過濾 + 全文搜尋）
+      await recommendationsCollection.createIndex(
+        { messageId: 1 },
+        { unique: true, name: "uniq_rec_messageId" },
+      );
+      await recommendationsCollection.createIndex(
+        { guildId: 1, type: 1, createdAt: -1 },
+        { name: "rec_guild_type_time" },
+      );
+      await recommendationsCollection.createIndex(
+        { guildId: 1, area: 1 },
+        { name: "rec_guild_area" },
+      );
+      await recommendationsCollection.createIndex(
+        { keywords: 1 },
+        { name: "rec_keywords" },
       );
 
       // 成員自辦活動索引

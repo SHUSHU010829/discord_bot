@@ -13,6 +13,7 @@ const welfare = require("./welfare.json");
 const quests = require("./quests.json");
 const stocks = require("./stocks.json");
 const stockEvents = require("./stockEvents.json");
+const recommendation = require("./recommendation.json");
 
 module.exports = {
   ...server,
@@ -28,4 +29,5 @@ module.exports = {
   ...quests,
   ...stocks,
   ...stockEvents,
+  ...recommendation,
 };
