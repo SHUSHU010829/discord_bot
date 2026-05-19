@@ -290,10 +290,11 @@ async function analyzeRecommendation(rawText, options = {}) {
 
 // 對外介面：批次分析
 // items: [{ id, rawText, mapMetas }]
-// 回傳 Map<id, normalizedAnalysis>。AI 失敗時各筆 fallback 啟發式。
+// 回傳 { analyses: Map<id, normalizedAnalysis>, sources: Map<id, 'ai_batch'|'ai_single'|'heuristic'> }
+// 失敗的批次會自動 fallback 到單筆模式（payload 較小、Anthropic 過載時較容易過）。
 async function analyzeRecommendationBatch(items, options = {}) {
-  const out = new Map();
-  if (!Array.isArray(items) || items.length === 0) return out;
+  const result = { analyses: new Map(), sources: new Map() };
+  if (!Array.isArray(items) || items.length === 0) return result;
 
   const prepared = items.map((it) => ({
     id: String(it.id),
@@ -303,21 +304,43 @@ async function analyzeRecommendationBatch(items, options = {}) {
   }));
 
   const nonEmpty = prepared.filter((p) => p.text || p.mapContext);
+  const singleHits = new Map();
+  let batchMap = null;
 
-  let aiMap = null;
   if (nonEmpty.length > 0) {
-    aiMap = await classifyBatchWithClaude(nonEmpty, options);
+    batchMap = await classifyBatchWithClaude(nonEmpty, options);
+
+    // Batch 整批失敗（通常是 Overloaded）→ 改用單筆，payload 小、過載時較容易過
+    if (!batchMap && options.singleFallback !== false) {
+      console.log(
+        `[Recommendation] Batch x${nonEmpty.length} 失敗，改用單筆模式逐筆 fallback`
+          .yellow,
+      );
+      for (const p of nonEmpty) {
+        const single = await classifyWithClaude(p.text, p.mapContext);
+        if (single) singleHits.set(p.id, single);
+        // 單筆之間留一點間隔
+        await new Promise((r) => setTimeout(r, 800));
+      }
+    }
   }
 
   for (const p of prepared) {
-    const aiResult = aiMap?.get(p.id);
+    const fromBatch = batchMap?.get(p.id);
+    const fromSingle = singleHits.get(p.id);
+    const aiResult = fromBatch || fromSingle;
     if (aiResult) {
-      out.set(p.id, normalizeAnalysis(aiResult, p.text));
+      result.analyses.set(p.id, normalizeAnalysis(aiResult, p.text));
+      result.sources.set(p.id, fromBatch ? "ai_batch" : "ai_single");
     } else {
-      out.set(p.id, applyFallbackName(heuristicAnalyze(p.text), p.mapMetas));
+      result.analyses.set(
+        p.id,
+        applyFallbackName(heuristicAnalyze(p.text), p.mapMetas),
+      );
+      result.sources.set(p.id, "heuristic");
     }
   }
-  return out;
+  return result;
 }
 
 module.exports = {
