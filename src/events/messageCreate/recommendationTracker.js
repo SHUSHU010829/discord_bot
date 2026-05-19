@@ -1,13 +1,5 @@
 require("colors");
 
-const {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  StringSelectMenuBuilder,
-  EmbedBuilder,
-} = require("discord.js");
-
 const config = require("../../config");
 const {
   extractMapUrls,
@@ -19,47 +11,9 @@ const {
 } = require("../../services/recommendationClassifier");
 const { fetchMapMetaForUrls } = require("../../services/mapMetaFetcher");
 const {
-  TYPES,
-  TYPE_DISPLAY,
-} = require("../../constants/recommendationCategories");
-
-function buildClassifyComponents(messageId, currentType) {
-  const select = new StringSelectMenuBuilder()
-    .setCustomId(`rec_class_select:${messageId}`)
-    .setPlaceholder("重新選擇分類…")
-    .addOptions(
-      Object.entries(TYPES).map(([value, { label, emoji }]) => ({
-        label,
-        value,
-        emoji,
-        default: value === currentType,
-      })),
-    );
-
-  const confirm = new ButtonBuilder()
-    .setCustomId(`rec_class_confirm:${messageId}`)
-    .setLabel("確認分類")
-    .setEmoji("✅")
-    .setStyle(ButtonStyle.Success);
-
-  return [
-    new ActionRowBuilder().addComponents(select),
-    new ActionRowBuilder().addComponents(confirm),
-  ];
-}
-
-function buildClassifyEmbed(doc) {
-  const lines = [];
-  lines.push(`類別：${TYPE_DISPLAY[doc.type] || doc.type}`);
-  if (doc.cuisine) lines.push(`料理：${doc.cuisine}`);
-  if (doc.area) lines.push(`地區：${doc.area}`);
-  if (doc.name) lines.push(`店名：${doc.name}`);
-  return new EmbedBuilder()
-    .setTitle("🤖 我幫你分到這個分類，對嗎？")
-    .setDescription(lines.join("\n"))
-    .setFooter({ text: "點下方選單可以改分類，按「確認分類」即可保留" })
-    .setColor(0x5865f2);
-}
+  buildClassifyComponents,
+  buildClassifyEmbed,
+} = require("../../features/recommendation/classifyUI");
 
 module.exports = async (client, message) => {
   if (message.author?.bot) return;
@@ -122,7 +76,7 @@ module.exports = async (client, message) => {
         .cyan,
     );
 
-    // 在頻道公開回覆分類確認提示；PO 按下「確認」後會自動刪除
+    // 在頻道公開回覆分類確認提示；按下「確認」後會自動刪除
     try {
       const prompt = await message.reply({
         embeds: [buildClassifyEmbed(doc)],
