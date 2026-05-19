@@ -122,7 +122,7 @@ module.exports = async (client, message) => {
         .cyan,
     );
 
-    // 送出分類確認提示（公開回覆，但只有作者能操作）
+    // 在頻道公開回覆分類確認提示；PO 按下「確認」後會自動刪除
     try {
       const prompt = await message.reply({
         embeds: [buildClassifyEmbed(doc)],
