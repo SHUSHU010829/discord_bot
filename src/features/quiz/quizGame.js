@@ -17,13 +17,26 @@ const MAX_OPTION_LEN = 100;
 const OPTION_KEYS = ["A", "B", "C", "D"];
 const OPTION_EMOJIS = { A: "🇦", B: "🇧", C: "🇨", D: "🇩" };
 
+const KIND_QUIZ = "quiz";
+const KIND_PREDICTION = "prediction";
+
 const COLOR_ACTIVE = 0x5865f2;
+const COLOR_PREDICTION_ACTIVE = 0x9b59b6;
 const COLOR_LOCKED = 0xeb8f34;
 const COLOR_SETTLED = 0xfee75c;
 const COLOR_CANCELLED = 0xed4245;
 
-function newQuizId(hostId) {
-  return `qz-${Date.now().toString(36)}-${hostId.slice(-5)}`;
+function getKind(quizDoc) {
+  return quizDoc?.kind === KIND_PREDICTION ? KIND_PREDICTION : KIND_QUIZ;
+}
+
+function isPrediction(quizDoc) {
+  return getKind(quizDoc) === KIND_PREDICTION;
+}
+
+function newQuizId(hostId, kind) {
+  const prefix = kind === KIND_PREDICTION ? "pd" : "qz";
+  return `${prefix}-${Date.now().toString(36)}-${hostId.slice(-5)}`;
 }
 
 function formatEndsAt(endsAt) {
@@ -31,17 +44,27 @@ function formatEndsAt(endsAt) {
   return `<t:${ts}:R>（<t:${ts}:T>）`;
 }
 
+function kindLabel(quizDoc) {
+  return isPrediction(quizDoc) ? "預測" : "問答";
+}
+
 function buildActiveEmbed(quizDoc) {
   const { question, options, prizePool, hostId, endsAt, answers = {} } = quizDoc;
   const answerCount = Object.keys(answers).length;
+  const prediction = isPrediction(quizDoc);
 
   const optionLines = options
     .map((o) => `${OPTION_EMOJIS[o.key]} **${o.key}.** ${o.text}`)
     .join("\n");
 
+  const title = prediction ? `🔮 [預測] ${question}` : `❓ ${question}`;
+  const footerTip = prediction
+    ? "答對者平分獎金池（答案稍後由主辦人公布）"
+    : "答對者平分獎金池";
+
   return new EmbedBuilder()
-    .setColor(COLOR_ACTIVE)
-    .setTitle(`❓ ${question}`)
+    .setColor(prediction ? COLOR_PREDICTION_ACTIVE : COLOR_ACTIVE)
+    .setTitle(title)
     .setDescription(optionLines)
     .addFields(
       { name: "主辦人", value: `<@${hostId}>`, inline: true },
@@ -49,7 +72,7 @@ function buildActiveEmbed(quizDoc) {
       { name: "已作答人數", value: `${answerCount} 人`, inline: true },
       { name: "截止時間", value: formatEndsAt(endsAt), inline: false }
     )
-    .setFooter({ text: `問答 ID：${quizDoc.quizId}　提示：答對者平分獎金池` })
+    .setFooter({ text: `${kindLabel(quizDoc)} ID：${quizDoc.quizId}　提示：${footerTip}` })
     .setTimestamp(quizDoc.createdAt);
 }
 
@@ -62,11 +85,14 @@ function buildLockedEmbed(quizDoc) {
     .join("\n");
 
   const ts = lockedAt ? Math.floor(new Date(lockedAt).getTime() / 1000) : null;
+  const tip = isPrediction(quizDoc)
+    ? "**作答已截止**，等待主辦人公布正確答案 🔮"
+    : "**作答已截止**，等待主辦人公布答案 ⏳";
 
   return new EmbedBuilder()
     .setColor(COLOR_LOCKED)
     .setTitle(`🔒 ${question}`)
-    .setDescription(`${optionLines}\n\n**作答已截止**，等待主辦人公布答案 ⏳`)
+    .setDescription(`${optionLines}\n\n${tip}`)
     .addFields(
       { name: "主辦人", value: `<@${hostId}>`, inline: true },
       { name: "獎金池", value: `${prizePool.toLocaleString()} credits`, inline: true },
@@ -75,7 +101,7 @@ function buildLockedEmbed(quizDoc) {
         ? { name: "截止時間", value: `<t:${ts}:R>（<t:${ts}:T>）`, inline: false }
         : { name: "狀態", value: "作答已截止", inline: false }
     )
-    .setFooter({ text: `問答 ID：${quizDoc.quizId}` })
+    .setFooter({ text: `${kindLabel(quizDoc)} ID：${quizDoc.quizId}` })
     .setTimestamp(new Date(lockedAt || Date.now()));
 }
 
@@ -132,7 +158,7 @@ function buildSettledEmbed(quizDoc) {
         inline: false,
       }
     )
-    .setFooter({ text: `問答 ID：${quizDoc.quizId}` })
+    .setFooter({ text: `${kindLabel(quizDoc)} ID：${quizDoc.quizId}` })
     .setTimestamp(quizDoc.settledAt || new Date());
 
   if (refunded > 0) {
@@ -157,25 +183,82 @@ function buildCancelledEmbed(quizDoc) {
         inline: true,
       }
     )
-    .setFooter({ text: `問答 ID：${quizDoc.quizId}` })
+    .setFooter({ text: `${kindLabel(quizDoc)} ID：${quizDoc.quizId}` })
     .setTimestamp(quizDoc.cancelledAt || new Date());
 }
 
 function buildActionRow(quizDoc) {
-  const locked = quizDoc.status === "LOCKED";
-  const answerRow = new ActionRowBuilder();
-  for (const opt of quizDoc.options) {
-    answerRow.addComponents(
+  const prediction = isPrediction(quizDoc);
+  const status = quizDoc.status;
+  const rows = [];
+
+  if (status === "ACTIVE") {
+    const answerRow = new ActionRowBuilder();
+    for (const opt of quizDoc.options) {
+      answerRow.addComponents(
+        new ButtonBuilder()
+          .setCustomId(`quiz_ans_${quizDoc.quizId}_${opt.key}`)
+          .setLabel(opt.key)
+          .setEmoji(OPTION_EMOJIS[opt.key])
+          .setStyle(ButtonStyle.Primary)
+      );
+    }
+    rows.push(answerRow);
+
+    const ctrlRow = new ActionRowBuilder();
+    if (prediction) {
+      ctrlRow.addComponents(
+        new ButtonBuilder()
+          .setCustomId(`quiz_lock_${quizDoc.quizId}`)
+          .setLabel("提早截止作答（限主辦人）")
+          .setEmoji("🔒")
+          .setStyle(ButtonStyle.Primary)
+      );
+    } else {
+      ctrlRow.addComponents(
+        new ButtonBuilder()
+          .setCustomId(`quiz_reveal_${quizDoc.quizId}`)
+          .setLabel("立即公布答案並發獎金（限主辦人）")
+          .setEmoji("🏁")
+          .setStyle(ButtonStyle.Success)
+      );
+    }
+    ctrlRow.addComponents(
       new ButtonBuilder()
-        .setCustomId(`quiz_ans_${quizDoc.quizId}_${opt.key}`)
-        .setLabel(opt.key)
-        .setEmoji(OPTION_EMOJIS[opt.key])
-        .setStyle(locked ? ButtonStyle.Secondary : ButtonStyle.Primary)
-        .setDisabled(locked)
+        .setCustomId(`quiz_cancel_${quizDoc.quizId}`)
+        .setLabel("取消")
+        .setEmoji("🚫")
+        .setStyle(ButtonStyle.Danger)
     );
+    rows.push(ctrlRow);
+    return rows;
   }
-  const ctrlRow = new ActionRowBuilder();
-  if (locked) {
+
+  if (status === "LOCKED") {
+    if (prediction) {
+      // 預測：作答已截止，主辦人按 A/B/C/D 公布正確答案
+      const setAnsRow = new ActionRowBuilder();
+      for (const opt of quizDoc.options) {
+        setAnsRow.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`quiz_setans_${quizDoc.quizId}_${opt.key}`)
+            .setLabel(`公布 ${opt.key}`)
+            .setEmoji(OPTION_EMOJIS[opt.key])
+            .setStyle(ButtonStyle.Success)
+        );
+      }
+      setAnsRow.addComponents(
+        new ButtonBuilder()
+          .setCustomId(`quiz_cancel_${quizDoc.quizId}`)
+          .setLabel("取消")
+          .setEmoji("🚫")
+          .setStyle(ButtonStyle.Danger)
+      );
+      rows.push(setAnsRow);
+      return rows;
+    }
+    // 舊版問答（kind=quiz）在 LOCKED 狀態的相容路徑：保留公布答案/取消按鈕
+    const ctrlRow = new ActionRowBuilder();
     ctrlRow.addComponents(
       new ButtonBuilder()
         .setCustomId(`quiz_reveal_${quizDoc.quizId}`)
@@ -183,23 +266,19 @@ function buildActionRow(quizDoc) {
         .setEmoji("🏁")
         .setStyle(ButtonStyle.Success)
     );
-  } else {
     ctrlRow.addComponents(
       new ButtonBuilder()
-        .setCustomId(`quiz_lock_${quizDoc.quizId}`)
-        .setLabel("提早截止作答（限主辦人）")
-        .setEmoji("🔒")
-        .setStyle(ButtonStyle.Primary)
+        .setCustomId(`quiz_cancel_${quizDoc.quizId}`)
+        .setLabel("取消")
+        .setEmoji("🚫")
+        .setStyle(ButtonStyle.Danger)
     );
+    rows.push(ctrlRow);
+    return rows;
   }
-  ctrlRow.addComponents(
-    new ButtonBuilder()
-      .setCustomId(`quiz_cancel_${quizDoc.quizId}`)
-      .setLabel("取消問答")
-      .setEmoji("🚫")
-      .setStyle(ButtonStyle.Danger)
-  );
-  return [answerRow, ctrlRow];
+
+  // SETTLED / CANCELLED：不放任何按鈕
+  return [];
 }
 
 function validateInputs({
@@ -208,6 +287,7 @@ function validateInputs({
   correctKey,
   prizePool,
   minutes,
+  kind,
 }) {
   if (!question || question.length > MAX_QUESTION_LEN) {
     throw new Error(`題目長度需為 1 ~ ${MAX_QUESTION_LEN} 字。`);
@@ -220,8 +300,10 @@ function validateInputs({
       throw new Error(`選項 ${o.key} 內容需為 1 ~ ${MAX_OPTION_LEN} 字。`);
     }
   }
-  if (!options.some((o) => o.key === correctKey)) {
-    throw new Error(`正確答案 ${correctKey} 不在提供的選項中。`);
+  if (kind !== KIND_PREDICTION) {
+    if (!options.some((o) => o.key === correctKey)) {
+      throw new Error(`正確答案 ${correctKey} 不在提供的選項中。`);
+    }
   }
   if (!Number.isInteger(prizePool) || prizePool < 1) {
     throw new Error("獎金池需為 ≥ 1 的整數。");
@@ -241,13 +323,16 @@ async function createQuiz(client, opts) {
     correctKey,
     prizePool,
     minutes,
+    kind: rawKind,
   } = opts;
 
+  const kind = rawKind === KIND_PREDICTION ? KIND_PREDICTION : KIND_QUIZ;
+
   if (!client.quizGamesCollection) {
-    throw new Error("問答系統尚未啟動（資料庫未連線）");
+    throw new Error(`${kind === KIND_PREDICTION ? "預測" : "問答"}系統尚未啟動（資料庫未連線）`);
   }
 
-  validateInputs({ question, options, correctKey, prizePool, minutes });
+  validateInputs({ question, options, correctKey, prizePool, minutes, kind });
 
   const before = await client.userCoinsCollection.findOne({
     userId: host.id,
@@ -256,16 +341,18 @@ async function createQuiz(client, opts) {
   const balance = before?.totalCoins || 0;
   if (balance < prizePool) {
     throw new Error(
-      `餘額不足！問答需鎖定 ${prizePool.toLocaleString()} credits，目前 ${balance.toLocaleString()}。`
+      `餘額不足！需鎖定 ${prizePool.toLocaleString()} credits，目前 ${balance.toLocaleString()}。`
     );
   }
 
   const channel = await guild.channels.fetch(QUIZ_CHANNEL_ID).catch(() => null);
   if (!channel || !channel.isTextBased?.()) {
-    throw new Error(`找不到問答發布頻道（${QUIZ_CHANNEL_ID}），請聯絡舒舒。`);
+    throw new Error(
+      `找不到${kind === KIND_PREDICTION ? "預測" : "問答"}發布頻道（${QUIZ_CHANNEL_ID}），請聯絡舒舒。`
+    );
   }
 
-  const quizId = newQuizId(host.id);
+  const quizId = newQuizId(host.id, kind);
   const endsAt = new Date(Date.now() + minutes * 60 * 1000);
 
   const debit = await grantCoins(client, {
@@ -276,14 +363,15 @@ async function createQuiz(client, opts) {
     amount: -prizePool,
     source: "event_host_lock",
     member,
-    meta: { quizId, question },
+    meta: { quizId, question, kind },
   });
   if (!debit) {
-    throw new Error("扣款失敗，問答未建立。");
+    throw new Error("扣款失敗，未建立。");
   }
 
   const quizDoc = {
     quizId,
+    kind,
     guildId: guild.id,
     channelId: channel.id,
     messageId: null,
@@ -291,7 +379,7 @@ async function createQuiz(client, opts) {
     hostName: member?.displayName || host.username,
     question,
     options,
-    correctKey,
+    correctKey: kind === KIND_PREDICTION ? null : correctKey,
     prizePool,
     endsAt,
     status: "ACTIVE",
@@ -301,8 +389,9 @@ async function createQuiz(client, opts) {
   };
 
   try {
+    const label = kind === KIND_PREDICTION ? "預測" : "問答";
     const msg = await channel.send({
-      content: `📣 新問答！答對者平分 **${prizePool.toLocaleString()}** credits 獎金池。`,
+      content: `📣 新${label}！答對者平分 **${prizePool.toLocaleString()}** credits 獎金池。`,
       embeds: [buildActiveEmbed(quizDoc)],
       components: buildActionRow(quizDoc),
     });
@@ -315,7 +404,7 @@ async function createQuiz(client, opts) {
       guildId: guild.id,
       amount: prizePool,
       source: "event_refund",
-      meta: { quizId, reason: "create_rollback" },
+      meta: { quizId, reason: "create_rollback", kind },
     }).catch(() => {});
     throw err;
   }
@@ -333,20 +422,16 @@ async function refreshQuizMessage(client, quizDoc) {
   if (!msg) return null;
 
   let embed;
-  let components;
   if (quizDoc.status === "ACTIVE") {
     embed = buildActiveEmbed(quizDoc);
-    components = buildActionRow(quizDoc);
   } else if (quizDoc.status === "LOCKED") {
     embed = buildLockedEmbed(quizDoc);
-    components = buildActionRow(quizDoc);
   } else if (quizDoc.status === "SETTLED") {
     embed = buildSettledEmbed(quizDoc);
-    components = [];
   } else {
     embed = buildCancelledEmbed(quizDoc);
-    components = [];
   }
+  const components = buildActionRow(quizDoc);
 
   await msg.edit({ embeds: [embed], components }).catch(() => {});
   return msg;
@@ -372,7 +457,7 @@ async function setAnswer(client, quizDoc, userId, key, displayName) {
 
 async function lockQuiz(client, quizDoc, reason = "manual") {
   if (quizDoc.status !== "ACTIVE") {
-    throw new Error("問答已不在作答中。");
+    throw new Error("已不在作答中。");
   }
   const updated = await client.quizGamesCollection.findOneAndUpdate(
     { _id: quizDoc._id, status: "ACTIVE" },
@@ -388,7 +473,7 @@ async function lockQuiz(client, quizDoc, reason = "manual") {
   );
   const doc = unwrap(updated);
   if (!doc) {
-    throw new Error("問答狀態已改變，無法截止作答。");
+    throw new Error("狀態已改變，無法截止作答。");
   }
 
   const msg = await refreshQuizMessage(client, doc);
@@ -400,7 +485,7 @@ async function lockQuiz(client, quizDoc, reason = "manual") {
         : "主辦人提早截止作答。";
     await msg
       .reply({
-        content: `${head} 問答「${doc.question}」${tip}\n等待主辦人 <@${doc.hostId}> 公布答案。`,
+        content: `${head} 預測「${doc.question}」${tip}\n等待主辦人 <@${doc.hostId}> 公布正確答案。`,
       })
       .catch(() => {});
   }
@@ -408,13 +493,16 @@ async function lockQuiz(client, quizDoc, reason = "manual") {
 }
 
 async function settleQuiz(client, quizDoc, reason = "manual") {
-  if (quizDoc.status === "ACTIVE") {
-    // 還在作答中 → 先鎖、再結算（保險路徑，主流程應該不會走到）
-    quizDoc = await lockQuiz(client, quizDoc, reason);
+  // quiz 類型可從 ACTIVE 直接結算；prediction 必須先 LOCKED 並具備 correctKey
+  if (quizDoc.status === "CANCELLED" || quizDoc.status === "SETTLED") {
+    throw new Error("已不在可結算的狀態。");
   }
-  if (quizDoc.status !== "LOCKED") {
-    throw new Error("問答已不在等待公布答案的狀態。");
+  if (!quizDoc.correctKey) {
+    throw new Error("尚未設定正確答案，無法結算。");
   }
+
+  const fromStatus = quizDoc.status; // "ACTIVE" or "LOCKED"
+  const settledAt = new Date();
 
   const answers = quizDoc.answers || {};
   const winnerIds = Object.entries(answers)
@@ -427,24 +515,28 @@ async function settleQuiz(client, quizDoc, reason = "manual") {
   const refund = quizDoc.prizePool - totalPaid;
   const winners = winnerIds.map((uid) => ({ userId: uid, prize: perWinnerPrize }));
 
+  const setFields = {
+    status: "SETTLED",
+    settledAt,
+    updatedAt: settledAt,
+    winners,
+    perWinnerPrize,
+    totalPaid,
+    settleReason: reason,
+  };
+  if (fromStatus === "ACTIVE") {
+    setFields.lockedAt = settledAt;
+    setFields.lockReason = reason;
+  }
+
   const updated = await client.quizGamesCollection.findOneAndUpdate(
-    { _id: quizDoc._id, status: "LOCKED" },
-    {
-      $set: {
-        status: "SETTLED",
-        settledAt: new Date(),
-        updatedAt: new Date(),
-        winners,
-        perWinnerPrize,
-        totalPaid,
-        settleReason: reason,
-      },
-    },
+    { _id: quizDoc._id, status: fromStatus },
+    { $set: setFields },
     { returnDocument: "after" }
   );
   const doc = unwrap(updated);
   if (!doc) {
-    throw new Error("問答狀態已改變，無法結算。");
+    throw new Error("狀態已改變，無法結算。");
   }
 
   for (const w of winners) {
@@ -453,10 +545,10 @@ async function settleQuiz(client, quizDoc, reason = "manual") {
       guildId: quizDoc.guildId,
       amount: w.prize,
       source: "event_prize",
-      meta: { quizId: quizDoc.quizId, hostId: quizDoc.hostId, kind: "quiz" },
+      meta: { quizId: quizDoc.quizId, hostId: quizDoc.hostId, kind: getKind(doc) },
     }).catch((e) => {
       console.log(
-        `[ERROR] quiz prize payout failed (${quizDoc.quizId} user ${w.userId}): ${e}`.red
+        `[ERROR] ${getKind(doc)} prize payout failed (${quizDoc.quizId} user ${w.userId}): ${e}`.red
       );
     });
   }
@@ -467,26 +559,31 @@ async function settleQuiz(client, quizDoc, reason = "manual") {
       guildId: quizDoc.guildId,
       amount: refund,
       source: "event_refund",
-      meta: { quizId: quizDoc.quizId, reason: winnerCount === 0 ? "no_winner" : "leftover" },
+      meta: {
+        quizId: quizDoc.quizId,
+        reason: winnerCount === 0 ? "no_winner" : "leftover",
+        kind: getKind(doc),
+      },
     }).catch((e) => {
-      console.log(`[ERROR] quiz refund failed: ${e}`.red);
+      console.log(`[ERROR] ${getKind(doc)} refund failed: ${e}`.red);
     });
   }
 
   const msg = await refreshQuizMessage(client, doc);
 
   if (msg) {
+    const label = kindLabel(doc);
     let summary;
     if (winnerCount === 0) {
       summary =
-        `🏁 問答「${doc.question}」結束\n` +
+        `🏁 ${label}「${doc.question}」結束\n` +
         `正確答案：**${doc.correctKey}**\n` +
         `沒有人答對，獎金 ${doc.prizePool.toLocaleString()} credits 已退還主辦人 <@${doc.hostId}>。`;
       await msg.reply({ content: summary }).catch(() => {});
     } else {
       const mentions = winnerIds.map((id) => `<@${id}>`).join(" ");
       summary =
-        `🎉 問答「${doc.question}」結束！正確答案：**${doc.correctKey}**\n` +
+        `🎉 ${label}「${doc.question}」結束！正確答案：**${doc.correctKey}**\n` +
         `${winnerCount} 人答對，每人獲得 **${perWinnerPrize.toLocaleString()}** credits\n${mentions}` +
         (refund > 0 ? `\n（餘數 ${refund.toLocaleString()} 已退回主辦人）` : "");
       await msg
@@ -499,6 +596,30 @@ async function settleQuiz(client, quizDoc, reason = "manual") {
   }
 
   return doc;
+}
+
+async function setCorrectAnswerAndSettle(client, quizDoc, correctKey, reason = "manual") {
+  if (!isPrediction(quizDoc)) {
+    throw new Error("這不是預測，請直接公布答案。");
+  }
+  if (quizDoc.status !== "LOCKED") {
+    throw new Error("預測尚未截止作答，無法公布答案。");
+  }
+  if (!quizDoc.options.some((o) => o.key === correctKey)) {
+    throw new Error(`選項 ${correctKey} 不存在。`);
+  }
+
+  const updated = await client.quizGamesCollection.findOneAndUpdate(
+    { _id: quizDoc._id, status: "LOCKED" },
+    { $set: { correctKey, updatedAt: new Date() } },
+    { returnDocument: "after" }
+  );
+  const doc = unwrap(updated);
+  if (!doc) {
+    throw new Error("狀態已改變，無法公布答案。");
+  }
+
+  return settleQuiz(client, doc, reason);
 }
 
 async function cancelQuiz(client, quizDoc, actor) {
@@ -516,7 +637,7 @@ async function cancelQuiz(client, quizDoc, actor) {
   );
   const doc = unwrap(updated);
   if (!doc) {
-    throw new Error("問答已結束，無法取消。");
+    throw new Error("已結束，無法取消。");
   }
 
   await grantCoins(client, {
@@ -524,16 +645,17 @@ async function cancelQuiz(client, quizDoc, actor) {
     guildId: quizDoc.guildId,
     amount: quizDoc.prizePool,
     source: "event_refund",
-    meta: { quizId: quizDoc.quizId, reason: "host_cancelled" },
+    meta: { quizId: quizDoc.quizId, reason: "host_cancelled", kind: getKind(doc) },
   }).catch((e) => {
-    console.log(`[ERROR] quiz cancel refund failed: ${e}`.red);
+    console.log(`[ERROR] ${getKind(doc)} cancel refund failed: ${e}`.red);
   });
 
   const msg = await refreshQuizMessage(client, doc);
   if (msg) {
+    const label = kindLabel(doc);
     await msg
       .reply({
-        content: `🚫 問答「${doc.question}」已由主辦人取消，獎金已退還。`,
+        content: `🚫 ${label}「${doc.question}」已由主辦人取消，獎金已退還。`,
       })
       .catch(() => {});
   }
@@ -548,10 +670,15 @@ module.exports = {
   MAX_OPTION_LEN,
   OPTION_KEYS,
   OPTION_EMOJIS,
+  KIND_QUIZ,
+  KIND_PREDICTION,
+  isPrediction,
+  getKind,
   createQuiz,
   setAnswer,
   lockQuiz,
   settleQuiz,
+  setCorrectAnswerAndSettle,
   cancelQuiz,
   refreshQuizMessage,
   buildActiveEmbed,
