@@ -9,6 +9,8 @@ const { coinSystem } = require("../../config");
 const {
   createQuiz,
   KIND_QUIZ,
+  MODE_SPLIT,
+  MODE_SOLO,
   MIN_MINUTES,
   MAX_MINUTES,
   MAX_QUESTION_LEN,
@@ -22,10 +24,15 @@ const ANSWER_CHOICES = [
   { name: "D", value: "D" },
 ];
 
+const MODE_CHOICES = [
+  { name: "平分獎金（答對者平分）", value: MODE_SPLIT },
+  { name: "搶答獨佔（首位答對者獨得）", value: MODE_SOLO },
+];
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("問答")
-    .setDescription("發布一題有獎問答，答對者平分主辦人提供的獎金池 🎯")
+    .setDescription("發布一題有獎問答，可選擇平分獎金或搶答獨佔模式 🎯")
     .setContexts(InteractionContextType.Guild)
     .addStringOption((o) =>
       o
@@ -84,6 +91,13 @@ module.exports = {
         .setMinValue(MIN_MINUTES)
         .setMaxValue(MAX_MINUTES)
     )
+    .addStringOption((o) =>
+      o
+        .setName("模式")
+        .setDescription("獎金分配方式（預設：平分獎金）")
+        .setRequired(false)
+        .addChoices(...MODE_CHOICES)
+    )
     .toJSON(),
 
   run: async (client, interaction) => {
@@ -105,6 +119,7 @@ module.exports = {
       const optC = interaction.options.getString("選項c")?.trim() || null;
       const optD = interaction.options.getString("選項d")?.trim() || null;
       const minutes = interaction.options.getInteger("分鐘") ?? 1;
+      const mode = interaction.options.getString("模式") || MODE_SPLIT;
 
       const options = [
         { key: "A", text: optA },
@@ -130,10 +145,17 @@ module.exports = {
         prizePool,
         minutes,
         kind: KIND_QUIZ,
+        mode,
       });
+
+      const modeLine =
+        mode === MODE_SOLO
+          ? `⚡ 模式：搶答獨佔（首位答對者獨得全部獎金）\n`
+          : `🤝 模式：平分獎金（答對者平分獎金池）\n`;
 
       await interaction.editReply(
         `✅ 問答已發布！已鎖定 **${prizePool.toLocaleString()}** credits 作為獎金池。\n` +
+          modeLine +
           `📢 問答訊息：${message.url}\n` +
           `⏰ ${minutes} 分鐘後自動公布答案並結算（也可以隨時按「立即公布答案並發獎金」提早結算）。\n` +
           `問答 ID：\`${quizDoc.quizId}\``
@@ -147,6 +169,7 @@ module.exports = {
         msg.includes("正確答案") ||
         msg.includes("獎金") ||
         msg.includes("時間") ||
+        msg.includes("模式") ||
         msg.includes("問答發布頻道");
       if (!isUserError) {
         console.log(`[ERROR] /問答 開設:\n${error}\n${error.stack || ""}`.red);

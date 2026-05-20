@@ -20,8 +20,12 @@ const OPTION_EMOJIS = { A: "🇦", B: "🇧", C: "🇨", D: "🇩" };
 const KIND_QUIZ = "quiz";
 const KIND_PREDICTION = "prediction";
 
+const MODE_SPLIT = "split";
+const MODE_SOLO = "solo";
+
 const COLOR_ACTIVE = 0x5865f2;
 const COLOR_PREDICTION_ACTIVE = 0x9b59b6;
+const COLOR_SOLO_ACTIVE = 0xe67e22;
 const COLOR_LOCKED = 0xeb8f34;
 const COLOR_SETTLED = 0xfee75c;
 const COLOR_CANCELLED = 0xed4245;
@@ -32,6 +36,18 @@ function getKind(quizDoc) {
 
 function isPrediction(quizDoc) {
   return getKind(quizDoc) === KIND_PREDICTION;
+}
+
+function getMode(quizDoc) {
+  return quizDoc?.mode === MODE_SOLO ? MODE_SOLO : MODE_SPLIT;
+}
+
+function isSolo(quizDoc) {
+  return getMode(quizDoc) === MODE_SOLO && !isPrediction(quizDoc);
+}
+
+function modeLabel(quizDoc) {
+  return isSolo(quizDoc) ? "搶答獨佔" : "平分獎金";
 }
 
 function newQuizId(hostId, kind) {
@@ -52,26 +68,44 @@ function buildActiveEmbed(quizDoc) {
   const { question, options, prizePool, hostId, endsAt, answers = {} } = quizDoc;
   const answerCount = Object.keys(answers).length;
   const prediction = isPrediction(quizDoc);
+  const solo = isSolo(quizDoc);
 
   const optionLines = options
     .map((o) => `${OPTION_EMOJIS[o.key]} **${o.key}.** ${o.text}`)
     .join("\n");
 
-  const title = prediction ? `🔮 [預測] ${question}` : `❓ ${question}`;
+  const title = prediction
+    ? `🔮 [預測] ${question}`
+    : solo
+    ? `⚡ [搶答] ${question}`
+    : `❓ ${question}`;
   const footerTip = prediction
     ? "答對者平分獎金池（答案稍後由主辦人公布）"
+    : solo
+    ? "首位答對者獨得全部獎金"
     : "答對者平分獎金池";
 
+  const color = prediction
+    ? COLOR_PREDICTION_ACTIVE
+    : solo
+    ? COLOR_SOLO_ACTIVE
+    : COLOR_ACTIVE;
+
+  const fields = [
+    { name: "主辦人", value: `<@${hostId}>`, inline: true },
+    { name: "獎金池", value: `${prizePool.toLocaleString()} credits`, inline: true },
+    { name: "已作答人數", value: `${answerCount} 人`, inline: true },
+  ];
+  if (!prediction) {
+    fields.push({ name: "模式", value: modeLabel(quizDoc), inline: true });
+  }
+  fields.push({ name: "截止時間", value: formatEndsAt(endsAt), inline: false });
+
   return new EmbedBuilder()
-    .setColor(prediction ? COLOR_PREDICTION_ACTIVE : COLOR_ACTIVE)
+    .setColor(color)
     .setTitle(title)
     .setDescription(optionLines)
-    .addFields(
-      { name: "主辦人", value: `<@${hostId}>`, inline: true },
-      { name: "獎金池", value: `${prizePool.toLocaleString()} credits`, inline: true },
-      { name: "已作答人數", value: `${answerCount} 人`, inline: true },
-      { name: "截止時間", value: formatEndsAt(endsAt), inline: false }
-    )
+    .addFields(...fields)
     .setFooter({ text: `${kindLabel(quizDoc)} ID：${quizDoc.quizId}　提示：${footerTip}` })
     .setTimestamp(quizDoc.createdAt);
 }
@@ -133,12 +167,21 @@ function buildSettledEmbed(quizDoc) {
     })
     .join("\n");
 
+  const solo = isSolo(quizDoc);
   const winnersField = winners.length
     ? winners
-        .map((w) => `🎉 <@${w.userId}> — ${w.prize.toLocaleString()} credits`)
+        .map((w) =>
+          solo
+            ? `🏆 <@${w.userId}> 搶答成功 — ${w.prize.toLocaleString()} credits`
+            : `🎉 <@${w.userId}> — ${w.prize.toLocaleString()} credits`
+        )
         .join("\n")
         .slice(0, 1024)
     : "（無人答對，獎金已退回主辦人）";
+
+  const winnersHeader = solo
+    ? `搶答得獎者（獨得 ${perWinnerPrize.toLocaleString()} credits）`
+    : `得獎者（每人 ${perWinnerPrize.toLocaleString()} credits）`;
 
   const embed = new EmbedBuilder()
     .setColor(COLOR_SETTLED)
@@ -147,13 +190,16 @@ function buildSettledEmbed(quizDoc) {
     .addFields(
       { name: "主辦人", value: `<@${hostId}>`, inline: true },
       { name: "原始獎金池", value: `${prizePool.toLocaleString()} credits`, inline: true },
+      ...(!isPrediction(quizDoc)
+        ? [{ name: "模式", value: modeLabel(quizDoc), inline: true }]
+        : []),
       {
         name: "正確答案",
         value: `${OPTION_EMOJIS[correctKey]} **${correctKey}.** ${correctOpt?.text || ""}`,
         inline: false,
       },
       {
-        name: `得獎者（每人 ${perWinnerPrize.toLocaleString()} credits）`,
+        name: winnersHeader,
         value: winnersField,
         inline: false,
       }
@@ -287,6 +333,7 @@ function validateInputs({
   prizePool,
   minutes,
   kind,
+  mode,
 }) {
   if (!question || question.length > MAX_QUESTION_LEN) {
     throw new Error(`題目長度需為 1 ~ ${MAX_QUESTION_LEN} 字。`);
@@ -310,6 +357,12 @@ function validateInputs({
   if (!Number.isInteger(minutes) || minutes < MIN_MINUTES || minutes > MAX_MINUTES) {
     throw new Error(`時間需為 ${MIN_MINUTES} ~ ${MAX_MINUTES} 分鐘。`);
   }
+  if (mode && mode !== MODE_SPLIT && mode !== MODE_SOLO) {
+    throw new Error("模式只能是「平分獎金」或「搶答獨佔」。");
+  }
+  if (kind === KIND_PREDICTION && mode === MODE_SOLO) {
+    throw new Error("預測不支援搶答獨佔模式。");
+  }
 }
 
 async function createQuiz(client, opts) {
@@ -323,15 +376,22 @@ async function createQuiz(client, opts) {
     prizePool,
     minutes,
     kind: rawKind,
+    mode: rawMode,
   } = opts;
 
   const kind = rawKind === KIND_PREDICTION ? KIND_PREDICTION : KIND_QUIZ;
+  const mode =
+    kind === KIND_PREDICTION
+      ? MODE_SPLIT
+      : rawMode === MODE_SOLO
+      ? MODE_SOLO
+      : MODE_SPLIT;
 
   if (!client.quizGamesCollection) {
     throw new Error(`${kind === KIND_PREDICTION ? "預測" : "問答"}系統尚未啟動（資料庫未連線）`);
   }
 
-  validateInputs({ question, options, correctKey, prizePool, minutes, kind });
+  validateInputs({ question, options, correctKey, prizePool, minutes, kind, mode });
 
   const before = await client.userCoinsCollection.findOne({
     userId: host.id,
@@ -371,6 +431,7 @@ async function createQuiz(client, opts) {
   const quizDoc = {
     quizId,
     kind,
+    mode,
     guildId: guild.id,
     channelId: channel.id,
     messageId: null,
@@ -389,8 +450,12 @@ async function createQuiz(client, opts) {
 
   try {
     const label = kind === KIND_PREDICTION ? "預測" : "問答";
+    const intro =
+      mode === MODE_SOLO
+        ? `📣 新${label}（⚡ 搶答獨佔）！首位答對者獨得 **${prizePool.toLocaleString()}** credits！`
+        : `📣 新${label}！答對者平分 **${prizePool.toLocaleString()}** credits 獎金池。`;
     const msg = await channel.send({
-      content: `📣 新${label}！答對者平分 **${prizePool.toLocaleString()}** credits 獎金池。`,
+      content: intro,
       embeds: [buildActiveEmbed(quizDoc)],
       components: buildActionRow(quizDoc),
     });
@@ -451,7 +516,71 @@ async function setAnswer(client, quizDoc, userId, key, displayName) {
   );
   const doc = unwrap(updated);
   if (!doc) return { action: "closed", doc: quizDoc };
+
+  // 搶答獨佔模式：答對的第一人原子地拿下整個獎金池並立刻結算
+  if (isSolo(doc) && doc.correctKey && key === doc.correctKey) {
+    const settled = await trySettleSoloWinner(client, doc, userId);
+    if (settled) {
+      return { action: "solo_won", doc: settled };
+    }
+    const fresh = await client.quizGamesCollection.findOne({ _id: doc._id });
+    return { action: "too_late", doc: fresh || doc };
+  }
+
   return { action: "ok", doc };
+}
+
+async function trySettleSoloWinner(client, quizDoc, winnerUserId) {
+  const settledAt = new Date();
+  const winners = [{ userId: winnerUserId, prize: quizDoc.prizePool }];
+  const setFields = {
+    status: "SETTLED",
+    settledAt,
+    lockedAt: settledAt,
+    lockReason: "solo_win",
+    updatedAt: settledAt,
+    winners,
+    perWinnerPrize: quizDoc.prizePool,
+    totalPaid: quizDoc.prizePool,
+    settleReason: "solo_win",
+    soloWinnerId: winnerUserId,
+  };
+
+  const updated = await client.quizGamesCollection.findOneAndUpdate(
+    { _id: quizDoc._id, status: "ACTIVE" },
+    { $set: setFields },
+    { returnDocument: "after" }
+  );
+  const doc = unwrap(updated);
+  if (!doc) return null;
+
+  await grantCoins(client, {
+    userId: winnerUserId,
+    guildId: doc.guildId,
+    amount: doc.prizePool,
+    source: "event_prize",
+    meta: {
+      quizId: doc.quizId,
+      hostId: doc.hostId,
+      kind: getKind(doc),
+      mode: MODE_SOLO,
+    },
+  }).catch((e) => {
+    console.log(`[ERROR] solo prize payout failed (${doc.quizId}): ${e}`.red);
+  });
+
+  const msg = await refreshQuizMessage(client, doc);
+  if (msg) {
+    await msg
+      .reply({
+        content:
+          `🏆 問答「${doc.question}」搶答結束！正確答案：**${doc.correctKey}**\n` +
+          `<@${winnerUserId}> 搶答成功，獨得 **${doc.prizePool.toLocaleString()}** credits！`,
+        allowedMentions: { users: [winnerUserId] },
+      })
+      .catch(() => {});
+  }
+  return doc;
 }
 
 async function lockQuiz(client, quizDoc, reason = "manual") {
@@ -504,12 +633,29 @@ async function settleQuiz(client, quizDoc, reason = "manual") {
   const settledAt = new Date();
 
   const answers = quizDoc.answers || {};
-  const winnerIds = Object.entries(answers)
-    .filter(([, a]) => a.key === quizDoc.correctKey)
-    .map(([uid]) => uid);
+  const correctEntries = Object.entries(answers).filter(
+    ([, a]) => a.key === quizDoc.correctKey
+  );
+  const solo = isSolo(quizDoc);
+
+  let winnerIds;
+  if (solo) {
+    // 搶答獨佔：只取最早答對的那一位
+    const earliest = correctEntries
+      .map(([uid, a]) => ({ uid, ts: new Date(a.ts).getTime() }))
+      .sort((x, y) => x.ts - y.ts)[0];
+    winnerIds = earliest ? [earliest.uid] : [];
+  } else {
+    winnerIds = correctEntries.map(([uid]) => uid);
+  }
 
   const winnerCount = winnerIds.length;
-  const perWinnerPrize = winnerCount > 0 ? Math.floor(quizDoc.prizePool / winnerCount) : 0;
+  const perWinnerPrize =
+    winnerCount > 0
+      ? solo
+        ? quizDoc.prizePool
+        : Math.floor(quizDoc.prizePool / winnerCount)
+      : 0;
   const totalPaid = perWinnerPrize * winnerCount;
   const refund = quizDoc.prizePool - totalPaid;
   const winners = winnerIds.map((uid) => ({ userId: uid, prize: perWinnerPrize }));
@@ -579,6 +725,17 @@ async function settleQuiz(client, quizDoc, reason = "manual") {
         `正確答案：**${doc.correctKey}**\n` +
         `沒有人答對，獎金 ${doc.prizePool.toLocaleString()} credits 已退還主辦人 <@${doc.hostId}>。`;
       await msg.reply({ content: summary }).catch(() => {});
+    } else if (isSolo(doc)) {
+      const mentions = winnerIds.map((id) => `<@${id}>`).join(" ");
+      summary =
+        `🏆 ${label}「${doc.question}」搶答結束！正確答案：**${doc.correctKey}**\n` +
+        `${mentions} 搶答成功，獨得 **${perWinnerPrize.toLocaleString()}** credits！`;
+      await msg
+        .reply({
+          content: summary,
+          allowedMentions: { users: winnerIds },
+        })
+        .catch(() => {});
     } else {
       const mentions = winnerIds.map((id) => `<@${id}>`).join(" ");
       summary =
@@ -671,8 +828,13 @@ module.exports = {
   OPTION_EMOJIS,
   KIND_QUIZ,
   KIND_PREDICTION,
+  MODE_SPLIT,
+  MODE_SOLO,
   isPrediction,
+  isSolo,
   getKind,
+  getMode,
+  modeLabel,
   createQuiz,
   setAnswer,
   lockQuiz,

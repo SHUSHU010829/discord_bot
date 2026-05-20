@@ -75,6 +75,17 @@ async function handleAnswerButton(client, interaction) {
   if (result.action === "invalid") {
     return interaction.editReply("❌ 這個選項不存在。");
   }
+  if (result.action === "too_late") {
+    return interaction.editReply(
+      "💨 你也答對了，但已經有人比你早一步搶答完畢！下次手再快一點～"
+    );
+  }
+  if (result.action === "solo_won") {
+    const emoji = OPTION_EMOJIS[key] || "";
+    return interaction.editReply(
+      `🏆 搶答成功！你選了 ${emoji} **${key}**，獨得 **${result.doc.prizePool.toLocaleString()}** credits！`
+    );
+  }
 
   if (!previous) {
     refreshQuizMessage(client, result.doc).catch(() => {});
