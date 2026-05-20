@@ -5,7 +5,9 @@ const {
   setAnswer,
   lockQuiz,
   settleQuiz,
+  setCorrectAnswerAndSettle,
   cancelQuiz,
+  isPrediction,
   OPTION_EMOJIS,
 } = require("../../features/quiz/quizGame");
 const { consume } = require("../../utils/rateLimiter");
@@ -17,12 +19,17 @@ function isQuizInteraction(customId) {
       customId.startsWith("quiz_lock_") ||
       customId.startsWith("quiz_reveal_") ||
       customId.startsWith("quiz_end_") ||
+      customId.startsWith("quiz_setans_") ||
       customId.startsWith("quiz_cancel_"))
   );
 }
 
 async function loadQuiz(client, quizId) {
   return client.quizGamesCollection.findOne({ quizId });
+}
+
+function labelOf(doc) {
+  return isPrediction(doc) ? "預測" : "問答";
 }
 
 async function handleAnswerButton(client, interaction) {
@@ -36,19 +43,19 @@ async function handleAnswerButton(client, interaction) {
 
   const doc = await loadQuiz(client, quizId);
   if (!doc) {
-    return interaction.editReply("❌ 找不到這場問答。");
+    return interaction.editReply("❌ 找不到這場活動。");
   }
   if (doc.status === "LOCKED") {
     return interaction.editReply("🔒 作答已截止，等待主辦人公布答案。");
   }
   if (doc.status !== "ACTIVE") {
-    return interaction.editReply("❌ 問答已結束。");
+    return interaction.editReply(`❌ ${labelOf(doc)}已結束。`);
   }
   if (interaction.user.id === doc.hostId) {
-    return interaction.editReply("❌ 主辦人不能參加自己的問答。");
+    return interaction.editReply(`❌ 主辦人不能參加自己的${labelOf(doc)}。`);
   }
   if (new Date(doc.endsAt).getTime() <= Date.now()) {
-    return interaction.editReply("⏰ 答題時間已截止。");
+    return interaction.editReply("⏰ 作答時間已截止。");
   }
 
   const previous = doc.answers?.[interaction.user.id]?.key || null;
@@ -62,7 +69,7 @@ async function handleAnswerButton(client, interaction) {
   );
 
   if (result.action === "closed") {
-    return interaction.editReply("❌ 問答已結束，無法作答。");
+    return interaction.editReply("❌ 已結束，無法作答。");
   }
   if (result.action === "invalid") {
     return interaction.editReply("❌ 這個選項不存在。");
@@ -71,7 +78,7 @@ async function handleAnswerButton(client, interaction) {
   const emoji = OPTION_EMOJIS[key] || "";
   if (previous && previous !== key) {
     return interaction.editReply(
-      `✏️ 已將你的答案從 **${previous}** 改成 ${emoji} **${key}**。（時間到自動結算）`
+      `✏️ 已將你的答案從 **${previous}** 改成 ${emoji} **${key}**。`
     );
   }
   if (previous === key) {
@@ -87,21 +94,26 @@ async function handleLockButton(client, interaction) {
 
   const quizId = interaction.customId.slice("quiz_lock_".length);
   const doc = await loadQuiz(client, quizId);
-  if (!doc) return interaction.editReply("❌ 找不到問答。");
+  if (!doc) return interaction.editReply("❌ 找不到活動。");
   if (interaction.user.id !== doc.hostId) {
     return interaction.editReply("❌ 只有主辦人能截止作答。");
   }
   if (doc.status === "LOCKED") {
-    return interaction.editReply("ℹ️ 作答已經截止了，按「公布答案並發獎金」就會結算。");
+    return interaction.editReply("ℹ️ 作答已經截止了，請按「公布 A/B/C/D」其中一個公布答案並結算。");
   }
   if (doc.status !== "ACTIVE") {
-    return interaction.editReply("❌ 問答已結束。");
+    return interaction.editReply(`❌ ${labelOf(doc)}已結束。`);
+  }
+  if (!isPrediction(doc)) {
+    return interaction.editReply(
+      "ℹ️ 問答不需要分兩步——請直接按「立即公布答案並發獎金」結算。"
+    );
   }
 
   try {
     await lockQuiz(client, doc, "manual");
     await interaction.editReply(
-      `🔒 已截止作答。準備好就按「公布答案並發獎金」公布結果。`
+      `🔒 已截止作答。請按訊息上的「公布 A/B/C/D」公布正確答案並結算。`
     );
   } catch (err) {
     console.log(`[ERROR] quiz lock: ${err}\n${err.stack || ""}`.red);
@@ -110,9 +122,10 @@ async function handleLockButton(client, interaction) {
 }
 
 async function handleRevealButton(client, interaction) {
+  // 問答（kind=quiz）：從 ACTIVE 直接結算
+  // 舊版資料（沒有 kind 欄位 / 仍在 LOCKED 的問答）也走這條路徑
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  // 支援舊版 quiz_end_ 與新版 quiz_reveal_
   const prefix = interaction.customId.startsWith("quiz_reveal_")
     ? "quiz_reveal_"
     : "quiz_end_";
@@ -122,13 +135,13 @@ async function handleRevealButton(client, interaction) {
   if (interaction.user.id !== doc.hostId) {
     return interaction.editReply("❌ 只有主辦人能公布答案。");
   }
-  if (doc.status === "ACTIVE") {
-    return interaction.editReply(
-      "ℹ️ 還在作答中，請先按「提早截止作答」再公布答案，或等時間到自動截止。"
-    );
-  }
-  if (doc.status !== "LOCKED") {
+  if (doc.status === "SETTLED" || doc.status === "CANCELLED") {
     return interaction.editReply("❌ 問答已結束。");
+  }
+  if (isPrediction(doc)) {
+    return interaction.editReply(
+      "ℹ️ 這是預測，請按「公布 A/B/C/D」其中一個來宣告正確答案。"
+    );
   }
 
   try {
@@ -149,23 +162,67 @@ async function handleRevealButton(client, interaction) {
   }
 }
 
+async function handleSetAnswerButton(client, interaction) {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  // customId: quiz_setans_{quizId}_{key}
+  const rest = interaction.customId.slice("quiz_setans_".length);
+  const lastUnderscore = rest.lastIndexOf("_");
+  const quizId = rest.slice(0, lastUnderscore);
+  const key = rest.slice(lastUnderscore + 1);
+
+  const doc = await loadQuiz(client, quizId);
+  if (!doc) return interaction.editReply("❌ 找不到預測。");
+  if (interaction.user.id !== doc.hostId) {
+    return interaction.editReply("❌ 只有主辦人能公布答案。");
+  }
+  if (!isPrediction(doc)) {
+    return interaction.editReply("❌ 這不是預測。");
+  }
+  if (doc.status === "ACTIVE") {
+    return interaction.editReply(
+      "ℹ️ 還在作答中，請先按「提早截止作答」或等時間到自動截止後再公布答案。"
+    );
+  }
+  if (doc.status !== "LOCKED") {
+    return interaction.editReply("❌ 預測已結束。");
+  }
+
+  try {
+    const settled = await setCorrectAnswerAndSettle(client, doc, key, "manual");
+    const winners = settled.winners?.length || 0;
+    if (winners === 0) {
+      await interaction.editReply(
+        `🏁 已公布答案 **${key}** 並結算。沒有人答對，獎金 ${settled.prizePool.toLocaleString()} 已退還給你。`
+      );
+    } else {
+      await interaction.editReply(
+        `🏁 已公布答案 **${key}** 並結算！${winners} 人答對，每人 ${settled.perWinnerPrize.toLocaleString()} credits。`
+      );
+    }
+  } catch (err) {
+    console.log(`[ERROR] prediction setans: ${err}\n${err.stack || ""}`.red);
+    await interaction.editReply(`❌ ${err.message || err}`).catch(() => {});
+  }
+}
+
 async function handleCancelButton(client, interaction) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const quizId = interaction.customId.slice("quiz_cancel_".length);
   const doc = await loadQuiz(client, quizId);
-  if (!doc) return interaction.editReply("❌ 找不到問答。");
+  if (!doc) return interaction.editReply("❌ 找不到活動。");
   if (interaction.user.id !== doc.hostId) {
-    return interaction.editReply("❌ 只有主辦人能取消問答。");
+    return interaction.editReply(`❌ 只有主辦人能取消${labelOf(doc)}。`);
   }
-  if (doc.status !== "ACTIVE") {
-    return interaction.editReply("❌ 問答已結束，無法取消。");
+  if (doc.status !== "ACTIVE" && doc.status !== "LOCKED") {
+    return interaction.editReply(`❌ ${labelOf(doc)}已結束，無法取消。`);
   }
 
   try {
     const cancelled = await cancelQuiz(client, doc, interaction.user);
     await interaction.editReply(
-      `🚫 問答已取消，獎金 ${cancelled.prizePool.toLocaleString()} credits 已退還。`
+      `🚫 ${labelOf(cancelled)}已取消，獎金 ${cancelled.prizePool.toLocaleString()} credits 已退還。`
     );
   } catch (err) {
     console.log(`[ERROR] quiz cancel: ${err}\n${err.stack || ""}`.red);
@@ -194,6 +251,7 @@ module.exports = async (client, interaction) => {
 
   try {
     if (customId.startsWith("quiz_ans_")) return handleAnswerButton(client, interaction);
+    if (customId.startsWith("quiz_setans_")) return handleSetAnswerButton(client, interaction);
     if (customId.startsWith("quiz_lock_")) return handleLockButton(client, interaction);
     if (customId.startsWith("quiz_reveal_")) return handleRevealButton(client, interaction);
     if (customId.startsWith("quiz_end_")) return handleRevealButton(client, interaction);
@@ -202,10 +260,10 @@ module.exports = async (client, interaction) => {
     console.log(`[ERROR] handleQuizInteraction (${customId}): ${error}\n${error.stack || ""}`.red);
     try {
       if (interaction.deferred || interaction.replied) {
-        await interaction.editReply({ content: "❌ 處理問答互動時發生錯誤。" });
+        await interaction.editReply({ content: "❌ 處理互動時發生錯誤。" });
       } else {
         await interaction.reply({
-          content: "❌ 處理問答互動時發生錯誤。",
+          content: "❌ 處理互動時發生錯誤。",
           flags: MessageFlags.Ephemeral,
         });
       }
