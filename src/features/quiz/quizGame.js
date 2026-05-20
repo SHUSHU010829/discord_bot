@@ -198,7 +198,6 @@ function buildActionRow(quizDoc) {
       answerRow.addComponents(
         new ButtonBuilder()
           .setCustomId(`quiz_ans_${quizDoc.quizId}_${opt.key}`)
-          .setLabel(opt.key)
           .setEmoji(OPTION_EMOJIS[opt.key])
           .setStyle(ButtonStyle.Primary)
       );
