@@ -55,7 +55,7 @@ async function handleAnswerButton(client, interaction) {
   if (interaction.user.id === doc.hostId) {
     return interaction.editReply(`❌ 主辦人不能參加自己的${labelOf(doc)}。`);
   }
-  if (new Date(doc.endsAt).getTime() <= Date.now()) {
+  if (doc.endsAt && new Date(doc.endsAt).getTime() <= Date.now()) {
     return interaction.editReply("⏰ 作答時間已截止。");
   }
 

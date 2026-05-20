@@ -86,7 +86,9 @@ module.exports = {
     .addIntegerOption((o) =>
       o
         .setName("分鐘")
-        .setDescription(`答題時間（${MIN_MINUTES} ~ ${MAX_MINUTES} 分鐘，預設 1）`)
+        .setDescription(
+          `答題時間（${MIN_MINUTES} ~ ${MAX_MINUTES} 分鐘，預設：平分 1 分鐘 / 搶答 無限）`
+        )
         .setRequired(false)
         .setMinValue(MIN_MINUTES)
         .setMaxValue(MAX_MINUTES)
@@ -118,8 +120,11 @@ module.exports = {
       const optB = interaction.options.getString("選項b").trim();
       const optC = interaction.options.getString("選項c")?.trim() || null;
       const optD = interaction.options.getString("選項d")?.trim() || null;
-      const minutes = interaction.options.getInteger("分鐘") ?? 1;
       const mode = interaction.options.getString("模式") || MODE_SPLIT;
+      const minutesOpt = interaction.options.getInteger("分鐘");
+      // 搶答獨佔模式預設不限時，平分模式預設 1 分鐘
+      const minutes =
+        minutesOpt ?? (mode === MODE_SOLO ? null : 1);
 
       const options = [
         { key: "A", text: optA },
@@ -153,11 +158,16 @@ module.exports = {
           ? `⚡ 模式：搶答獨佔（首位答對者獨得全部獎金）\n`
           : `🤝 模式：平分獎金（答對者平分獎金池）\n`;
 
+      const timeLine =
+        minutes === null
+          ? `♾️ 不限時間，請按「立即公布答案並發獎金」結算（或等首位答對者觸發搶答獨佔結算）。\n`
+          : `⏰ ${minutes} 分鐘後自動公布答案並結算（也可以隨時按「立即公布答案並發獎金」提早結算）。\n`;
+
       await interaction.editReply(
         `✅ 問答已發布！已鎖定 **${prizePool.toLocaleString()}** credits 作為獎金池。\n` +
           modeLine +
           `📢 問答訊息：${message.url}\n` +
-          `⏰ ${minutes} 分鐘後自動公布答案並結算（也可以隨時按「立即公布答案並發獎金」提早結算）。\n` +
+          timeLine +
           `問答 ID：\`${quizDoc.quizId}\``
       );
     } catch (error) {
