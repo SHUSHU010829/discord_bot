@@ -99,7 +99,11 @@ function buildActiveEmbed(quizDoc) {
   if (!prediction) {
     fields.push({ name: "模式", value: modeLabel(quizDoc), inline: true });
   }
-  fields.push({ name: "截止時間", value: formatEndsAt(endsAt), inline: false });
+  fields.push({
+    name: "截止時間",
+    value: endsAt ? formatEndsAt(endsAt) : "♾️ 無時間限制（等待主辦人結算或首位答對者搶答）",
+    inline: false,
+  });
 
   return new EmbedBuilder()
     .setColor(color)
@@ -354,7 +358,19 @@ function validateInputs({
   if (!Number.isInteger(prizePool) || prizePool < 1) {
     throw new Error("獎金池需為 ≥ 1 的整數。");
   }
-  if (!Number.isInteger(minutes) || minutes < MIN_MINUTES || minutes > MAX_MINUTES) {
+  if (minutes === null || minutes === undefined) {
+    // null/undefined 代表不限時，僅問答（搶答獨佔）允許
+    if (kind === KIND_PREDICTION) {
+      throw new Error("預測必須指定答題時間。");
+    }
+    if (mode !== MODE_SOLO) {
+      throw new Error("不限時答題只有搶答獨佔模式支援。");
+    }
+  } else if (
+    !Number.isInteger(minutes) ||
+    minutes < MIN_MINUTES ||
+    minutes > MAX_MINUTES
+  ) {
     throw new Error(`時間需為 ${MIN_MINUTES} ~ ${MAX_MINUTES} 分鐘。`);
   }
   if (mode && mode !== MODE_SPLIT && mode !== MODE_SOLO) {
@@ -412,7 +428,10 @@ async function createQuiz(client, opts) {
   }
 
   const quizId = newQuizId(host.id, kind);
-  const endsAt = new Date(Date.now() + minutes * 60 * 1000);
+  const endsAt =
+    minutes === null || minutes === undefined
+      ? null
+      : new Date(Date.now() + minutes * 60 * 1000);
 
   const debit = await grantCoins(client, {
     userId: host.id,

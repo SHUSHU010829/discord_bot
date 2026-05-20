@@ -34,8 +34,9 @@ async function processExpiredQuizzes(client) {
   // 1) 作答時間到的 ACTIVE：
   //    - 問答 (kind=quiz 或舊資料): 直接結算
   //    - 預測 (kind=prediction): 鎖住等待主辦人公布答案
+  // endsAt: null 代表不限時的搶答獨佔，由首位答對者或主辦人手動結算，不在這裡處理
   const toHandle = await client.quizGamesCollection
-    .find({ status: "ACTIVE", endsAt: { $lte: new Date() } })
+    .find({ status: "ACTIVE", endsAt: { $ne: null, $lte: new Date() } })
     .toArray();
   if (toHandle.length > 0) {
     console.log(`[QUIZ] ${toHandle.length} 個活動到期，自動處理中...`.yellow);
