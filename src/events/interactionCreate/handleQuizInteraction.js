@@ -8,6 +8,7 @@ const {
   setCorrectAnswerAndSettle,
   cancelQuiz,
   isPrediction,
+  refreshQuizMessage,
   OPTION_EMOJIS,
 } = require("../../features/quiz/quizGame");
 const { consume } = require("../../utils/rateLimiter");
@@ -73,6 +74,10 @@ async function handleAnswerButton(client, interaction) {
   }
   if (result.action === "invalid") {
     return interaction.editReply("❌ 這個選項不存在。");
+  }
+
+  if (!previous) {
+    refreshQuizMessage(client, result.doc).catch(() => {});
   }
 
   const emoji = OPTION_EMOJIS[key] || "";
